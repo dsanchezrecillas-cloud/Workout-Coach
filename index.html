@@ -18,6 +18,16 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);min-height:1
 .mono{font-family:var(--mono)}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* Exercise SVG animations */
+@keyframes pu{0%,100%{transform:translateY(0)}50%{transform:translateY(10px)}}
+@keyframes br{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+@keyframes pl{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes mc{0%{transform:translateY(0)}50%{transform:translateY(-10px)}100%{transform:translateY(0)}}
+@keyframes row{0%,100%{transform:translateX(0)}50%{transform:translateX(12px)}}
+@keyframes ov{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+@keyframes lu{0%,100%{transform:rotate(0deg)}50%{transform:rotate(20deg)}}
+@keyframes cr{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
 @keyframes slideup{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .fade{animation:fadein .25s cubic-bezier(.16,1,.3,1) both}
@@ -606,7 +616,12 @@ async function fetchSuggestion(){
     document.getElementById('coach-text').style.animation='';
     document.getElementById('coach-text').textContent=suggestion.message||'';
     if(suggestion.tip){document.getElementById('coach-tip').style.display='block';document.getElementById('coach-tip').textContent='💡 '+suggestion.tip;}
-  }catch(e){console.error(e);document.getElementById('coach-text').style.animation='';document.getElementById('coach-text').textContent='Nach dem ersten Workout gebe ich personalisierte Empfehlungen.';}
+  }catch(e){
+    console.error('Coach error:',e);
+    document.getElementById('coach-text').style.animation='';
+    document.getElementById('coach-text').textContent='Empfehlung konnte nicht geladen werden. ';
+    document.getElementById('coach-card').innerHTML += '<button onclick="fetchSuggestion()" style="color:var(--accent);font-size:12px;font-weight:600;background:none;border:none;cursor:pointer;padding:4px 0;display:block;margin-top:6px;font-family:var(--font)">↻ Erneut versuchen</button>';
+  }
   document.getElementById('coach-spinner').style.display='none';
 }
 
@@ -962,16 +977,192 @@ function addRep(side,delta){
   else document.getElementById('rep-display').textContent=timerReps[rk];
 }
 
+
+// ─── Exercise Illustrations ───────────────────────────────────────────────────
+function getExerciseSVG(name) {
+  const n = (name||'').toLowerCase();
+  const bg='#161625', ac='#a78bfa', am='#fbbf24', co='#34d399', bd='#1f1f35', rd='#fb923c';
+
+  const H=(cx,cy,r=7)=>`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${ac}"/>`;
+  const L=(x1,y1,x2,y2,c=ac,w=2.5)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
+  const D=(cx,cy,r=4,c=am)=>`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}"/>`;
+  const F=y=>`<line x1="10" y1="${y}" x2="150" y2="${y}" stroke="${bd}" stroke-width="1.5"/>`;
+  const W=(body,anim='')=>`<svg viewBox="0 0 160 90" style="width:100%;height:90px;border-radius:10px;display:block;margin-bottom:14px"><rect width="160" height="90" fill="${bg}" rx="10"/><style>${anim}</style>${body}</svg>`;
+
+  // Push-up (Liegestütz)
+  if (n.match(/push|liegest/)) return W(
+    `${F(75)}${H(35,52)}
+    ${L(35,59,120,59,ac,3)}
+    ${L(52,59,47,75)}${L(75,59,70,75)}
+    ${D(47,75)}${D(70,75)}${D(120,75)}
+    <g style="animation:pu 1.4s ease-in-out infinite;transform-origin:60px 67px">
+      <text x="138" y="52" fill="${am}" font-size="20" text-anchor="middle">↕</text>
+    </g>
+    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">LIEGESTÜTZ</text>`,
+    '@keyframes pu{0%,100%{transform:translateY(0)}50%{transform:translateY(9px)}}'
+  );
+
+  // Glute Bridge / Hip Thrust
+  if (n.match(/bridge|glute|hip|gesäß|po/)) return W(
+    `${F(75)}
+    ${H(25,58)}${L(25,65,75,65,ac,3)}
+    <g style="animation:br 1.4s ease-in-out infinite;transform-origin:75px 65px">
+      ${L(75,65,95,55,ac,3)}${L(95,55,110,65,ac,3)}
+    </g>
+    ${D(45,75)}${D(110,75)}
+    ${L(25,65,40,75)}${L(40,75,45,75,am,2)}
+    <path d="M50 65 Q80 35 95 55" stroke="${co}" stroke-width="2" fill="none" stroke-dasharray="5,3" style="animation:br 1.4s ease-in-out infinite"/>
+    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">GLUTE BRIDGE</text>`,
+    '@keyframes br{0%,100%{transform:translateY(8px)}50%{transform:translateY(-2px)}}'
+  );
+
+  // Plank
+  if (n.match(/plank|brett/)) return W(
+    `${F(75)}
+    ${H(30,50)}${L(30,57,130,57,ac,3)}
+    ${L(50,57,45,75)}${L(80,57,75,75)}
+    ${D(45,75)}${D(75,75)}${D(130,75)}
+    <circle cx="80" cy="57" r="5" fill="${co}" style="animation:pl 2s ease-in-out infinite"/>
+    <text x="105" y="48" fill="${am}" font-size="11" font-weight="bold" font-family="-apple-system,sans-serif">HALTEN</text>
+    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">PLANK</text>`,
+    '@keyframes pl{0%,100%{opacity:.4;r:3}50%{opacity:1;r:6}}'
+  );
+
+  // Row (Rudern)
+  if (n.match(/row|ruder|zug/)) return W(
+    `${H(35,30)}${L(35,37,35,60,ac,2.5)}
+    ${L(35,42,20,52)}${L(35,42,55,52,ac,2.5)}
+    ${L(35,60,25,75)}${L(35,60,45,75)}${D(25,75)}${D(45,75)}
+    <g style="animation:row 1.4s ease-in-out infinite">
+      ${L(55,52,100,52,am,3)}${D(100,52,5,co)}
+    </g>
+    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">ROW / RUDERN</text>`,
+    '@keyframes row{0%,100%{transform:translateX(0)}50%{transform:translateX(-18px)}}'
+  );
+
+  // Pull-up / Klimmzug
+  if (n.match(/pull|klimmzug|chin.*up/)) return W(
+    `<line x1="20" y1="8" x2="140" y2="8" stroke="${bd}" stroke-width="3"/>
+    ${D(80,8,4,am)}
+    <g style="animation:ov 1.5s ease-in-out infinite">
+      ${H(80,28)}${L(80,35,80,58,ac,2.5)}
+      ${L(80,42,65,35,ac,2)}${L(80,42,95,35,ac,2)}
+      ${L(80,58,70,72)}${L(80,58,90,72)}
+    </g>
+    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">KLIMMZUG</text>`,
+    '@keyframes ov{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}'
+  );
+
+  // Lunge / Ausfallschritt
+  if (n.match(/lunge|ausfallschritt/)) return W(
+    `${F(75)}${H(80,25)}
+    ${L(80,32,80,52,ac,2.5)}
+    ${L(80,38,65,48,ac,2)}
+    <g style="animation:lu 1.3s ease-in-out infinite;transform-origin:80px 52px">
+      ${L(80,52,60,75,ac,3)}
+    </g>
+    ${L(80,52,100,75,ac,3)}
+    ${D(60,75)}${D(100,75)}
+    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">AUSFALLSCHRITT</text>`,
+    '@keyframes lu{0%,100%{transform:rotate(0deg)}50%{transform:rotate(25deg)}}'
+  );
+
+  // Dead Bug / Core
+  if (n.match(/dead.*bug|käfer|crunch|bauch|core|ab/)) return W(
+    `${H(80,20)}${L(80,27,80,52,ac,2.5)}
+    <g style="animation:cr 1.5s ease-in-out infinite;transform-origin:80px 35px">
+      ${L(80,35,50,25,ac,2)}${L(50,25,40,40,ac,2)}
+    </g>
+    <g style="animation:cr 1.5s ease-in-out infinite reverse;transform-origin:80px 35px">
+      ${L(80,35,110,25,ac,2)}${L(110,25,120,40,ac,2)}
+    </g>
+    ${L(80,52,60,70,ac,2.5)}${L(80,52,100,70,ac,2.5)}
+    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">CORE / DEAD BUG</text>`,
+    '@keyframes cr{0%,100%{transform:translateY(0)rotate(0deg)}50%{transform:translateY(-10px)rotate(-15deg)}}'
+  );
+
+  // Mountain Climber
+  if (n.match(/mountain|bergsteig/)) return W(
+    `${F(75)}${H(30,48)}${L(30,55,120,55,ac,3)}
+    ${D(120,75)}
+    <g style="animation:mc 0.8s ease-in-out infinite">
+      ${L(65,55,55,75,ac,2.5)}
+    </g>
+    <g style="animation:mc 0.8s ease-in-out infinite reverse">
+      ${L(90,55,80,75,ac,2.5)}
+    </g>
+    ${D(30,75)}
+    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">MOUNTAIN CLIMBER</text>`,
+    '@keyframes mc{0%{transform:translateY(0)}50%{transform:translateY(-16px)}100%{transform:translateY(0)}}'
+  );
+
+  // Shoulder press / Overhead
+  if (n.match(/shoulder|schulter|overhead|pike.*push|drücken/)) return W(
+    `${H(80,30)}${L(80,37,80,58,ac,2.5)}
+    <g style="animation:ov 1.4s ease-in-out infinite">
+      ${L(80,44,60,35,ac,2)}${D(60,35,4,am)}
+      ${L(80,44,100,35,ac,2)}${D(100,35,4,am)}
+    </g>
+    ${L(80,58,65,75)}${L(80,58,95,75)}${D(65,75)}${D(95,75)}
+    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">SCHULTERDRÜCKEN</text>`,
+    '@keyframes ov{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}'
+  );
+
+  // Superman / Rücken
+  if (n.match(/superman|rücken|back.*ext/)) return W(
+    `${F(62)}${H(30,55)}${L(30,62,90,62,ac,3)}
+    <g style="animation:br 1.5s ease-in-out infinite">
+      ${L(90,62,120,52,ac,2.5)}${D(120,52,4,am)}
+      ${L(35,62,15,52,am,2)}${D(15,52,4,co)}
+    </g>
+    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">SUPERMAN / RÜCKEN</text>`,
+    '@keyframes br{0%,100%{transform:translateY(4px)}50%{transform:translateY(-4px)}}'
+  );
+
+  // Generic standing exercise
+  return W(
+    `${F(75)}${H(80,25)}${L(80,32,80,55,ac,2.5)}
+    <g style="animation:ov 1.5s ease-in-out infinite">
+      ${L(80,42,60,35,ac,2)}${L(80,42,100,35,ac,2)}
+    </g>
+    ${L(80,55,65,75)}${L(80,55,95,75)}${D(65,75)}${D(95,75)}
+    <circle cx="80" cy="50" r="22" stroke="${ac}" stroke-width="1" fill="none" stroke-dasharray="4,4" style="animation:pl 2s ease-in-out infinite"/>
+    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">ÜBUNG</text>`,
+    '@keyframes pl{0%,100%{opacity:.2}50%{opacity:.8}}'
+  );
+}
+
+function showExInfo(idx) {
+  currentExInfoIdx = idx;
+  const ex = currentExercises[idx];
+  if (!ex) return;
+  showExerciseModal(ex);
+}
+
+let currentExInfoIdx = 0;
+
+function showExerciseModal(ex) {
+  document.getElementById('modal-info-name').textContent = ex.name + (ex.bilateral ? ' (beidseitig)' : '');
+  // Add SVG illustration
+  const existing = document.getElementById('modal-info-svg');
+  if (existing) existing.remove();
+  const svgEl = document.createElement('div');
+  svgEl.id = 'modal-info-svg';
+  svgEl.innerHTML = getExerciseSVG(ex.name);
+  const content = document.getElementById('modal-info-content');
+  content.parentNode.insertBefore(svgEl, content);
+  content.textContent = ex.details || ex.tip || 'Keine Details verfügbar.';
+  const mEl = document.getElementById('modal-info-mistakes');
+  if (ex.mistakes) { mEl.style.display = 'block'; document.getElementById('modal-info-mistakes-text').textContent = ex.mistakes; } else mEl.style.display = 'none';
+  document.getElementById('modal-info-muscles').innerHTML = (ex.muscles || []).map(m => mkTag(m, '#a78bfa')).join(' ');
+  document.getElementById('modal-info').classList.add('open');
+}
+
 // ─── Exercise Info Modal ──────────────────────────────────────────────────────
 function showInfoModal(){
   const exList=isWarmupPhase?warmupExercises:currentExercises;
   const ex=exList[timerExIdx];if(!ex)return;
-  document.getElementById('modal-info-name').textContent=ex.name+(ex.bilateral?' (beidseitig)':'');
-  document.getElementById('modal-info-content').textContent=ex.details||ex.tip||'Keine Details verfügbar.';
-  const mEl=document.getElementById('modal-info-mistakes');
-  if(ex.mistakes){mEl.style.display='block';document.getElementById('modal-info-mistakes-text').textContent=ex.mistakes;}else mEl.style.display='none';
-  document.getElementById('modal-info-muscles').innerHTML=(ex.muscles||[]).map(m=>mkTag(m,'#a78bfa')).join(' ');
-  document.getElementById('modal-info').classList.add('open');
+  showExerciseModal(ex);
 }
 
 // ─── Swap Modal (during timer) ────────────────────────────────────────────────
