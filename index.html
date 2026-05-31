@@ -134,8 +134,19 @@ button:active:not(:disabled){transform:scale(.96)}
     </div>
   </div>
 
+  <div id="plan-home-card" style="display:none;margin-bottom:12px" class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:10px;color:var(--ac);letter-spacing:.1em;text-transform:uppercase;font-weight:600">📅 Trainingsplan</div>
+      <button onclick="show('s-plan')" style="font-size:12px;color:var(--ac);font-weight:600;background:none;border:none;cursor:pointer;font-family:var(--f)">Details →</button>
+    </div>
+    <div id="plan-home-today" style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:6px"></div>
+    <div id="plan-home-sub" style="font-size:12px;color:var(--mu);margin-bottom:12px"></div>
+    <button id="plan-home-btn" class="btn btn-ac" style="padding:12px">Einheit starten →</button>
+  </div>
+
   <div style="display:flex;gap:8px;margin-bottom:8px">
     <button onclick="startChat()" class="btn btn-ac" style="flex:1">🏋️ Mit Coach trainieren</button>
+    <button onclick="show('s-plan-create')" style="width:50px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:17px;flex-shrink:0">📅</button>
   </div>
   <div style="display:flex;gap:8px">
     <button onclick="showHistory()" id="hist-btn" style="display:none;flex:1;padding:13px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">📋 Verlauf</button>
@@ -297,6 +308,89 @@ button:active:not(:disabled){transform:scale(.96)}
   <div style="font-size:13px;color:var(--mu);margin-bottom:14px" id="lib-count"></div>
   <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px" id="lib-filter"></div>
   <div id="lib-list" style="display:flex;flex-direction:column;gap:7px"></div>
+</div>
+
+
+<!-- PLAN CREATE -->
+<div id="s-plan-create" class="screen">
+  <button class="back" onclick="show('s-home')">← zurück</button>
+  <div style="font-size:21px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px">Trainingsplan erstellen</div>
+  <div style="font-size:13px;color:var(--mu);margin-bottom:22px">Dein persönlicher Plan — wie Runna, nur für Zuhause</div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:11px">Dein Ziel</div>
+    <div style="display:flex;flex-wrap:wrap;gap:7px" id="goal-chips">
+      <button class="chip" onclick="selectPlanOption('goal','abnehmen',this)">🔥 Abnehmen</button>
+      <button class="chip" onclick="selectPlanOption('goal','kraft',this)">💪 Kraft & Muskel</button>
+      <button class="chip" onclick="selectPlanOption('goal','fitness',this)">⚡ Fitness & Ausdauer</button>
+      <button class="chip" onclick="selectPlanOption('goal','beweglich',this)">🧘 Beweglichkeit</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:11px">Dauer</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap" id="dur-plan-chips">
+      <button class="chip" onclick="selectPlanOption('weeks',4,this)">4 Wochen</button>
+      <button class="chip" onclick="selectPlanOption('weeks',6,this)">6 Wochen</button>
+      <button class="chip ac" onclick="selectPlanOption('weeks',8,this)">8 Wochen</button>
+      <button class="chip" onclick="selectPlanOption('weeks',12,this)">12 Wochen</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:11px">Einheiten pro Woche</div>
+    <div style="display:flex;gap:7px" id="freq-chips">
+      <button class="chip" onclick="selectPlanOption('daysPerWeek',2,this)">2×</button>
+      <button class="chip ac" onclick="selectPlanOption('daysPerWeek',3,this)">3×</button>
+      <button class="chip" onclick="selectPlanOption('daysPerWeek',4,this)">4×</button>
+      <button class="chip" onclick="selectPlanOption('daysPerWeek',5,this)">5×</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:22px">
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:11px">Zeit pro Einheit</div>
+    <div style="display:flex;gap:7px" id="time-chips">
+      <button class="chip" onclick="selectPlanOption('sessionMin',20,this)">20 min</button>
+      <button class="chip ac" onclick="selectPlanOption('sessionMin',30,this)">30 min</button>
+      <button class="chip" onclick="selectPlanOption('sessionMin',45,this)">45 min</button>
+    </div>
+  </div>
+
+  <button onclick="generatePlan()" class="btn btn-ac" id="gen-plan-btn">Plan erstellen →</button>
+</div>
+
+<!-- PLAN VIEW -->
+<div id="s-plan" class="screen">
+  <button class="back" onclick="show('s-home')">← zurück</button>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+    <div style="font-size:21px;font-weight:700;letter-spacing:-.02em">Mein Plan</div>
+    <button onclick="show('s-plan-create')" style="padding:7px 12px;border-radius:9px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">Neu</button>
+  </div>
+  <div id="plan-goal-label" style="font-size:13px;color:var(--mu);margin-bottom:18px"></div>
+
+  <!-- Progress bar -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div id="plan-progress-label" style="font-size:13px;font-weight:600;color:var(--tx)"></div>
+      <div id="plan-progress-pct" style="font-size:13px;color:var(--ac);font-weight:600"></div>
+    </div>
+    <div style="height:6px;border-radius:3px;background:var(--br)">
+      <div id="plan-progress-bar" style="height:6px;border-radius:3px;background:var(--ac);transition:width .5s"></div>
+    </div>
+    <div id="plan-dates" style="font-size:11px;color:var(--mu);margin-top:8px"></div>
+  </div>
+
+  <!-- This week -->
+  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px" id="plan-week-label"></div>
+
+  <!-- Week calendar strip -->
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:16px" id="plan-week-strip"></div>
+
+  <!-- Session list -->
+  <div id="plan-sessions" style="display:flex;flex-direction:column;gap:9px;margin-bottom:18px"></div>
+
+  <!-- Future weeks collapsed -->
+  <div id="plan-future" style="display:flex;flex-direction:column;gap:8px"></div>
 </div>
 
 <!-- SETTINGS -->
@@ -523,6 +617,7 @@ function updateHome(){
   document.getElementById('hist-btn').style.display=log.length>0?'block':'none';
   document.getElementById('bk-info').textContent=log.length+' Workouts';
   const key=loadKey();if(key)document.getElementById('key-inp').value=key;
+  updatePlanHomeCard();
   const h=new Date().getHours();
   document.getElementById('greeting').textContent=(h<12?'Guten Morgen':h<18?'Guten Tag':'Guten Abend')+', Dario.';
   if(last){document.getElementById('last-card').style.display='block';document.getElementById('l-name').textContent=(last.muscles||[]).join(', ')||'Workout';const rc=rpc(last.rpe);document.getElementById('l-tags').innerHTML=mkT(fmtD(last.date),'#64748b')+' '+mkT((last.durationMin||'?')+' min','#64748b')+' '+mkT('RPE '+last.rpe+'/10',rc)+(last.note?' '+mkT('📝','#64748b'):'');document.getElementById('l-rpe').textContent=last.rpe+'/10';document.getElementById('l-rpe').style.color=rc;}
@@ -577,72 +672,131 @@ function sendChat(){const v=document.getElementById('chat-in').value.trim();if(!
 async function sendChatMsg(msg){
   addUserMsg(msg);
   chatHistory.push({role:'user',content:msg});
-  // Remove old chips
   document.querySelectorAll('#chat-messages .chips-row').forEach(r=>r.remove());
 
   if(!loadKey()){addAIMsg('Bitte zuerst den API Key in den Einstellungen eintragen.',['Zu Einstellungen →']);return;}
 
-  // Show typing indicator
-  const typing=document.createElement('div');typing.className='msg ai';typing.style.cssText='color:var(--mu);font-size:22px;letter-spacing:4px';typing.textContent='···';document.getElementById('chat-messages').appendChild(typing);document.getElementById('chat-messages').scrollTop=9999;
+  const typing=document.createElement('div');
+  typing.className='msg ai';typing.style.cssText='color:var(--mu);font-size:20px;letter-spacing:3px';
+  typing.textContent='···';
+  document.getElementById('chat-messages').appendChild(typing);
+  document.getElementById('chat-messages').scrollTop=9999;
+
+  // Phase 1: Quick conversation — small response, NO workout generation
+  const convPrompt=`Du bist ein erfahrener Personal Trainer. Führe ein kurzes, freundliches Gespräch.
+
+Frage maximal 4 Dinge ab: Muskelgruppen/Ziel, Zeit, Equipment, Intensität.
+Wenn du genug weißt, setze ready:true und fasse kurz zusammen was du generieren wirst.
+
+Antworte NUR mit kompaktem JSON (kein Markdown):
+{"message":"Antwort DE","chips":["Option1","Option2"],"ready":false,"summary":""}
+
+Wenn ready:true, fülle summary mit: Ziel, Zeit, Equipment, Intensität.
+Trainingshistorie: ${histTxt()}`;
 
   try{
-    const sysPrompt=`Du bist ein erfahrener Personal Trainer. Führe ein kurzes, natürliches Gespräch um ein Workout zu erstellen.
-
-Frage maximal 4 Dinge ab: Muskelgruppen/Ziel, verfügbare Zeit, Equipment, Intensität.
-Wenn du genug weißt (nach 2-4 Nachrichten), generiere SOFORT ein komplettes Workout.
-
-Antworte IMMER mit JSON:
-{
-  "message": "Deine Trainer-Antwort auf Deutsch (locker, motivierend)",
-  "chips": ["Chip1", "Chip2"],
-  "ready": false,
-  "workout": null
-}
-
-Wenn ready=true, setze workout auf ein Array:
-[{"name":"...","duration":40,"rest":20,"icon":"◈","tip":"max 8 Wörter","muscles":["Brust"],"bilateral":false,"details":"Ausführung 1-2 Sätze","mistakes":"Häufigster Fehler","warmup":false,"alternatives":[{"name":"Alt 1","tip":"..."},{"name":"Alt 2","tip":"..."}]}]
-
-Warmup: füge 2-3 Übungen mit warmup:true, duration:25, rest:10 hinzu wenn sinnvoll.
-Knieschonend: ja. 5-8 Hauptübungen je nach verfügbarer Zeit.
-
-Historie des Nutzers:
-${histTxt()}`;
-
-    const raw=await callAPI(chatHistory, 3000, sysPrompt);
+    const raw=await callAPI(chatHistory, 400, convPrompt);
     typing.remove();
     const parsed=extractJSON(raw);
+    const resp=Array.isArray(parsed)?parsed[0]:parsed;
+    if(!resp||!resp.message)throw new Error('Keine Antwort');
 
-    // Handle array (workout direct) or object (chat response)
-    let resp;
-    if(Array.isArray(parsed)){
-      resp={message:'Workout erstellt!',chips:[],ready:true,workout:parsed};
-    } else {
-      resp=parsed;
-      if(typeof resp.workout==='string'){try{resp.workout=JSON.parse(resp.workout);}catch{resp.workout=null;}}
-    }
-    if(!resp||(!resp.message&&!resp.ready))throw new Error('Ungültige Antwort vom Coach');
+    chatHistory.push({role:'assistant',content:resp.message});
+    addAIMsg(resp.message, resp.chips||[]);
 
-    chatHistory.push({role:'assistant',content:resp.message||''});
-    addAIMsg(resp.message||'Verstanden!', resp.chips||[]);
-
-    if(resp.ready&&resp.workout&&resp.workout.length>0){
-      const ex=(resp.workout||[]).filter(e=>!e.warmup);
-      const wu=(resp.workout||[]).filter(e=>e.warmup);
-      if(ex.length>0){
-        curExercises=ex;wuExercises=wu;
-        curSetup={muscles:[...new Set(ex.flatMap(e=>e.muscles||[]))],durationMin:Math.round(ex.length*3+wu.length)};
-        setTimeout(()=>{
-          addAIMsg('Workout fertig — schau es dir an! 💪', ['Los gehts →']);
-          document.getElementById('chat-messages').lastElementChild.querySelector('button').onclick=()=>showReview();
-        },500);
-      }
+    if(resp.ready){
+      chatContext.summary=resp.summary||resp.message;
+      // Show generate button
+      setTimeout(()=>{
+        const wrap=document.getElementById('chat-messages');
+        const btn=document.createElement('button');
+        btn.className='btn btn-ac fade';
+        btn.style.cssText='margin:6px 0;width:100%';
+        btn.textContent='💪 Workout erstellen';
+        btn.onclick=()=>{btn.remove();generateWorkoutFromChat();};
+        wrap.appendChild(btn);
+        wrap.scrollTop=9999;
+      },400);
     }
   }catch(e){
     typing.remove();
-    console.error('Chat error:',e);
-    const msg=e.message||'Unbekannter Fehler';
-    addAIMsg('Fehler: '+msg+'. Versuchen wir es nochmal.',['Ganzkörper','Oberkörper','Core']);
+    console.error('Chat:',e);
+    addAIMsg('Fehler: '+e.message,['Ganzkörper','Oberkörper','Core']);
   }
+}
+
+async function generateWorkoutFromChat(){
+  show('s-gen');
+  document.getElementById('gen-text').textContent='Workout wird erstellt';
+
+  // Phase 2: Workout generation — separate, simpler call
+  const summary=chatContext.summary||'Ganzkörper, 30 Minuten, Körpergewicht, mittlere Intensität';
+  const genPrompt=`Du bist ein erfahrener Fitness-Trainer. Erstelle ein Home-Workout auf Deutsch.
+
+Vorgaben: ${summary}
+Knieschonend: ja. Messbar: zählbare Übungen bevorzugen.
+5-7 Übungen, kein Equipment nötig sofern nicht anders angegeben.
+
+Antworte NUR mit einem JSON-Array (kein Markdown, kein Text davor/danach):
+[{"name":"Übungsname","duration":40,"rest":20,"icon":"◈","tip":"max 6 Wörter DE","muscles":["chest"],"bilateral":false,"details":"Ausführung in einem Satz","mistakes":"Häufigster Fehler","warmup":false}]
+
+Füge 2-3 Warmup-Übungen mit warmup:true, duration:25, rest:10 am Anfang hinzu.
+bilateral:true nur wenn Links/Rechts getrennt.
+Keine gleichen Muskelgruppen direkt hintereinander.`;
+
+  try{
+    const raw=await callAPI([{role:'user',content:'Erstelle das Workout.'}], 2000, genPrompt);
+    const parsed=extractJSON(raw);
+    // Normalize: handle various AI response formats
+    let arr=normalizeExercises(parsed);
+    if(!arr.length)throw new Error('Leeres Workout');
+    const ex=arr.filter(e=>!e.warmup);
+    const wu=arr.filter(e=>e.warmup);
+    if(ex.length===0)throw new Error('Keine Hauptübungen');
+    curExercises=ex;wuExercises=wu;
+    curSetup={
+      muscles:[...new Set(ex.flatMap(e=>e.muscles||[]))],
+      durationMin:Math.round((wu.length*35+ex.length*60)/60)
+    };
+    showReview();
+  }catch(e){
+    console.error('Generate:',e);
+    showErr('Workout konnte nicht erstellt werden: '+e.message);
+    show('s-chat');
+    addAIMsg('Das hat leider nicht geklappt ('+e.message+'). Soll ich es nochmal versuchen?',['Nochmal versuchen','Ganzkörper','Oberkörper']);
+    document.getElementById('chat-messages').querySelector('.btn-ac')?.remove();
+    const btn=document.createElement('button');
+    btn.className='btn btn-ac';btn.style.cssText='margin:6px 0;width:100%';btn.textContent='💪 Nochmal versuchen';
+    btn.onclick=()=>{btn.remove();generateWorkoutFromChat();};
+    document.getElementById('chat-messages').appendChild(btn);
+  }
+}
+
+// ─── Normalize exercise format ────────────────────────────────────────────────
+function normalizeExercises(raw){
+  let arr=[];
+  if(Array.isArray(raw))arr=raw;
+  else if(raw&&raw.workout&&Array.isArray(raw.workout))arr=raw.workout;
+  else if(raw&&raw.exercises&&Array.isArray(raw.exercises))arr=raw.exercises;
+  else if(raw&&raw.plan&&Array.isArray(raw.plan))arr=raw.plan;
+  else if(raw&&raw.training&&Array.isArray(raw.training))arr=raw.training;
+  else if(raw){
+    // Try any array-valued key
+    const key=Object.keys(raw).find(k=>Array.isArray(raw[k]));
+    if(key)arr=raw[key];else arr=[raw];
+  }
+  return arr.filter(Boolean).map(e=>({
+    name:e.name||e.exercise||e.title||e.Übung||'Unbekannte Übung',
+    duration:typeof e.duration==='number'?e.duration:40,
+    rest:typeof e.rest==='number'?e.rest:20,
+    icon:e.icon||'◈',
+    tip:e.tip||e.hint||e.cue||'',
+    muscles:Array.isArray(e.muscles)?e.muscles:e.muscle_groups||[],
+    bilateral:!!e.bilateral,
+    details:e.details||e.description||e.instructions||'',
+    mistakes:e.mistakes||e.common_mistakes||'',
+    warmup:!!e.warmup,
+  }));
 }
 
 // ─── Review ───────────────────────────────────────────────────────────────────
@@ -679,22 +833,31 @@ function showReview(){
 
 function cycleAlt(idx){
   const ex=curExercises[idx];
-  if(!ex||!ex.alternatives||!ex.alternatives.length){showErr('Keine Alternativen vorgeladen für diese Übung.');return;}
-  // Store alt index
-  if(ex._altIdx===undefined)ex._altIdx=0;else ex._altIdx=(ex._altIdx+1)%ex.alternatives.length;
-  const alt=ex.alternatives[ex._altIdx];
-  // Show alternative info
-  const card=document.getElementById('rev-'+idx);
-  const btn=document.getElementById('alt-btn-'+idx);
+  const muscles=ex.muscles||[];
+  // Find local alternatives from DEFAULT_LIB matching muscle group
+  const allEx=[...DEFAULT_LIB,...library];
+  const candidates=allEx.filter(e=>e.name!==ex.name&&(e.muscles||[]).some(m=>muscles.includes(m)));
+  if(!candidates.length){showErr('Keine Alternativen im Verzeichnis für diese Muskelgruppe.');return;}
+  ex._altIdx=((ex._altIdx||0)+1)%candidates.length;
+  const alt=candidates[ex._altIdx];
   const info=document.getElementById('alt-info-'+idx);
   info.style.display='block';
-  info.innerHTML=`<b style="color:var(--tx)">Alt: ${alt.name}</b> — ${alt.tip||''} <button onclick="applyAlt(${idx})" style="color:var(--ac);font-weight:600;font-size:12px;background:none;border:none;cursor:pointer;font-family:var(--f);margin-left:6px">Annehmen →</button>`;
+  info.innerHTML=`<b style="color:var(--tx)">${alt.name}</b>${alt.bilateral?' ↔':''} — ${alt.tip||''} <button onclick="applyLocalAlt(${idx})" style="color:var(--ac);font-weight:600;font-size:12px;background:none;border:none;cursor:pointer;font-family:var(--f);margin-left:6px">Annehmen →</button>`;
 }
 
-function applyAlt(idx){
+function applyLocalAlt(idx){
   const ex=curExercises[idx];
-  const alt=ex.alternatives[ex._altIdx||0];
-  curExercises[idx]={...ex,...alt,alternatives:ex.alternatives};
+  const muscles=ex.muscles||[];
+  const allEx=[...DEFAULT_LIB,...library];
+  const candidates=allEx.filter(e=>e.name!==ex.name&&(e.muscles||[]).some(m=>muscles.includes(m)));
+  const alt=candidates[ex._altIdx%candidates.length]||candidates[0];
+  if(!alt)return;
+  curExercises[idx]={
+    ...ex,
+    name:alt.name,tip:alt.tip,details:alt.details,mistakes:alt.mistakes,
+    muscles:alt.muscles,bilateral:alt.bilateral,icon:getExIcon(alt.name),
+    _altIdx:ex._altIdx
+  };
   showReview();
 }
 
@@ -868,7 +1031,10 @@ function initRating(){
 
 function saveWorkout(){
   log.push({id:Date.now(),date:new Date().toISOString(),muscles:curSetup.muscles||[],durationMin:curSetup.durationMin||20,exercises:curExercises,repLog:{...tReps},rpe,note:document.getElementById('rat-note').value.trim(),intensity:'medium'});
-  persist();updateHome();
+  const wid=log[log.length-1].id;
+  persist();
+  markPlanSessionDone(wid);
+  updateHome();
   setTimeout(fetchCoach,500);
   show('s-home');
 }
@@ -1009,9 +1175,245 @@ function saveKey(){const k=document.getElementById('key-inp').value.trim();saveA
 function doExport(){const b=new Blob([JSON.stringify({version:4,data:log,library,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='coach-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);}
 function doImport(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const p=JSON.parse(ev.target.result);const d=Array.isArray(p)?p:(p.data||[]);log=d.map(w=>({...w,repLog:w.repLog||{},note:w.note||''}));if(p.library)library=p.library;persist();saveLibrary();updateHome();alert('✓ '+log.length+' Workouts importiert.');}catch{alert('Ungültige Datei.');}};r.readAsText(f);}
 
+
+// ─── Training Plan ────────────────────────────────────────────────────────────
+const PLAN_KEY='coach_training_plan';
+const DOW_DE=['So','Mo','Di','Mi','Do','Fr','Sa'];
+const GOAL_LABELS={abnehmen:'🔥 Abnehmen',kraft:'💪 Kraft & Muskel',fitness:'⚡ Fitness',beweglich:'🧘 Beweglichkeit'};
+let trainingPlan=null;
+let planOptions={goal:null,weeks:8,daysPerWeek:3,sessionMin:30};
+
+function loadTrainingPlan(){try{return JSON.parse(localStorage.getItem(PLAN_KEY))||null;}catch{return null;}}
+function saveTrainingPlan(p){localStorage.setItem(PLAN_KEY,JSON.stringify(p));}
+
+function selectPlanOption(key,val,btn){
+  planOptions[key]=val;
+  const group=btn.parentElement;
+  group.querySelectorAll('.chip').forEach(b=>b.className='chip');
+  btn.className='chip ac';
+}
+
+function planDate(startIso,weekOffset,dow){
+  // dow: 0=Mo,1=Di,...,6=So
+  const REAL_DOW=[1,2,3,4,5,6,0]; // Mo=1,Di=2,...,So=0 in JS
+  const start=new Date(startIso);
+  const startDow=start.getDay(); // JS: 0=So
+  const startMonday=new Date(start);
+  startMonday.setDate(start.getDate()-(startDow===0?6:startDow-1));
+  const d=new Date(startMonday);
+  d.setDate(startMonday.getDate()+weekOffset*7+dow);
+  return d.toISOString().slice(0,10);
+}
+
+function todayIso(){return new Date().toISOString().slice(0,10);}
+
+function weekOfDate(startIso,dateIso){
+  const start=new Date(startIso);
+  const startMon=new Date(start);
+  const sd=start.getDay();startMon.setDate(start.getDate()-(sd===0?6:sd-1));
+  const d=new Date(dateIso);
+  return Math.floor((d-startMon)/(7*86400000));
+}
+
+async function generatePlan(){
+  if(!planOptions.goal){showErr('Bitte ein Ziel wählen');return;}
+  if(!loadKey()){showErr('API Key fehlt');return;}
+  const btn=document.getElementById('gen-plan-btn');
+  btn.textContent='Plan wird erstellt...';btn.disabled=true;
+  show('s-gen');document.getElementById('gen-text').textContent='Trainingsplan wird erstellt';
+
+  const goalLabel=GOAL_LABELS[planOptions.goal]||planOptions.goal;
+  const today=todayIso();
+
+  // Determine training days (spread evenly, no 3+ consecutive)
+  const dayMaps={2:[0,3],3:[0,2,4],4:[0,2,4,6],5:[0,1,3,4,6]}; // Mo=0,...So=6
+  const trainingDows=dayMaps[planOptions.daysPerWeek]||dayMaps[3];
+
+  const sysP=`Du bist ein erfahrener Personal Trainer. Erstelle einen strukturierten Trainingsplan.
+
+Gib für jede Einheit an: Fokus-Muskelgruppe und Intensität.
+Progression: Woche 1-2 leicht, 3-4 moderat, 5-6 intensiver, 7+ peak.
+Abwechslung: gleiche Muskelgruppe nicht 2x hintereinander.
+Ziel: ${goalLabel}, Knieschonend.
+
+Antworte NUR mit JSON-Array (kein Markdown):
+[{"week":1,"dow":0,"focus":"Oberkörper","intensity":"easy","note":"Eingewöhnung"}]
+
+dow: 0=Mo,1=Di,2=Mi,3=Do,4=Fr,5=Sa,6=So
+intensity: easy/medium/hard
+Exakt ${planOptions.weeks*planOptions.daysPerWeek} Einträge.`;
+
+  try{
+    const raw=await callAPI([{role:'user',content:'Erstelle den Plan.'}],1500,sysP);
+    const parsed=extractJSON(raw);
+    const sessions=Array.isArray(parsed)?parsed:(parsed.sessions||parsed.plan||[parsed]);
+    if(!sessions.length)throw new Error('Kein Plan generiert');
+
+    // Build full plan with dates
+    const fullSessions=[];
+    for(let w=0;w<planOptions.weeks;w++){
+      trainingDows.forEach((dow,di)=>{
+        const s=sessions.find(s2=>s2.week===w+1&&s2.dow===dow)||sessions[w*planOptions.daysPerWeek+di]||{};
+        fullSessions.push({
+          id:fullSessions.length,
+          week:w+1,
+          dow:dow,
+          date:planDate(today,w,dow),
+          focus:s.focus||'Ganzkörper',
+          intensity:s.intensity||'medium',
+          note:s.note||'',
+          done:false,
+          workoutId:null
+        });
+      });
+    }
+
+    trainingPlan={
+      id:Date.now(),
+      goal:planOptions.goal,
+      goalLabel:goalLabel,
+      startDate:today,
+      weeks:planOptions.weeks,
+      daysPerWeek:planOptions.daysPerWeek,
+      sessionMin:planOptions.sessionMin,
+      sessions:fullSessions
+    };
+    saveTrainingPlan(trainingPlan);
+    updateHome();
+    renderPlanView();
+    show('s-plan');
+  }catch(e){
+    console.error(e);
+    showErr('Plan konnte nicht erstellt werden: '+e.message);
+    btn.textContent='Plan erstellen →';btn.disabled=false;
+    show('s-plan-create');
+  }
+}
+
+function renderPlanView(){
+  if(!trainingPlan){show('s-plan-create');return;}
+  const p=trainingPlan;
+  const today=todayIso();
+  const done=p.sessions.filter(s=>s.done).length;
+  const total=p.sessions.length;
+  const pct=total>0?Math.round(done/total*100):0;
+  const curWeek=Math.max(1,Math.min(p.weeks,weekOfDate(p.startDate,today)+1));
+
+  // Header
+  document.getElementById('plan-goal-label').textContent=p.goalLabel+' · '+p.weeks+' Wochen · '+p.daysPerWeek+'× / Woche · '+p.sessionMin+' min';
+  document.getElementById('plan-progress-label').textContent='Woche '+curWeek+' von '+p.weeks;
+  document.getElementById('plan-progress-pct').textContent=pct+'%';
+  document.getElementById('plan-progress-bar').style.width=pct+'%';
+  const end=new Date(p.startDate);end.setDate(end.getDate()+p.weeks*7);
+  document.getElementById('plan-dates').textContent='Start: '+fmtD(p.startDate)+' · Ende: '+fmtD(end.toISOString());
+
+  // Week strip (current week)
+  const strip=document.getElementById('plan-week-strip');strip.innerHTML='';
+  const DAYS=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  for(let d=0;d<7;d++){
+    const date=planDate(p.startDate,curWeek-1,d);
+    const sess=p.sessions.find(s=>s.date===date);
+    const isToday=date===today;
+    const bg=sess?sess.done?'var(--co)':isToday?'var(--ac)':'rgba(167,139,250,.15)':'var(--up)';
+    const co=sess?sess.done?'#fff':isToday?'#fff':'var(--ac)':'var(--mu)';
+    const bdr=isToday?'2px solid var(--ac)':sess?'1px solid rgba(167,139,250,.3)':'1px solid var(--br)';
+    strip.innerHTML+=`<div style="aspect-ratio:1;border-radius:9px;background:${bg};border:${bdr};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+      <span style="font-size:8px;color:${co};font-weight:600">${DAYS[d]}</span>
+      <span style="font-size:10px;color:${co}">${sess?sess.done?'✓':'•':''}</span>
+    </div>`;
+  }
+
+  // This week's sessions
+  document.getElementById('plan-week-label').textContent='Woche '+curWeek;
+  const thisWeekSess=p.sessions.filter(s=>s.week===curWeek).sort((a,b)=>a.dow-b.dow);
+  const sessEl=document.getElementById('plan-sessions');sessEl.innerHTML='';
+  thisWeekSess.forEach(s=>{
+    const isToday=s.date===today;const isPast=s.date<today&&!s.done;
+    const intC=s.intensity==='easy'?'var(--co)':s.intensity==='hard'?'var(--hot)':'var(--am)';
+    const intL=s.intensity==='easy'?'Leicht':s.intensity==='hard'?'Intensiv':'Moderat';
+    const card=document.createElement('div');
+    card.className='card';
+    card.style.cssText=isToday?'border-color:rgba(167,139,250,.4);box-shadow:0 0 18px rgba(167,139,250,.12)':'';
+    card.innerHTML=`<div style="display:flex;align-items:center;gap:12px">
+      <div style="width:44px;height:44px;border-radius:10px;background:${s.done?'rgba(52,211,153,.15)':isToday?'rgba(167,139,250,.15)':'var(--up)'};border:1px solid ${s.done?'rgba(52,211,153,.3)':isToday?'rgba(167,139,250,.3)':'var(--br)'};display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
+        <span style="font-size:9px;color:var(--mu);font-weight:600">${DAYS[s.dow]}</span>
+        <span style="font-size:11px;font-weight:700;color:${s.done?'var(--co)':isToday?'var(--ac)':'var(--su)'}">${s.done?'✓':new Date(s.date).getDate()}</span>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'};margin-bottom:3px">${s.focus}</div>
+        <div style="display:flex;gap:5px;align-items:center">
+          <span class="tag" style="background:${intC}18;color:${intC}">${intL}</span>
+          <span class="tag" style="background:var(--up);color:var(--mu)">${p.sessionMin} min</span>
+          ${s.note?`<span style="font-size:11px;color:var(--mu)">${s.note}</span>`:''}
+        </div>
+      </div>
+      ${s.done?`<span style="font-size:20px;color:var(--co)">✓</span>`:
+        `<button onclick="startPlannedSession(${s.id})" style="padding:9px 14px;border-radius:10px;background:${isToday?'var(--ac)':'var(--up)'};border:1px solid ${isToday?'rgba(167,139,250,.4)':'var(--br)'};color:${isToday?'#fff':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f);white-space:nowrap">${isToday?'Starten':'Start'}</button>`}
+    </div>`;
+    sessEl.appendChild(card);
+  });
+
+  // Future weeks summary
+  const futureEl=document.getElementById('plan-future');futureEl.innerHTML='';
+  for(let w=curWeek+1;w<=Math.min(p.weeks,curWeek+3);w++){
+    const wSess=p.sessions.filter(s=>s.week===w);
+    const focusList=[...new Set(wSess.map(s=>s.focus))].join(', ');
+    futureEl.innerHTML+=`<div class="card" style="opacity:.6">
+      <div style="font-size:12px;font-weight:600;color:var(--su)">Woche ${w}</div>
+      <div style="font-size:12px;color:var(--mu);margin-top:3px">${focusList}</div>
+    </div>`;
+  }
+
+  show('s-plan');
+}
+
+function startPlannedSession(sessionId){
+  if(!trainingPlan)return;
+  const sess=trainingPlan.sessions.find(s=>s.id===sessionId);
+  if(!sess)return;
+  // Pre-fill chat context and jump to workout generation
+  chatHistory=[];chatContext={
+    summary:`${sess.focus}, ${trainingPlan.sessionMin} Minuten, Körpergewicht, ${sess.intensity==='easy'?'leichte':sess.intensity==='hard'?'intensive':'moderate'} Intensität`,
+    plannedSessionId:sessionId
+  };
+  generateWorkoutFromChat();
+}
+
+function markPlanSessionDone(workoutId){
+  // Called after saving workout — mark planned session as done if applicable
+  if(!trainingPlan||!chatContext.plannedSessionId)return;
+  const sess=trainingPlan.sessions.find(s=>s.id===chatContext.plannedSessionId);
+  if(sess){sess.done=true;sess.workoutId=workoutId;}
+  saveTrainingPlan(trainingPlan);
+  chatContext.plannedSessionId=null;
+}
+
+function updatePlanHomeCard(){
+  if(!trainingPlan){document.getElementById('plan-home-card').style.display='none';return;}
+  const today=todayIso();
+  const todaySess=trainingPlan.sessions.find(s=>s.date===today&&!s.done);
+  const nextSess=trainingPlan.sessions.find(s=>s.date>=today&&!s.done);
+  const card=document.getElementById('plan-home-card');
+  card.style.display='block';
+  if(todaySess){
+    document.getElementById('plan-home-today').textContent='Heutiges Training: '+todaySess.focus;
+    document.getElementById('plan-home-sub').textContent='Woche '+todaySess.week+' · '+trainingPlan.sessionMin+' min · '+(todaySess.intensity==='easy'?'Leicht':todaySess.intensity==='hard'?'Intensiv':'Moderat');
+    document.getElementById('plan-home-btn').textContent='Einheit starten →';
+    document.getElementById('plan-home-btn').onclick=()=>startPlannedSession(todaySess.id);
+  }else if(nextSess){
+    const d=new Date(nextSess.date);
+    document.getElementById('plan-home-today').textContent='Nächste Einheit: '+nextSess.focus;
+    document.getElementById('plan-home-sub').textContent=d.toLocaleDateString('de-DE',{weekday:'long'})+' · Woche '+nextSess.week;
+    document.getElementById('plan-home-btn').textContent='Plan anzeigen →';
+    document.getElementById('plan-home-btn').onclick=()=>renderPlanView();
+  }else{
+    card.style.display='none';
+  }
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
-  log=loadLog();library=loadLibrary();
+  log=loadLog();library=loadLibrary();trainingPlan=loadTrainingPlan();
   updateHome();
   if(loadKey()&&log.length>=1)setTimeout(fetchCoach,800);
   document.querySelectorAll('.modal-ov').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
