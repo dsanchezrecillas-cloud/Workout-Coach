@@ -232,7 +232,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <!-- Controls -->
   <div style="display:flex;gap:8px;margin-bottom:8px">
     <button id="timer-main-btn" class="btn btn-accent" style="flex:1">Start</button>
-    <button id="skip-btn" onclick="skipExercise()" style="display:none;width:52px;border-radius:14px;background:var(--elevated);border:1px solid var(--border);color:var(--muted);font-size:18px;flex-shrink:0" title="Übung skippen">⏭</button>
+    <button id="skip-btn" onclick="skipExercise()" style="width:52px;border-radius:14px;background:var(--elevated);border:1px solid var(--border);color:var(--muted);font-size:18px;flex-shrink:0;opacity:0;pointer-events:none;transition:opacity .2s" title="Übung skippen">⏭</button>
   </div>
   <button id="end-early-btn" onclick="endEarly()" style="display:none;width:100%;padding:12px;border-radius:12px;background:transparent;border:1px solid rgba(251,146,60,.3);color:var(--hot);font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase">✕ Training beenden</button>
 </div>
@@ -584,9 +584,10 @@ function updateTimerUI(){
 
   // Skip & end early buttons
   const skipBtn=document.getElementById('skip-btn'),endBtn=document.getElementById('end-early-btn');
-  const isActive=timerStatus==='work'||timerStatus==='rest'||timerStatus==='round_rest';
-  skipBtn.style.display=(timerStatus==='work'&&timerRunning)?'flex':'none';
-  endBtn.style.display=isActive?'block':'none';
+  const showSkip=timerStatus==='work'&&timerRunning;
+  skipBtn.style.opacity=showSkip?'1':'0';
+  skipBtn.style.pointerEvents=showSkip?'auto':'none';
+  endBtn.style.display=(timerStatus==='work'||timerStatus==='rest'||timerStatus==='round_rest')?'block':'none';
 
   // Main button
   const btn=document.getElementById('timer-main-btn');
@@ -677,10 +678,14 @@ async function showSwapModal(){
       'Muskelgruppen: '+(ex.muscles||[]).join(', ')+'\n'+
       'Equipment: '+buildEqText(currentSetup.equipment)+'\n'+
       'Knieschonend: ja\n\n'+
-      'Antworte NUR mit einem JSON-Objekt:\n'+
+      'Antworte NUR mit einem JSON-Objekt (kein Array, kein Markdown):\n'+
       '{"name":"...","duration":'+ex.duration+',"rest":'+ex.rest+',"icon":"◈","tip":"max 8 Wörter DE","muscles":["Brust"],"bilateral":false,"details":"Ausführung in 1-2 Sätzen","mistakes":"Häufigster Fehler"}'
     }],400);
-    pendingSwap=extractJSON(raw);
+    // Handle both object and array responses
+    let parsed=extractJSON(raw);
+    if(Array.isArray(parsed))parsed=parsed[0];
+    if(!parsed||!parsed.name)throw new Error('Kein gültiger Vorschlag');
+    pendingSwap=parsed;
     document.getElementById('swap-ex-name').textContent=pendingSwap.name+(pendingSwap.bilateral?' ↔':'');
     document.getElementById('swap-ex-tip').textContent=pendingSwap.tip||'';
     document.getElementById('swap-ex-details').textContent=pendingSwap.details||'';
