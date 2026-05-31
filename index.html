@@ -396,20 +396,24 @@ function showErr(msg){document.getElementById('err-txt').textContent=msg;documen
 function hideErr(){document.getElementById('err').style.display='none';}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 
-// ─── Wake Lock ────────────────────────────────────────────────────────────────
-async function reqWL(){try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch{}}
-function relWL(){try{wakeLock?.release();wakeLock=null;}catch{}}
+
+
 
 // ─── API ──────────────────────────────────────────────────────────────────────
-async function callAPI(messages, maxT=800){
+async function callAPI(messages, maxT=800, system=''){
   const key=loadKey();
-  const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key},body:JSON.stringify({model:MODEL,max_tokens:maxT,messages})});
+  const body={model:MODEL,max_tokens:maxT,messages};
+  if(system)body.system=system;
+  const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key},body:JSON.stringify(body)});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'HTTP '+res.status);}
   const d=await res.json();
   return(d.content||[]).find(b=>b.type==='text')?.text||'';
 }
 
-// ─── Beep ─────────────────────────────────────────────────────────────────────
+// ─── Wake Lock ────────────────────────────────────────────────────────────────
+async function reqWL(){try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch{}}
+function relWL(){try{wakeLock?.release();wakeLock=null;}catch{}}
+
 function beep(f,d){try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency.value=f;g.gain.setValueAtTime(.22,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+d);o.start(audioCtx.currentTime);o.stop(audioCtx.currentTime+d);}catch{}}
 
 // ─── Bar chart ────────────────────────────────────────────────────────────────
@@ -595,7 +599,7 @@ Knieschonend: ja. 5-8 Hauptübungen je nach verfügbarer Zeit.
 Historie des Nutzers:
 ${histTxt()}`;
 
-    const raw=await callAPI([{role:'system',content:sysPrompt},...chatHistory],1800);
+    const raw=await callAPI(chatHistory, 1800, sysPrompt);
     typing.remove();
     const parsed=extractJSON(raw);
     const resp=Array.isArray(parsed)?parsed[0]:parsed;
