@@ -137,6 +137,7 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
   <div style="display:flex;gap:8px">
     <button onclick="showHistory()" id="hist-btn" style="display:none;flex:1;padding:13px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">📋 Verlauf</button>
+    <button onclick="openTemplates()" id="tpl-btn" style="display:none;flex:1;padding:13px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">💾 Vorlagen</button>
     <button onclick="show('s-library')" style="flex:1;padding:13px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">📚 Übungen</button>
   </div>
 </div>
@@ -180,7 +181,13 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
   <div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Haupttraining</div>
   <div id="rev-list" style="display:flex;flex-direction:column;gap:7px;margin-bottom:22px"></div>
-  <button onclick="startWorkout()" class="btn btn-ac">Training starten →</button>
+  <div style="display:flex;gap:8px">
+    <button onclick="startWorkout()" class="btn btn-ac" style="flex:2">Training starten →</button>
+    <button onclick="openSaveForLater()" style="flex:1;padding:15px;border-radius:13px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f);display:flex;align-items:center;justify-content:center;gap:5px">📅 Einplanen</button>
+  </div>
+  <div style="text-align:center;margin-top:9px">
+    <button onclick="saveAsTemplate()" style="color:var(--mu);font-size:12px;background:none;border:none;cursor:pointer;font-family:var(--f)">💾 Als Vorlage speichern</button>
+  </div>
 </div>
 
 <!-- TIMER -->
@@ -460,6 +467,28 @@ button:active:not(:disabled){transform:scale(.96)}
     <div id="plan-link-body"></div>
   </div>
 </div>
+
+<!-- MODAL: Save workout for later -->
+<div class="modal-ov" id="modal-save-later">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:700">Workout einplanen</div>
+      <button onclick="closeModal('modal-save-later')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div id="save-later-body"></div>
+  </div>
+</div>
+
+<!-- MODAL: Saved Templates -->
+<div class="modal-ov" id="modal-templates">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:700">Gespeicherte Workouts</div>
+      <button onclick="closeModal('modal-templates')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div id="templates-list"></div>
+  </div>
+</div>
 <!-- MODAL: Exercise Info -->
 <div class="modal-ov" id="modal-info">
   <div class="modal-box">
@@ -699,6 +728,7 @@ function updateHome(){
   document.getElementById('h-last').textContent=last?(dSince(last.date)===0?'heute':'vor '+dSince(last.date)+'T'):'—';
   document.getElementById('hist-btn').style.display=log.length>0?'block':'none';
   document.getElementById('bk-info').textContent=log.length+' Workouts';
+  if(loadTemplates().length)document.getElementById('tpl-btn').style.display='block';
   const key=loadKey();if(key)document.getElementById('key-inp').value=key;
   const prof=loadProfile();if(prof){if(prof.name)document.getElementById('prof-name').value=prof.name;if(prof.goals)document.getElementById('prof-goals').value=prof.goals;if(prof.limits)document.getElementById('prof-limits').value=prof.limits;if(prof.notes)document.getElementById('prof-notes').value=prof.notes;}
   const h=new Date().getHours();
@@ -808,6 +838,113 @@ Antworte NUR mit JSON-Array: [{"name":"...","type":"time","duration":40,"reps":n
   }
 }
 
+
+
+// ─── Saved workout templates ─────────────────────────────────────────────────
+function loadTemplates(){try{return JSON.parse(localStorage.getItem('coach_templates'))||[];}catch{return[];}}
+function saveTemplates(t){localStorage.setItem('coach_templates',JSON.stringify(t));}
+
+function saveAsTemplate(){
+  const name=prompt('Name für diese Vorlage:',curSetup.muscles?.join(', ')||'Mein Workout');
+  if(!name)return;
+  const templates=loadTemplates();
+  templates.push({id:Date.now(),name,muscles:curSetup.muscles||[],exercises:[...curExercises],warmup:[...wuExercises],createdAt:todayIso()});
+  saveTemplates(templates);
+  const btn=document.querySelector('button[onclick="saveAsTemplate()"]');
+  if(btn){btn.textContent='✓ Gespeichert';setTimeout(()=>btn.textContent='💾 Als Vorlage speichern',2000);}
+  // Show templates button on home
+  document.getElementById('tpl-btn').style.display='block';
+}
+
+function openTemplates(){
+  const templates=loadTemplates();
+  const el=document.getElementById('templates-list');
+  if(!templates.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--mu);font-size:13px">Noch keine Vorlagen gespeichert.<br><br>Konfiguriere ein Workout im Coach und tippe "Als Vorlage speichern".</div>';document.getElementById('modal-templates').classList.add('open');return;}
+  el.innerHTML=templates.map((t,i)=>`<div class="card" style="margin-bottom:9px">
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:3px">${t.name}</div>
+        <div style="font-size:11px;color:var(--mu)">${t.exercises.length} Übungen${t.warmup?.length?' + '+t.warmup.length+' Warmup':''} · ${t.createdAt}</div>
+      </div>
+      <button onclick="deleteTpl(${i})" style="width:26px;height:26px;border-radius:7px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:var(--hot);font-size:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:11px">
+      <button onclick="startFromTemplate(${i})" class="btn btn-ac" style="flex:1;padding:10px;font-size:13px;text-transform:none">Jetzt starten</button>
+      <button onclick="planFromTemplate(${i})" style="flex:1;padding:10px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">📅 Einplanen</button>
+    </div>
+  </div>`).join('');
+  document.getElementById('modal-templates').classList.add('open');
+}
+
+function deleteTpl(idx){
+  const templates=loadTemplates();templates.splice(idx,1);saveTemplates(templates);openTemplates();
+}
+
+function startFromTemplate(idx){
+  const templates=loadTemplates();const t=templates[idx];if(!t)return;
+  curExercises=[...t.exercises];wuExercises=[...(t.warmup||[])];
+  curSetup={muscles:t.muscles,durationMin:Math.round(((t.warmup||[]).length*35+t.exercises.length*60)/60)};
+  closeModal('modal-templates');startWorkout();
+}
+
+function planFromTemplate(idx){
+  const templates=loadTemplates();const t=templates[idx];if(!t)return;
+  closeModal('modal-templates');
+  // Reuse save-for-later modal with template context
+  window._planningTemplate=idx;
+  openSaveForLater(t);
+}
+
+// ─── Save workout for later / plan integration ────────────────────────────────
+function openSaveForLater(template){
+  if(!plan?.weeks?.length){showErr('Kein aktiver Trainingsplan. Erst einen Plan erstellen.');return;}
+  const tpl=template||null;
+  const exercises=tpl?tpl.exercises:curExercises;
+  const muscles=(tpl?tpl.muscles:curSetup.muscles)||[];
+  const wi=getCurrentWeekIdx();
+  let html='';
+  html+=`<div style="font-size:12px;color:var(--mu);margin-bottom:14px">Wähle eine Session im Plan, zu der dieses Workout gespeichert wird. Du kannst es dann jederzeit von dort starten.</div>`;
+  // Week tabs
+  html+=`<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none">`;
+  plan.weeks.forEach((w,i)=>{html+=`<button onclick="renderSaveLaterWeek(${i},${!!tpl})" id="sl-tab-${i}" style="white-space:nowrap;padding:7px 13px;border-radius:9px;border:1.5px solid ${i===wi?'var(--ac)':'var(--br)'};background:${i===wi?'rgba(124,58,237,.08)':'var(--up)'};color:${i===wi?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f)">Wo ${i+1}</button>`;});
+  html+=`</div><div id="sl-sessions"></div>`;
+  html+=`<div style="margin-top:10px;border-top:1px solid var(--br);padding-top:12px"><button onclick="addNewSessionWithWorkout(${wi},${!!tpl})" class="btn" style="border:1.5px solid var(--br);color:var(--mu);padding:12px;font-size:13px;font-family:var(--f)">+ Neue Session in Woche ${wi+1} erstellen</button></div>`;
+  document.getElementById('save-later-body').innerHTML=html;
+  renderSaveLaterWeek(wi,!!tpl);
+  document.getElementById('modal-save-later').classList.add('open');
+}
+
+function renderSaveLaterWeek(wi,isTpl){
+  const week=plan.weeks[wi];if(!week)return;
+  // Highlight selected tab
+  plan.weeks.forEach((_,i)=>{const t=document.getElementById('sl-tab-'+i);if(t){t.style.borderColor=i===wi?'var(--ac)':'var(--br)';t.style.background=i===wi?'rgba(124,58,237,.08)':'var(--up)';t.style.color=i===wi?'var(--ac)':'var(--mu)';}});
+  const el=document.getElementById('sl-sessions');if(!el)return;
+  if(!week.sessions.length){el.innerHTML='<div style="text-align:center;padding:12px;color:var(--mu);font-size:13px">Keine Sessions in dieser Woche.</div>';return;}
+  el.innerHTML=week.sessions.map((s,si)=>`<button onclick="attachWorkoutToSession(${wi},${si},${isTpl})" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:12px 14px;border-radius:11px;border:1.5px solid ${s.savedWorkout?'var(--co)':'var(--br)'};background:${s.savedWorkout?'rgba(5,150,105,.06)':'var(--card)'};margin-bottom:8px;cursor:pointer;font-family:var(--f)">
+    <div style="width:36px;height:36px;border-radius:9px;background:var(--up);border:1px solid var(--br);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--mu);flex-shrink:0">${(['So','Mo','Di','Mi','Do','Fr','Sa'])[s.dow]}</div>
+    <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.focus}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.durationMin||30} min${s.savedWorkout?' · 💾 Workout gespeichert':''}</div></div>
+    <div style="font-size:11px;color:var(--ac);font-weight:600">Hier →</div>
+  </button>`).join('');
+}
+
+function attachWorkoutToSession(wi,si,isTpl){
+  if(!plan?.weeks[wi]?.sessions[si])return;
+  const exercises=isTpl&&window._planningTemplate!=null?loadTemplates()[window._planningTemplate]?.exercises:curExercises;
+  const warmup=isTpl&&window._planningTemplate!=null?loadTemplates()[window._planningTemplate]?.warmup:wuExercises;
+  plan.weeks[wi].sessions[si].savedWorkout={exercises:[...(exercises||[])],warmup:[...(warmup||[])],savedAt:todayIso()};
+  savePlan();closeModal('modal-save-later');
+  showErr('✓ Workout in Session gespeichert — starte es jederzeit vom Plan.');
+  window._planningTemplate=null;
+}
+
+function addNewSessionWithWorkout(wi,isTpl){
+  const exercises=isTpl&&window._planningTemplate!=null?loadTemplates()[window._planningTemplate]?.exercises:curExercises;
+  const warmup=isTpl&&window._planningTemplate!=null?loadTemplates()[window._planningTemplate]?.warmup:wuExercises;
+  const muscles=(isTpl&&window._planningTemplate!=null?loadTemplates()[window._planningTemplate]?.muscles:curSetup.muscles)||[];
+  const todayDow=new Date().getDay();
+  plan.weeks[wi].sessions.push({dow:todayDow,focus:muscles.map(m=>MUSCLE_DE[m]||m).join(' & ')||'Workout',intensity:'medium',durationMin:Math.round(((warmup||[]).length*35+(exercises||[]).length*60)/60)||30,done:false,savedWorkout:{exercises:[...(exercises||[])],warmup:[...(warmup||[])],savedAt:todayIso()}});
+  savePlan();closeModal('modal-save-later');showErr('✓ Neue Session mit Workout erstellt.');window._planningTemplate=null;
+}
 
 // ─── Review controls ──────────────────────────────────────────────────────────
 let wuVisible=true;
@@ -1414,7 +1551,7 @@ function renderPlanView(wi=0){
   const todayDow=new Date().getDay();
   document.getElementById('plan-sessions').innerHTML=week.sessions.map((s,si)=>{
     const isToday=s.dow===todayDow,c=isToday?'rgba(167,139,250,.15)':'var(--card)',bc=isToday?'rgba(167,139,250,.35)':'var(--br)',ic=INT_COLORS[s.intensity||'medium'];
-    return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:38px;height:38px;border-radius:9px;background:${s.done?'rgba(52,211,153,.1)':isToday?'rgba(167,139,250,.15)':'var(--up)'};border:1px solid ${s.done?'rgba(52,211,153,.3)':isToday?'rgba(167,139,250,.3)':'var(--br)'};display:flex;align-items:center;justify-content:center;font-size:${s.done?18:12}px;font-weight:600;color:${s.done?'var(--co)':isToday?'var(--ac)':'var(--mu)'};flex-shrink:0">${s.done?'✓':DAYS[s.dow]}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}${isToday&&!s.done?' 📍':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${s.exerciseCount?' · '+s.exerciseCount+' Üb.':''}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${(s.equipment||['bodyweight']).map(e=>EQUIP_LABELS[e]||e).join(' · ')}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">⚡ Start</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">💬</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
+    return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:38px;height:38px;border-radius:9px;background:${s.done?'rgba(52,211,153,.1)':isToday?'rgba(167,139,250,.15)':'var(--up)'};border:1px solid ${s.done?'rgba(52,211,153,.3)':isToday?'rgba(167,139,250,.3)':'var(--br)'};display:flex;align-items:center;justify-content:center;font-size:${s.done?18:12}px;font-weight:600;color:${s.done?'var(--co)':isToday?'var(--ac)':'var(--mu)'};flex-shrink:0">${s.done?'✓':DAYS[s.dow]}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}${isToday&&!s.done?' 📍':''}${s.savedWorkout?' 💾':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${s.exerciseCount?' · '+s.exerciseCount+' Üb.':''}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${(s.equipment||['bodyweight']).map(e=>EQUIP_LABELS[e]||e).join(' · ')}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">⚡ Start</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">💬</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
   }).join('');
 }
 
@@ -1444,6 +1581,14 @@ function chatFromPlan(wi,si){
 function startSessAt(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;
   pendingPlanSession={wi,si};
+  // Use saved workout if available — no AI call needed
+  if(sess.savedWorkout?.exercises?.length){
+    curExercises=[...sess.savedWorkout.exercises];
+    wuExercises=[...(sess.savedWorkout.warmup||[])];
+    curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:sess.durationMin||30};
+    showReview();
+    return;
+  }
   const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';
   const count=sess.exerciseCount||5;
   const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;
@@ -1520,6 +1665,16 @@ const DEFAULT_LIB=[
   {name:'Lateral Raise',muscles:['shoulders'],bilateral:false,tip:'Arme bis Schulterhöhe',details:'Leichte Hanteln. Seitlich heben.',mistakes:'Traps übernehmen'},
   {name:'Bicep Curl',muscles:['arms'],bilateral:true,tip:'Ellbogen bleibt am Körper',details:'Hantel oder Band. Unterarm heben.',mistakes:'Mit Körper helfen'},
   {name:'Hanging Leg Raise',muscles:['core'],bilateral:false,tip:'Kein Schwung',details:'An Stange. Beine bis 90° heben.',mistakes:'Körper schaukelt'},
+  {name:'Burpee',muscles:['chest','core','legs','glutes'],bilateral:false,tip:'Explosiv hoch, weich landen',details:'Aus dem Stand in den Plank springen, Push-up, zurück springen, hochspringen.',mistakes:'Hüfte durchhängen im Plank'},
+  {name:'Navy Seal Burpee',muscles:['chest','core','legs','glutes','back'],bilateral:false,tip:'Push-up + Mountain Climber + Sprung',details:'Burpee mit Push-up unten, dann 2 Mountain Climber links/rechts, dann Sprung.',mistakes:'Tempo zu hoch, Form verlieren'},
+  {name:'Hampelmann',muscles:['legs','shoulders','core'],bilateral:false,tip:'Gleichmäßiger Rhythmus',details:'Beine spreizen und Arme über Kopf klatschen. Zurück. Wiederholen.',mistakes:'Knie einknicken beim Landen'},
+  {name:'Jump Squat',muscles:['legs','glutes'],bilateral:false,tip:'Weich landen, Knie federt',details:'Knie beugen, dann explosiv hoch springen. Sanft mit gebeugten Knien landen.',mistakes:'Steif landen, Knie eingeknickt'},
+  {name:'Squat',muscles:['legs','glutes'],bilateral:false,tip:'Knie über Zehen, Brust hoch',details:'Füße hüftbreit, Zehen leicht nach außen. Hüfte nach hinten unten, Oberkörper aufrecht.',mistakes:'Knie knicken nach innen'},
+  {name:'Inchworm',muscles:['core','back','chest'],bilateral:false,tip:'Langsam und kontrolliert',details:'Aus dem Stand Hände zum Boden, abwandeln bis Plank, zurück abwandeln, aufrichten.',mistakes:'Knie beugen'},
+  {name:'Bear Crawl',muscles:['core','chest','shoulders'],bilateral:false,tip:'Hüfte auf Kniehöhe, nicht höher',details:'Aus dem Vierfüßlerstand Knie heben und vorwärts/rückwärts kriechen.',mistakes:'Hüfte zu hoch'},
+  {name:'Tuck Jump',muscles:['legs','core'],bilateral:false,tip:'Knie zur Brust ziehen',details:'Aus dem Stand hochspringen und Knie zur Brust ziehen. Weich landen.',mistakes:'Keine Kniebewegung'},
+  {name:'Skater',muscles:['legs','glutes'],bilateral:true,tip:'Seitlich springen, weich landen',details:'Seitlich von Bein zu Bein springen. Landebein leicht gebeugt, Oberkörper neigt vor.',mistakes:'Aufrecht stehen statt seitlich neigen'},
+  {name:'High Knees',muscles:['legs','core'],bilateral:false,tip:'Knie bis Hüfthöhe heben',details:'Auf der Stelle laufen und Knie explosiv wechselnd hoch ziehen.',mistakes:'Oberkörper nach hinten lehnen'}
 ];
 
 function getExIcon(name){const n=(name||'').toLowerCase();if(n.match(/push|liegest/))return'▼';if(n.match(/bridge|glute/))return'⌒';if(n.match(/plank|brett/))return'—';if(n.match(/pull|klimmzug/))return'↑';if(n.match(/row|ruder/))return'←';if(n.match(/lunge|ausfallschritt/))return'⊣';if(n.match(/shoulder|schulter/))return'↑↑';if(n.match(/curl|bicep/))return'∫';if(n.match(/core|dead|hollow|twist/))return'○';if(n.match(/mountain|climber/))return'↗';return'◈';}
