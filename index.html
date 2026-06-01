@@ -312,8 +312,9 @@ button:active:not(:disabled){transform:scale(.96)}
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Workouts pro Woche</div>
   <div style="display:flex;gap:8px;margin-bottom:20px" id="freq-chips"></div>
 
-  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Session-Dauer</div>
-  <div style="display:flex;gap:8px;margin-bottom:20px" id="dur-chips"></div>
+  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Session-Dauer</div>
+  <div style="font-size:12px;color:var(--mu);margin-bottom:10px">Sessions variieren je nach Trainingstyp innerhalb der Zeitspanne</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px" id="dur-chips"></div>
 
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Zieldatum (optional)</div>
   <input type="date" id="plan-end-date" class="inp" style="margin-bottom:24px"/>
@@ -435,7 +436,7 @@ let plan=null; // single plan system
 let chatHistory=[], chatCtx={};
 let curExercises=[], wuExercises=[], curSetup={};
 let pendingPlanSession=null; // session that triggered a workout
-let planOpts={goal:'fitness',weeks:8,freq:3,sessionMin:30};
+let planOpts={goal:'fitness',weeks:8,freq:3,durMin:20,durMax:45};
 let currentViewWeek=0;
 let sessEditDow=1, sessEditInt='medium';
 let tStatus='idle', tRound=1, tIdx=0, tLeft=40, tRun=false, tIv=null, tReps={}, rpe=6;
@@ -858,7 +859,8 @@ function buildPlanCreate(){
   GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<span style="font-size:22px">${g.icon}</span><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(167,139,250,.1)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(167,139,250,.1)';}gc.appendChild(b);});
   const wc=document.getElementById('weeks-chips');wc.innerHTML='';[4,6,8,12].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});
   const fc=document.getElementById('freq-chips');fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' co':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';};fc.appendChild(b);});
-  const dc=document.getElementById('dur-chips');dc.innerHTML='';[20,30,45,60].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.sessionMin?' am':'');b.textContent=n+' min';b.onclick=()=>{planOpts.sessionMin=n;dc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip am';};dc.appendChild(b);});
+  const durRanges=[{min:15,max:25,label:'15-25 min'},{min:20,max:35,label:'20-35 min'},{min:30,max:50,label:'30-50 min'},{min:45,max:65,label:'45-65 min'},{min:60,max:80,label:'60-80 min'}];
+  const dc=document.getElementById('dur-chips');dc.innerHTML='';durRanges.forEach(r=>{const b=document.createElement('button');b.className='chip'+(r.min===planOpts.durMin&&r.max===planOpts.durMax?' am':'');b.textContent=r.label;b.onclick=()=>{planOpts.durMin=r.min;planOpts.durMax=r.max;dc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip am';};dc.appendChild(b);});
   document.getElementById('plan-end-date').value='';
 }
 
@@ -868,9 +870,13 @@ async function generatePlan(){
   const goalObj=GOALS.find(g=>g.id===planOpts.goal)||GOALS[0];
   const endDateVal=document.getElementById('plan-end-date').value;
   const weeks=endDateVal?Math.max(1,Math.ceil((new Date(endDateVal+'T12:00:00')-new Date(todayIso()+'T12:00:00'))/(7*86400000))):planOpts.weeks;
-  const sys=`Personal Trainer. ${weeks}-Wochen-Plan. Ziel: ${goalObj.label}. ${planOpts.freq}x/Woche, ${planOpts.sessionMin} min/Session. Knieschonend. Progressiv. Deload jede 4. Woche.
-NUR JSON: {"title":"...","goal":"${planOpts.goal}","freq":${planOpts.freq},"sessionMin":${planOpts.sessionMin},"startDate":"${todayIso()}","weeks":[{"week":1,"theme":"Grundlagen","sessions":[{"dow":1,"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.sessionMin},"done":false}]}]}
-dow: 0=So,1=Mo,2=Di,3=Mi,4=Do,5=Fr,6=Sa. Alle ${weeks} Wochen, je ${planOpts.freq} Sessions. intensity: easy/medium/hard.`;
+  const sys=`Personal Trainer. ${weeks}-Wochen-Plan. Ziel: ${goalObj.label}. ${planOpts.freq}x/Woche, Knieschonend. Progressiv. Deload jede 4. Woche.
+Session-Dauer variiert zwischen ${planOpts.durMin} und ${planOpts.durMax} Minuten je nach Trainingstyp und Intensität:
+- Leichte Sessions (easy, Mobility, Core): eher ${planOpts.durMin}-${Math.round((planOpts.durMin+planOpts.durMax)/2)} min
+- Mittlere Sessions (medium, Kraft, Ganzkörper): eher ${Math.round((planOpts.durMin+planOpts.durMax)/2)} min
+- Intensive Sessions (hard, HIIT, Ausdauer): eher ${Math.round((planOpts.durMin+planOpts.durMax)/2)}-${planOpts.durMax} min
+NUR JSON: {"title":"...","goal":"${planOpts.goal}","freq":${planOpts.freq},"durMin":${planOpts.durMin},"durMax":${planOpts.durMax},"startDate":"${todayIso()}","weeks":[{"week":1,"theme":"Grundlagen","sessions":[{"dow":1,"focus":"Brust & Arme","intensity":"easy","durationMin":25,"done":false}]}]}
+dow: 0=So,1=Mo,2=Di,3=Mi,4=Do,5=Fr,6=Sa. Alle ${weeks} Wochen, je ${planOpts.freq} Sessions. intensity: easy/medium/hard. durationMin für jede Session individuell setzen.`;
   try{
     const raw=await callAPI([{role:'user',content:'Erstelle den Plan.'}],2500,sys);
     const parsed=extractJSON(raw);
@@ -888,7 +894,7 @@ function renderPlanView(wi=0){
   const done=plan.weeks.flatMap(w=>w.sessions).filter(s=>s.done).length;
   const pct=total?Math.round(done/total*100):0;
   document.getElementById('plan-title').textContent=plan.title||'Trainingsplan';
-  document.getElementById('plan-subtitle').textContent=(GOALS.find(g=>g.id===plan.goal)||{label:''}).label+' · '+plan.weeks.length+' Wochen';
+  const durRange=plan.durMin&&plan.durMax?` · ${plan.durMin}-${plan.durMax} min`:(plan.sessionMin?` · ${plan.sessionMin} min`:'');document.getElementById('plan-subtitle').textContent=(GOALS.find(g=>g.id===plan.goal)||{label:''}).label+' · '+plan.weeks.length+' Wochen'+durRange;
   document.getElementById('plan-prog-lbl').textContent=done+' / '+total+' Sessions';
   document.getElementById('plan-prog-pct').textContent=pct+'%';
   document.getElementById('plan-prog-bar').style.width=pct+'%';
