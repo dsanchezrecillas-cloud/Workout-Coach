@@ -10,8 +10,9 @@
 <title>Personal Coach</title>
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='38' fill='%23080810'/><rect x='79' y='42' width='22' height='96' rx='5' fill='%23a78bfa'/><rect x='36' y='60' width='43' height='60' rx='10' fill='%23a78bfa'/><rect x='101' y='60' width='43' height='60' rx='10' fill='%23a78bfa'/><rect x='22' y='72' width='18' height='36' rx='6' fill='%23fb923c'/><rect x='140' y='72' width='18' height='36' rx='6' fill='%23fb923c'/></svg>">
 <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Personal%20Coach%22%2C%22short_name%22%3A%22Coach%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23080810%22%2C%22theme_color%22%3A%22%23080810%22%2C%22start_url%22%3A%22.%2F%22%7D">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--f:-apple-system,BlinkMacSystemFont,sans-serif;--m:'SF Mono',SFMono-Regular,ui-monospace,monospace;--bg:#080810;--card:#0f0f1a;--up:#161625;--br:#1f1f35;--ac:#a78bfa;--hot:#fb923c;--co:#34d399;--am:#fbbf24;--tx:#f1f5f9;--mu:#64748b;--su:#94a3b8}
+:root{--f:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;--m:'SF Mono',SFMono-Regular,ui-monospace,monospace;--bg:#f7f4ff;--card:#ffffff;--up:#efe9ff;--br:#ddd5f7;--ac:#7c3aed;--hot:#f43f5e;--co:#059669;--am:#d97706;--tx:#1e1740;--mu:#9181b4;--su:#5c4f82}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{background:var(--bg);min-height:100%}
 body{font-family:var(--f);color:var(--tx);min-height:100vh;min-height:-webkit-fill-available;-webkit-font-smoothing:antialiased;overflow-x:hidden}
@@ -27,7 +28,7 @@ body{font-family:var(--f);color:var(--tx);min-height:100vh;min-height:-webkit-fi
 @keyframes lu{0%,100%{transform:rotate(0)}50%{transform:rotate(22deg)}}
 @keyframes cr{0%,100%{transform:translateY(0)rotate(0)}50%{transform:translateY(-9px)rotate(-14deg)}}
 .fade{animation:up .22s cubic-bezier(.16,1,.3,1) both}
-.screen{display:none;width:100%;max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);padding:max(env(safe-area-inset-top,28px),28px) 16px 80px}
+.screen{display:none;width:100%;max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);padding:max(env(safe-area-inset-top,28px),28px) 16px 80px;-webkit-font-smoothing:antialiased}
 .screen.active{display:block}
 #s-gen.active,#s-chat.active{display:flex;flex-direction:column}
 #s-gen.active{align-items:center;justify-content:center;min-height:100vh;padding:0}
@@ -35,13 +36,13 @@ body{font-family:var(--f);color:var(--tx);min-height:100vh;min-height:-webkit-fi
 button{font-family:var(--f);cursor:pointer;border:none;background:none;color:inherit;transition:transform .1s}
 button:active:not(:disabled){transform:scale(.96)}
 .btn{display:block;width:100%;padding:15px;border-radius:13px;font-size:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:center}
-.btn-ac{background:linear-gradient(135deg,var(--ac),#8b5cf6);color:#fff;box-shadow:0 4px 20px rgba(167,139,250,.28)}
-.btn-co{background:linear-gradient(135deg,var(--co),#10b981);color:#fff;box-shadow:0 4px 20px rgba(52,211,153,.28)}
+.btn-ac{background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;box-shadow:0 4px 16px rgba(124,58,237,.22)}
+.btn-co{background:linear-gradient(135deg,#059669,#10b981);color:#fff;box-shadow:0 4px 16px rgba(5,150,105,.2)}
 .btn-ol{background:transparent;border:1.5px solid}
 .btn:disabled{background:var(--up)!important;color:var(--mu)!important;box-shadow:none!important;cursor:not-allowed}
-.card{background:var(--card);border:1px solid var(--br);border-radius:13px;padding:15px 17px}
+.card{background:var(--card);border:1px solid var(--br);border-radius:13px;padding:15px 17px;box-shadow:0 1px 4px rgba(124,58,237,.06)}
 .tag{font-size:11px;padding:3px 8px;border-radius:16px;font-weight:500;white-space:nowrap;display:inline-block}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:9px;border:1.5px solid var(--br);background:var(--up);color:var(--mu);font-size:13px;font-family:var(--f);transition:all .15s;cursor:pointer;user-select:none}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:9px;border:1.5px solid var(--br);background:var(--up);color:var(--mu);font-size:13px;font-family:var(--f);transition:all .15s;cursor:pointer;user-select:none;font-weight:500}
 .chip.ac{border-color:var(--ac);background:rgba(167,139,250,.12);color:var(--ac);font-weight:600}
 .chip.co{border-color:var(--co);background:rgba(52,211,153,.1);color:var(--co);font-weight:600}
 .chip.am{border-color:var(--am);background:rgba(251,191,36,.1);color:var(--am);font-weight:600}
@@ -49,7 +50,7 @@ button:active:not(:disabled){transform:scale(.96)}
 .back{color:var(--mu);font-size:13px;font-weight:500;padding:0 0 20px;display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;font-family:var(--f)}
 .inp{width:100%;background:var(--up);border:1px solid var(--br);border-radius:9px;padding:12px 14px;color:var(--tx);font-size:14px;outline:none;-webkit-appearance:none;font-family:var(--f)}
 .inp:focus{border-color:var(--ac)}
-.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100;align-items:flex-end;justify-content:center}
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(30,23,64,.45);backdrop-filter:blur(4px);z-index:100;align-items:flex-end;justify-content:center}
 .modal-ov.open{display:flex}
 .modal-box{background:var(--card);border:1px solid var(--br);border-radius:18px 18px 0 0;padding:22px 18px max(env(safe-area-inset-bottom,18px),18px);width:100%;max-width:480px;animation:slideup .28s cubic-bezier(.16,1,.3,1);max-height:88vh;overflow-y:auto}
 #timer-arc{transition:stroke-dashoffset .9s linear,stroke .3s}
@@ -64,7 +65,7 @@ button:active:not(:disabled){transform:scale(.96)}
 .chat-input input{flex:1;background:var(--up);border:1px solid var(--br);border-radius:10px;padding:12px 14px;color:var(--tx);font-size:14px;outline:none;font-family:var(--f)}
 .chat-input input:focus{border-color:var(--ac)}
 .chat-send{width:44px;height:44px;border-radius:10px;background:var(--ac);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;flex-shrink:0}
-#err{display:none;position:fixed;top:max(env(safe-area-inset-top,14px),14px);left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:480px;background:#1a0800;border:1px solid rgba(251,146,60,.4);border-radius:11px;padding:12px 15px;font-size:13px;color:var(--hot);align-items:center;justify-content:space-between;gap:10px;z-index:999}
+#err{display:none;position:fixed;top:max(env(safe-area-inset-top,14px),14px);left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:480px;background:#fff0f3;border:1px solid rgba(244,63,94,.25);border-radius:11px;padding:12px 15px;font-size:13px;color:var(--hot);align-items:center;justify-content:space-between;gap:10px;z-index:999;box-shadow:0 4px 20px rgba(244,63,94,.12)}
 .day-pill{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;font-size:12px;font-weight:600;border:1.5px solid var(--br);background:var(--up);color:var(--mu);cursor:pointer;transition:all .15s;font-family:var(--f)}
 .day-pill.active{border-color:var(--ac);background:rgba(167,139,250,.15);color:var(--ac)}
 .day-pill.done{border-color:var(--co);background:rgba(52,211,153,.1);color:var(--co)}
@@ -88,7 +89,7 @@ button:active:not(:disabled){transform:scale(.96)}
     <button onclick="show('s-settings')" style="width:38px;height:38px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">⚙</button>
   </div>
 
-  <div id="no-key" style="background:#1a1000;border:1px solid rgba(251,191,36,.3);border-radius:11px;padding:12px 15px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+  <div id="no-key" style="background:#fffbeb;border:1px solid rgba(217,119,6,.2);border-radius:11px;padding:12px 15px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
     <div style="font-size:13px;color:var(--am)">⚠ Kein API Key hinterlegt</div>
     <button onclick="show('s-settings')" style="color:var(--ac);font-size:12px;font-weight:600">Einrichten →</button>
   </div>
@@ -100,7 +101,7 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
 
   <!-- Coach card -->
-  <div class="card" id="coach-card" style="margin-bottom:12px">
+  <div class="card" id="coach-card" style="margin-bottom:12px;background:linear-gradient(135deg,#f5f0ff,#fff);border-color:#ddd5f7">
     <div style="display:flex;align-items:center;gap:7px;margin-bottom:9px">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="10.5" y="3" width="3" height="18" rx="1" fill="#a78bfa"/><rect x="4" y="7" width="6.5" height="10" rx="2" fill="#a78bfa"/><rect x="13.5" y="7" width="6.5" height="10" rx="2" fill="#a78bfa"/><rect x="1.5" y="9" width="3" height="6" rx="1" fill="#fb923c"/><rect x="19.5" y="9" width="3" height="6" rx="1" fill="#fb923c"/></svg>
       <span style="font-size:10px;letter-spacing:.1em;color:var(--ac);text-transform:uppercase;font-weight:600">Coach</span>
@@ -111,7 +112,7 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
 
   <!-- Plan today card -->
-  <div id="plan-home" class="card" style="display:none;margin-bottom:12px;border-color:rgba(167,139,250,.3);box-shadow:0 0 18px rgba(167,139,250,.1);cursor:pointer" onclick="showPlan()">
+  <div id="plan-home" class="card" style="display:none;margin-bottom:12px;border-color:rgba(124,58,237,.2);box-shadow:0 2px 16px rgba(124,58,237,.08);cursor:pointer;background:linear-gradient(135deg,#f5f0ff,#fff)" onclick="showPlan()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <div style="font-size:10px;color:var(--ac);letter-spacing:.08em;text-transform:uppercase;font-weight:600">📅 Heute geplant</div>
       <div style="font-size:11px;color:var(--mu)" id="plan-home-week"></div>
@@ -184,8 +185,8 @@ button:active:not(:disabled){transform:scale(.96)}
   <div style="display:flex;gap:5px;margin-bottom:18px;align-items:center" id="prog-bars"></div>
   <div style="position:relative;width:230px;height:230px;margin:0 auto 16px">
     <svg width="230" height="230" style="transform:rotate(-90deg)">
-      <circle cx="115" cy="115" r="100" fill="none" stroke="#161625" stroke-width="8"/>
-      <circle id="timer-arc" cx="115" cy="115" r="100" fill="none" stroke="#a78bfa" stroke-width="8" stroke-dasharray="628.3" stroke-dashoffset="628.3" stroke-linecap="round"/>
+      <circle cx="115" cy="115" r="100" fill="none" stroke="#ede9ff" stroke-width="8"/>
+      <circle id="timer-arc" cx="115" cy="115" r="100" fill="none" stroke="#7c3aed" stroke-width="8" stroke-dasharray="628.3" stroke-dashoffset="628.3" stroke-linecap="round"/>
     </svg>
     <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
       <div id="ph-label" style="font-size:10px;letter-spacing:.1em;color:var(--ac);text-transform:uppercase;font-weight:600;margin-bottom:4px"></div>
@@ -289,7 +290,7 @@ button:active:not(:disabled){transform:scale(.96)}
       <div id="plan-prog-lbl" style="font-size:13px;color:var(--tx)"></div>
       <div id="plan-prog-pct" style="font-size:13px;font-weight:700;color:var(--ac)"></div>
     </div>
-    <div style="height:5px;background:var(--br);border-radius:3px"><div id="plan-prog-bar" style="height:100%;background:linear-gradient(90deg,var(--ac),#8b5cf6);border-radius:3px;transition:width .5s;width:0"></div></div>
+    <div style="height:5px;background:var(--br);border-radius:3px"><div id="plan-prog-bar" style="height:100%;background:linear-gradient(90deg,#7c3aed,#a855f7);border-radius:3px;transition:width .5s;width:0"></div></div>
   </div>
 
   <!-- Week tabs -->
@@ -473,7 +474,7 @@ const STYLES=[
   {id:'upper_lower',label:'Ober- / Unterkörper',desc:'Abwechselnd oben und unten',icon:'↕'},
   {id:'hybrid',label:'Hybrid',desc:'Mix aus Split und Ganzkörper je nach Woche',icon:'🔄'},
 ];
-const rpc=n=>n>=8?'#fb923c':n>=5?'#fbbf24':'#34d399';
+const rpc=n=>n>=8?'#f43f5e':n>=5?'#d97706':'#059669';
 const mkT=(t,c)=>`<span class="tag" style="background:${c}18;color:${c}">${t}</span>`;
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -582,7 +583,7 @@ function drawBars(id,data,h){const s=document.getElementById(id);if(!s||!data.le
 // ─── Exercise SVGs ────────────────────────────────────────────────────────────
 function exSVG(name){
   const n=(name||'').toLowerCase();
-  const bg='#161625',ac='#a78bfa',am='#fbbf24',co='#34d399',bd='#1f1f35';
+  const bg='#f7f4ff',ac='#7c3aed',am='#d97706',co='#059669',bd='#ddd5f7';
   const H=(cx,cy,r=7)=>`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${ac}"/>`;
   const L=(x1,y1,x2,y2,c=ac,w=2.5)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
   const D=(cx,cy,r=4,c=am)=>`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}"/>`;
@@ -603,7 +604,7 @@ function exSVG(name){
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 function updateHome(){
   const hasKey=!!loadKey(),last=log[log.length-1];
-  document.getElementById('no-key').style.display=hasKey?'none':'flex';
+  const nk=document.getElementById('no-key');nk.style.display=hasKey?'none':'flex';
   document.getElementById('h-streak').textContent=streak()>0?streak()+'d 🔥':'—';
   document.getElementById('h-total').textContent=log.length;
   document.getElementById('h-last').textContent=last?(dSince(last.date)===0?'heute':'vor '+dSince(last.date)+'T'):'—';
