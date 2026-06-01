@@ -247,7 +247,8 @@ button:active:not(:disabled){transform:scale(.96)}
     <button id="main-btn" class="btn btn-ac" style="flex:1">Start</button>
     <button id="skip-btn" onclick="skipEx()" style="width:46px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:15px;flex-shrink:0;opacity:0;pointer-events:none;transition:opacity .2s">⏭</button>
   </div>
-  <button id="end-btn" onclick="endEarly()" style="display:none;width:100%;padding:11px;border-radius:11px;background:transparent;border:1px solid rgba(251,146,60,.3);color:var(--hot);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase">✕ Beenden</button>
+  <button id="reps-done-btn" onclick="repsDone()" style="display:none;width:100%;padding:15px;border-radius:13px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;font-size:15px;font-weight:700;font-family:var(--f);letter-spacing:.03em;margin-bottom:8px">✓ Satz fertig</button>
+<button id="end-btn" onclick="endEarly()" style="display:none;width:100%;padding:11px;border-radius:11px;background:transparent;border:1px solid rgba(244,63,94,.25);color:var(--hot);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase">✕ Beenden</button>
 </div>
 
 <!-- RATING -->
@@ -446,6 +447,17 @@ button:active:not(:disabled){transform:scale(.96)}
       <span style="font-size:13px;color:var(--tx)">Beidseitig (Links/Rechts getrennt)</span>
     </label>
     <button onclick="saveCustomEx()" class="btn btn-ac">Hinzufügen</button>
+  </div>
+</div>
+
+<!-- MODAL: Link workout to plan -->
+<div class="modal-ov" id="modal-plan-link">
+  <div class="modal-box">
+    <div style="text-align:center;padding:8px 0 16px">
+      <div style="font-size:28px;margin-bottom:6px">🎯</div>
+      <div style="font-size:17px;font-weight:700;color:var(--tx)">Training gespeichert!</div>
+    </div>
+    <div id="plan-link-body"></div>
   </div>
 </div>
 <!-- MODAL: Exercise Info -->
@@ -757,6 +769,9 @@ async function sendChatMsg(msg){
     }
     chatHistory.push({role:'assistant',content:resp.message});
     addAIMsg(resp.message,resp.chips||[]);
+    if(resp.message&&resp.message.match(/direkt erstell/i)&&chatCtx.summary){
+      generateWorkout(chatCtx.summary);return;
+    }
     if(resp.ready){
       chatCtx.summary=resp.summary||resp.message;
       setTimeout(()=>{
@@ -771,7 +786,12 @@ async function sendChatMsg(msg){
 async function generateWorkout(summaryOverride){
   show('s-gen');document.getElementById('gen-text').textContent='Workout wird erstellt';
   const summary=summaryOverride||chatCtx.summary||'Ganzkörper, 30 Minuten, Körpergewicht, mittlere Intensität';
-  const sys=`Fitness-Trainer. Erstelle Home-Workout auf Deutsch. Vorgaben: ${summary}. Knieschonend. 5-7 Übungen + 2-3 Warmup. Antworte NUR mit JSON-Array: [{"name":"...","duration":40,"rest":20,"icon":"◈","tip":"max 6 Wörter DE","muscles":["chest"],"bilateral":false,"details":"1 Satz","mistakes":"Fehler","warmup":false}]`;
+  const sys=`Fitness-Trainer. Erstelle Home-Workout auf Deutsch. Vorgaben: ${summary}. Knieschonend. 5-7 Übungen + 2-3 Warmup. Weise jedem Exercise einen passenden Typ zu:
+- type:"time" für zeitbasierte Übungen (Plank, Mountain Climber etc.)
+- type:"reps" für zählbare Übungen (Push-up, Klimmzug, Ausfallschritt etc.) → dann "reps":10 statt duration
+- type:"hold" für Halteübungen (Wall Sit, L-Sit, statische Dehnung)
+- type:"amrap" wenn maximale Wdh in Zeitfenster
+Antworte NUR mit JSON-Array: [{"name":"...","type":"time","duration":40,"reps":null,"rest":20,"icon":"◈","tip":"max 6 Wörter DE","muscles":["chest"],"bilateral":false,"details":"1 Satz","mistakes":"Fehler","warmup":false}]`;
   try{
     const raw=await callAPI([{role:'user',content:'Erstelle das Workout.'}],2000,sys);
     const arr=extractJSON(raw);
@@ -804,10 +824,16 @@ function toggleWarmup(){
 
 function adjEx(idx,field,delta){
   if(!curExercises[idx])return;
-  const min=field==='duration'?10:5,max=field==='duration'?300:120;
-  curExercises[idx][field]=Math.min(max,Math.max(min,(curExercises[idx][field]||20)+delta));
-  const el=document.getElementById(field==='duration'?`dur-val-${idx}`:`rest-val-${idx}`);
-  if(el)el.textContent=curExercises[idx][field]+'s';
+  const ex=curExercises[idx];
+  if(field==='reps'){ex.reps=Math.max(1,Math.min(100,(ex.reps||10)+delta));const el=document.getElementById(`dur-val-${idx}`);if(el)el.textContent=ex.reps;}
+  else if(field==='duration'){ex.duration=Math.min(300,Math.max(10,(ex.duration||40)+delta));const el=document.getElementById(`dur-val-${idx}`);if(el)el.textContent=ex.duration+'s';}
+  else if(field==='rest'){ex.rest=Math.min(120,Math.max(5,(ex.rest||20)+delta));const el=document.getElementById(`rest-val-${idx}`);if(el)el.textContent=ex.rest+'s';}
+}
+function setExType(idx,type){
+  if(!curExercises[idx])return;
+  curExercises[idx].type=type;
+  if(type==='reps'&&!curExercises[idx].reps)curExercises[idx].reps=10;
+  showReview();
 }
 
 function deleteEx(idx){
@@ -896,15 +922,26 @@ function showReview(){
       <button onclick="openSwapModal(${i})" style="padding:5px 9px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:11px;font-weight:600;font-family:var(--f);flex-shrink:0">↻</button>
       <button onclick="deleteEx(${i})" style="width:28px;height:28px;border-radius:8px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:var(--hot);font-size:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center">×</button>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid var(--br)">
-      <span style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.06em;width:36px">Zeit</span>
-      <button onclick="adjEx(${i},'duration',-5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
-      <span id="dur-val-${i}" style="font-size:13px;font-weight:600;color:var(--tx);min-width:34px;text-align:center">${ex.duration}s</span>
-      <button onclick="adjEx(${i},'duration',5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>
-      <span style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.06em;width:38px;margin-left:6px">Pause</span>
-      <button onclick="adjEx(${i},'rest',-5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
-      <span id="rest-val-${i}" style="font-size:13px;font-weight:600;color:var(--tx);min-width:34px;text-align:center">${ex.rest||20}s</span>
-      <button onclick="adjEx(${i},'rest',5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--br)">
+      <div style="display:flex;gap:5px;margin-bottom:8px">
+        <button onclick="setExType(${i},'time')" id="type-time-${i}" style="flex:1;padding:6px;border-radius:8px;border:1.5px solid ${(ex.type||'time')==='time'?'var(--ac)':'var(--br)'};background:${(ex.type||'time')==='time'?'rgba(124,58,237,.1)':'var(--up)'};color:${(ex.type||'time')==='time'?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">⏱ Zeit</button>
+        <button onclick="setExType(${i},'reps')" id="type-reps-${i}" style="flex:1;padding:6px;border-radius:8px;border:1.5px solid ${ex.type==='reps'?'var(--ac)':'var(--br)'};background:${ex.type==='reps'?'rgba(124,58,237,.1)':'var(--up)'};color:${ex.type==='reps'?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)"># Wdh</button>
+        <button onclick="setExType(${i},'amrap')" id="type-amrap-${i}" style="flex:1;padding:6px;border-radius:8px;border:1.5px solid ${ex.type==='amrap'?'var(--ac)':'var(--br)'};background:${ex.type==='amrap'?'rgba(124,58,237,.1)':'var(--up)'};color:${ex.type==='amrap'?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">∞ AMRAP</button>
+        <button onclick="setExType(${i},'hold')" id="type-hold-${i}" style="flex:1;padding:6px;border-radius:8px;border:1.5px solid ${ex.type==='hold'?'var(--ac)':'var(--br)'};background:${ex.type==='hold'?'rgba(124,58,237,.1)':'var(--up)'};color:${ex.type==='hold'?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">🧘 Hold</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        ${ex.type==='reps'?`<span style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.06em;width:30px">Wdh</span>
+        <button onclick="adjEx(${i},'reps',-1)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
+        <span id="dur-val-${i}" style="font-size:13px;font-weight:600;color:var(--tx);min-width:30px;text-align:center">${ex.reps||10}</span>
+        <button onclick="adjEx(${i},'reps',1)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>`:`<span style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.06em;width:30px">Sek</span>
+        <button onclick="adjEx(${i},'duration',-5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
+        <span id="dur-val-${i}" style="font-size:13px;font-weight:600;color:var(--tx);min-width:34px;text-align:center">${ex.duration}s</span>
+        <button onclick="adjEx(${i},'duration',5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>`}
+        <span style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-left:4px;width:38px">Pause</span>
+        <button onclick="adjEx(${i},'rest',-5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
+        <span id="rest-val-${i}" style="font-size:13px;font-weight:600;color:var(--tx);min-width:34px;text-align:center">${ex.rest||20}s</span>
+        <button onclick="adjEx(${i},'rest',5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>
+      </div>
     </div>
     <div id="alt-info-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--br);font-size:12px;color:var(--mu)"></div>
   </div>`).join('');
@@ -971,6 +1008,12 @@ function updateTimer(){
   const arc=document.getElementById('timer-arc');arc.setAttribute('stroke',pc);arc.setAttribute('stroke-dashoffset',CIRC-(pg/100)*CIRC);arc.style.filter=`drop-shadow(0 0 9px ${pc}55)`;
   document.getElementById('ph-label').textContent=pl;document.getElementById('ph-label').style.color=pc;
   document.getElementById('t-disp').textContent=fmtT(tLeft);
+  const curEx=(isWU?wuExercises:curExercises)[tIdx]||{};
+  const isRM=curEx.type==='reps';
+  if(isRM&&tStatus==='work'){
+    document.getElementById('t-disp').textContent=(curEx.reps||10)+' Wdh';
+    document.getElementById('timer-arc').setAttribute('stroke-dashoffset',CIRC*.75);
+  }
   document.getElementById('t-ctr').textContent=tStatus!=='idle'&&tStatus!=='done'?isWU?'Warmup '+(tIdx+1)+'/'+wuExercises.length:(tIdx+1)+'/'+curExercises.length:'';
   const bl=document.getElementById('bar-lbl');if(bl)bl.textContent=tStatus==='done'?'✓':isWU?'WU':(tIdx+1)+'/'+curExercises.length;
   const dv=document.getElementById('done-view'),av=document.getElementById('active-view'),rc=document.getElementById('rep-counter');
@@ -987,9 +1030,13 @@ function updateTimer(){
   }
   renderExList();
   (isWU?wuExercises:curExercises).forEach((_,i)=>{const row=document.getElementById('erow-'+i),dot=document.getElementById('edot-'+i);if(!row||!dot)return;const done=i<tIdx,cur=i===tIdx&&(tStatus==='work'||tStatus==='rest');row.style.opacity=done?.25:1;row.style.background=cur?pc+'10':'transparent';row.style.border=cur?`1px solid ${pc}33`:'1px solid transparent';dot.style.borderColor=done?'#1f1f35':cur?pc:'#1f1f35';dot.style.color=done?'#1f1f35':cur?pc:'#3a3a5a';dot.textContent=done?'✓':(i+1);});
-  const sk=document.getElementById('skip-btn'),en=document.getElementById('end-btn');
-  sk.style.opacity=tStatus==='work'&&tRun?'1':'0';sk.style.pointerEvents=tStatus==='work'&&tRun?'auto':'none';
+  const sk=document.getElementById('skip-btn'),en=document.getElementById('end-btn'),rd=document.getElementById('reps-done-btn');
+  const isRepsMode=(isWU?wuExercises:curExercises)[tIdx]?.type==='reps';
+  sk.style.opacity=tStatus==='work'&&tRun&&!isRepsMode?'1':'0';sk.style.pointerEvents=tStatus==='work'&&tRun&&!isRepsMode?'auto':'none';
   en.style.display=(tStatus==='work'||tStatus==='rest'||tStatus==='round_rest')?'block':'none';
+  rd.style.display=tStatus==='work'&&isRepsMode?'block':'none';
+  // Reps mode: pause auto-countdown during work phase
+  if(tStatus==='work'&&isRepsMode&&tRun){clearInterval(tIv);tRun=false;}
   const btn=document.getElementById('main-btn');
   if(tStatus==='done'){btn.textContent='Bewerten →';btn.className='btn btn-co';btn.style.flex='1';btn.style.border='none';btn.onclick=()=>initRating();}
   else if(!tRun){btn.textContent=tStatus==='idle'?'Start':'Weiter';btn.className='btn btn-ac';btn.style.flex='1';btn.style.border='none';btn.style.color='#fff';btn.onclick=()=>startTimer();}
@@ -1019,6 +1066,13 @@ function advance(){
   tRun=true;updateTimer();tIv=setInterval(tick,1000);
 }
 function skipEx(){if(tStatus!=='work')return;clearInterval(tIv);tRun=false;tStatus='rest';tLeft=3;beep(440,.1);tRun=true;updateTimer();tIv=setInterval(tick,1000);}
+function repsDone(){
+  // Manual advance for reps mode
+  const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};
+  clearInterval(tIv);tRun=false;
+  tStatus='rest';tLeft=ex.rest||20;beep(660,.15);
+  tRun=true;updateTimer();tIv=setInterval(tick,1000);
+}
 function endEarly(){if(!confirm('Training beenden?'))return;clearInterval(tIv);tRun=false;tStatus='done';relWL();updateTimer();}
 function addRep(side,d){const rk=tRound+'_'+tIdx+(side?'_'+side:'');tReps[rk]=Math.max(0,(tReps[rk]||0)+d);if(side==='L')document.getElementById('rep-L').textContent=tReps[rk];else if(side==='R')document.getElementById('rep-R').textContent=tReps[rk];else document.getElementById('rep-n').textContent=tReps[rk];}
 function showInfo(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx];if(!ex)return;document.getElementById('mi-name').textContent=ex.name+(ex.bilateral?' (beidseitig)':'');document.getElementById('mi-svg').innerHTML=exSVG(ex.name);document.getElementById('mi-detail').textContent=ex.details||ex.tip||'—';const mEl=document.getElementById('mi-mistakes');if(ex.mistakes){mEl.style.display='block';document.getElementById('mi-m-txt').textContent=ex.mistakes;}else mEl.style.display='none';document.getElementById('mi-muscles').innerHTML=(ex.muscles||[]).map(m=>mkT(MUSCLE_DE[m]||m,'#a78bfa')).join(' ');document.getElementById('modal-info').classList.add('open');}
@@ -1035,10 +1089,83 @@ function initRating(){
   show('s-rating');
 }
 function saveWorkout(){
-  log.push({id:Date.now(),date:new Date().toISOString(),muscles:curSetup.muscles||[],durationMin:curSetup.durationMin||20,exercises:curExercises,repLog:{...tReps},rpe,note:document.getElementById('rat-note').value.trim()});
-  persist();
-  if(pendingPlanSession){markSessDone(pendingPlanSession.wi,pendingPlanSession.si,true);pendingPlanSession=null;}
-  updateHome();setTimeout(fetchCoach,600);show('s-home');
+  const entry={id:Date.now(),date:new Date().toISOString(),muscles:curSetup.muscles||[],durationMin:curSetup.durationMin||20,exercises:curExercises,repLog:{...tReps},rpe,note:document.getElementById('rat-note').value.trim()};
+  log.push(entry);persist();
+  // If started from plan session — auto-link, no modal needed
+  if(pendingPlanSession){
+    markSessDone(pendingPlanSession.wi,pendingPlanSession.si,true);
+    pendingPlanSession=null;
+    updateHome();setTimeout(fetchCoach,600);show('s-home');
+    return;
+  }
+  updateHome();setTimeout(fetchCoach,600);
+  // Offer plan integration
+  if(plan?.weeks?.length){
+    showPlanLinkModal(entry);
+  } else {
+    show('s-home');
+  }
+}
+
+function showPlanLinkModal(entry){
+  const wi=getCurrentWeekIdx();
+  const week=plan?.weeks[wi];
+  const todayDow=new Date().getDay();
+  const todaySessions=week?.sessions.filter(s=>!s.done)||[];
+  const todayMatch=todaySessions.find(s=>s.dow===todayDow);
+  const anyMatch=todaySessions.length>0;
+  const muscles=entry.muscles||[];
+
+  let html='';
+
+  // Today's plan session
+  if(todayMatch){
+    html+=`<div class="card" style="margin-bottom:10px;border-color:rgba(124,58,237,.25);background:rgba(124,58,237,.05)">
+      <div style="font-size:10px;color:var(--ac);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Heute geplant</div>
+      <div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:2px">${todayMatch.focus}</div>
+      <div style="font-size:12px;color:var(--mu);margin-bottom:12px">${todayMatch.durationMin||30} min · ${INT_LABELS[todayMatch.intensity||'medium']} · Woche ${wi+1}</div>
+      <button onclick="linkToSession(${wi},${week.sessions.indexOf(todayMatch)});closeModal('modal-plan-link')" class="btn btn-ac" style="padding:11px;font-size:13px;text-transform:none;margin-bottom:6px">✓ Als diese Session markieren</button>
+    </div>`;
+  }
+
+  // Other open sessions this week
+  const otherSessions=todaySessions.filter(s=>s!==todayMatch);
+  if(otherSessions.length){
+    html+=`<div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:7px">Andere offene Sessions Woche ${wi+1}</div>`;
+    otherSessions.slice(0,2).forEach(s=>{
+      const si=week.sessions.indexOf(s);
+      html+=`<button onclick="linkToSession(${wi},${si});closeModal('modal-plan-link')" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;font-family:var(--f);cursor:pointer"><div style="font-size:18px">${(['So','Mo','Di','Mi','Do','Fr','Sa'])[s.dow]}</div><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.focus}</div><div style="font-size:11px;color:var(--mu)">${s.durationMin||30} min · ${INT_LABELS[s.intensity||'medium']}</div></div></button>`;
+    });
+  }
+
+  // Add as extra
+  html+=`<button onclick="addAsExtraSession(${wi},${JSON.stringify(muscles).replace(/"/g,'&quot;')});closeModal('modal-plan-link')" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--br);background:var(--up);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f);margin-bottom:7px">+ Als Zusatz-Training in Woche ${wi+1} eintragen</button>`;
+  html+=`<button onclick="closeModal('modal-plan-link');show('s-home')" style="width:100%;padding:10px;border-radius:10px;background:none;border:none;color:var(--mu);font-size:13px;font-family:var(--f)">Nicht verknüpfen</button>`;
+
+  document.getElementById('plan-link-body').innerHTML=html;
+  document.getElementById('modal-plan-link').classList.add('open');
+}
+
+function linkToSession(wi,si){
+  markSessDone(wi,si,true);
+  show('s-home');
+}
+
+function addAsExtraSession(wi,muscles){
+  if(!plan?.weeks[wi])return;
+  const todayDow=new Date().getDay();
+  const muscleStr=Array.isArray(muscles)?muscles.map(m=>MUSCLE_DE[m]||m).join(' & ')||'Zusatz':'Zusatz';
+  plan.weeks[wi].sessions.push({
+    dow:todayDow,
+    focus:muscleStr,
+    intensity:'medium',
+    durationMin:20,
+    done:true,
+    doneDate:todayIso(),
+    extra:true
+  });
+  savePlan();
+  show('s-home');
 }
 
 // ─── History ──────────────────────────────────────────────────────────────────
@@ -1287,7 +1414,7 @@ function renderPlanView(wi=0){
   const todayDow=new Date().getDay();
   document.getElementById('plan-sessions').innerHTML=week.sessions.map((s,si)=>{
     const isToday=s.dow===todayDow,c=isToday?'rgba(167,139,250,.15)':'var(--card)',bc=isToday?'rgba(167,139,250,.35)':'var(--br)',ic=INT_COLORS[s.intensity||'medium'];
-    return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:38px;height:38px;border-radius:9px;background:${s.done?'rgba(52,211,153,.1)':isToday?'rgba(167,139,250,.15)':'var(--up)'};border:1px solid ${s.done?'rgba(52,211,153,.3)':isToday?'rgba(167,139,250,.3)':'var(--br)'};display:flex;align-items:center;justify-content:center;font-size:${s.done?18:12}px;font-weight:600;color:${s.done?'var(--co)':isToday?'var(--ac)':'var(--mu)'};flex-shrink:0">${s.done?'✓':DAYS[s.dow]}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}${isToday&&!s.done?' 📍':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${s.exerciseCount?' · '+s.exerciseCount+' Üb.':''}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${(s.equipment||['bodyweight']).map(e=>EQUIP_LABELS[e]||e).join(' · ')}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<button onclick="startSessAt(${wi},${si})" style="padding:7px 11px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">Start</button>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
+    return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:38px;height:38px;border-radius:9px;background:${s.done?'rgba(52,211,153,.1)':isToday?'rgba(167,139,250,.15)':'var(--up)'};border:1px solid ${s.done?'rgba(52,211,153,.3)':isToday?'rgba(167,139,250,.3)':'var(--br)'};display:flex;align-items:center;justify-content:center;font-size:${s.done?18:12}px;font-weight:600;color:${s.done?'var(--co)':isToday?'var(--ac)':'var(--mu)'};flex-shrink:0">${s.done?'✓':DAYS[s.dow]}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}${isToday&&!s.done?' 📍':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${s.exerciseCount?' · '+s.exerciseCount+' Üb.':''}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${(s.equipment||['bodyweight']).map(e=>EQUIP_LABELS[e]||e).join(' · ')}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">⚡ Start</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">💬</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
   }).join('');
 }
 
@@ -1297,6 +1424,21 @@ function markSessDone(wi,si,done){
   if(done)plan.weeks[wi].sessions[si].doneDate=todayIso();
   else delete plan.weeks[wi].sessions[si].doneDate;
   savePlan();renderPlanView(currentViewWeek);updatePlanHome();
+}
+
+function chatFromPlan(wi,si){
+  const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;
+  pendingPlanSession={wi,si};
+  chatHistory=[];chatCtx={};
+  const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Körpergewicht';
+  const intLabel=INT_LABELS[sess.intensity||'medium'];
+  // Pre-fill chat and open coach
+  show('s-chat');
+  document.getElementById('chat-msgs').innerHTML='';
+  addAIMsg(`Bereit für "${sess.focus}"! ${sess.durationMin||30} Minuten, ${intLabel}, ${equip}. Soll ich direkt ein Workout erstellen oder hast du noch Wünsche?`,['Direkt erstellen','Ich hab noch Wünsche']);
+  chatCtx.summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${intLabel}, Equipment: ${equip}`;
+  chatCtx.planSession={wi,si};
+  chatHistory.push({role:'assistant',content:`Bereit für "${sess.focus}"! ${sess.durationMin||30} Minuten, ${intLabel}, ${equip}. Soll ich direkt ein Workout erstellen oder hast du noch Wünsche?`});
 }
 
 function startSessAt(wi,si){
