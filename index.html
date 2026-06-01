@@ -152,6 +152,9 @@ button:active:not(:disabled){transform:scale(.96)}
     <button onclick="showHistory()" id="hist-btn" style="display:none;flex:1;padding:13px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">📋 Verlauf</button>
     <button onclick="show('s-library')" style="flex:1;padding:13px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">📚 Übungen</button>
   </div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button onclick="showPlan()" style="flex:1;padding:13px;border-radius:12px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);color:var(--ac);font-size:13px;font-weight:600;font-family:var(--f)">📅 Trainingsplan</button>
+  </div>
 </div>
 
 <!-- CHAT -->
@@ -393,6 +396,68 @@ button:active:not(:disabled){transform:scale(.96)}
   <div id="plan-future" style="display:flex;flex-direction:column;gap:8px"></div>
 </div>
 
+
+<!-- PLAN SETUP -->
+<div id="s-plan-setup" class="screen">
+  <button class="back" onclick="show('s-home')">← zurück</button>
+  <div style="font-size:21px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px">Trainingsplan erstellen</div>
+  <div style="font-size:13px;color:var(--mu);margin-bottom:22px">Dein persönlicher Home-Workout Plan — wie Runna, aber für Zuhause.</div>
+
+  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Dein Ziel</div>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px" id="goal-cards"></div>
+
+  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Dauer</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px" id="weeks-chips"></div>
+
+  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Workouts pro Woche</div>
+  <div style="display:flex;gap:8px;margin-bottom:20px" id="freq-chips"></div>
+
+  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Zieldatum (optional)</div>
+  <input type="date" id="plan-end-date" class="inp" style="margin-bottom:24px"/>
+
+  <button onclick="generatePlan()" class="btn btn-ac" id="plan-gen-btn">Plan generieren →</button>
+</div>
+
+<!-- PLAN VIEW -->
+<div id="s-plan" class="screen">
+  <button class="back" onclick="show('s-home')">← zurück</button>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+    <div style="font-size:21px;font-weight:700;letter-spacing:-.02em" id="plan-title">Mein Plan</div>
+    <button onclick="show('s-plan-setup')" style="font-size:12px;color:var(--mu);background:var(--up);border:1px solid var(--br);border-radius:8px;padding:6px 10px;font-family:var(--f)">Neu</button>
+  </div>
+  <div id="plan-subtitle" style="font-size:13px;color:var(--mu);margin-bottom:18px"></div>
+
+  <!-- Progress bar -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div id="plan-prog-label" style="font-size:13px;font-weight:600;color:var(--tx)"></div>
+      <div id="plan-prog-pct" style="font-size:13px;font-weight:700;color:var(--ac)"></div>
+    </div>
+    <div style="height:6px;background:var(--br);border-radius:3px;overflow:hidden">
+      <div id="plan-prog-bar" style="height:100%;background:linear-gradient(90deg,var(--ac),#8b5cf6);border-radius:3px;transition:width .5s"></div>
+    </div>
+  </div>
+
+  <!-- Today's session -->
+  <div id="plan-today" class="card" style="display:none;margin-bottom:14px;border-color:rgba(167,139,250,.3);box-shadow:0 0 20px rgba(167,139,250,.12)">
+    <div style="font-size:10px;color:var(--ac);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Heute</div>
+    <div id="plan-today-focus" style="font-size:16px;font-weight:700;color:var(--tx);margin-bottom:4px"></div>
+    <div id="plan-today-meta" style="font-size:12px;color:var(--mu);margin-bottom:14px"></div>
+    <button onclick="startPlanSession()" class="btn btn-ac btn-sm" style="text-transform:none;font-size:14px;padding:12px">Training starten →</button>
+  </div>
+
+  <!-- Week tabs -->
+  <div id="week-tabs" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none"></div>
+
+  <!-- Week sessions -->
+  <div id="plan-sessions" style="display:flex;flex-direction:column;gap:8px"></div>
+
+  <!-- Re-generate option -->
+  <div style="margin-top:20px;text-align:center">
+    <button onclick="show('s-plan-setup')" style="color:var(--mu);font-size:13px;background:none;border:none;cursor:pointer;font-family:var(--f)">Plan neu erstellen</button>
+  </div>
+</div>
+
 <!-- SETTINGS -->
 <div id="s-settings" class="screen">
   <button class="back" onclick="show('s-home')">← zurück</button>
@@ -483,129 +548,25 @@ const fmtT=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart
 const dSince=iso=>Math.floor((Date.now()-new Date(iso))/86400000);
 function streak(){if(!log.length)return 0;let s=0;const d=[...new Set(log.map(w=>new Date(w.date).toDateString()))].reverse();for(let i=0;i<d.length;i++){if(d[i]===new Date(Date.now()-i*86400000).toDateString())s++;else break;}return s;}
 function extractJSON(t){
-  // Strip markdown code fences
   t=(t||'').replace(/```(?:json)?\n?/g,'').replace(/```/g,'').trim();
-  try{const p=JSON.parse(t);return p;}catch{}
-  // Find array first (for library), then object (for chat)
-  const a=t.match(/\[[\s\S]*\]/);if(a){try{return JSON.parse(a[0]);}catch{}}
-  const o=t.match(/\{[\s\S]*\}/);if(o){try{return JSON.parse(o[0]);}catch{}}
-  throw new Error('Kein JSON');
-}
-function histTxt(){if(!log.length)return'Keine bisherigen Workouts.';return log.slice(-8).map(w=>`${fmtD(w.date)} | ${w.muscles?.join(', ')||'?'} | RPE ${w.rpe}/10`).join('\n');}
-
-// ─── Navigation ───────────────────────────────────────────────────────────────
-function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);el.classList.add('active');el.classList.remove('fade');void el.offsetWidth;el.classList.add('fade');window.scrollTo(0,0);}
-function showErr(msg){document.getElementById('err-txt').textContent=msg;document.getElementById('err').style.display='flex';setTimeout(hideErr,7000);}
-function hideErr(){document.getElementById('err').style.display='none';}
-function closeModal(id){document.getElementById(id).classList.remove('open');}
-
-
-
-
-// ─── API ──────────────────────────────────────────────────────────────────────
-async function callAPI(messages, maxT=800, system=''){
-  const key=loadKey();
-  const body={model:MODEL,max_tokens:maxT,messages};
-  if(system)body.system=system;
-  const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key},body:JSON.stringify(body)});
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'HTTP '+res.status);}
-  const d=await res.json();
-  return(d.content||[]).find(b=>b.type==='text')?.text||'';
+  // Try direct parse
+  try{
+    const p=JSON.parse(t);
+    if(Array.isArray(p))return p;
+    // Extract array from wrapper object
+    if(p&&typeof p==='object'){
+      const arr=p.exercises||p.workout||p.workouts||p.plan||p.data||Object.values(p).find(v=>Array.isArray(v));
+      if(arr)return arr;
+    }
+    return p;
+  }catch{}
+  // Find JSON array
+  const a=t.match(/\[[\s\S]+\]/);if(a){try{return JSON.parse(a[0]);}catch{}}
+  // Find JSON object
+  const o=t.match(/\{[\s\S]+\}/);if(o){try{const p=JSON.parse(o[0]);const arr=p.exercises||p.workout||Object.values(p).find(v=>Array.isArray(v));return arr||p;}catch{}}
+  throw new Error('Kein gültiges JSON');
 }
 
-// ─── Wake Lock ────────────────────────────────────────────────────────────────
-async function reqWL(){try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch{}}
-function relWL(){try{wakeLock?.release();wakeLock=null;}catch{}}
-
-function beep(f,d){try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency.value=f;g.gain.setValueAtTime(.22,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+d);o.start(audioCtx.currentTime);o.stop(audioCtx.currentTime+d);}catch{}}
-
-// ─── Bar chart ────────────────────────────────────────────────────────────────
-function drawBars(id,data,h){const s=document.getElementById(id);if(!s||!data.length)return;const mx=Math.max(...data.map(d=>d.v),1),bw=100/data.length;s.innerHTML=data.map((d,i)=>{const bh=Math.max(3,(d.v/mx)*h),x=i*bw+bw*.15,w=bw*.7;return`<rect x="${x}%" y="${h-bh}" width="${w}%" height="${bh}" fill="${d.c||'#a78bfa'}" rx="3" opacity=".85"/><text x="${x+w/2}%" y="${h+14}" text-anchor="middle" font-size="9" fill="#64748b" font-family="-apple-system,sans-serif">${d.l}</text>`;}).join('');}
-
-// ─── Exercise SVG animations ──────────────────────────────────────────────────
-function exSVG(name){
-  const n=(name||'').toLowerCase();
-  const bg='#161625',ac='#a78bfa',am='#fbbf24',co='#34d399',bd='#1f1f35';
-  const H=(cx,cy,r=7)=>`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${ac}"/>`;
-  const L=(x1,y1,x2,y2,c=ac,w=2.5)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
-  const D=(cx,cy,r=4,c=am)=>`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}"/>`;
-  const FL=y=>`<line x1="10" y1="${y}" x2="150" y2="${y}" stroke="${bd}" stroke-width="1.5"/>`;
-  const W=(body,anim='')=>`<svg viewBox="0 0 160 90" style="width:100%;height:85px;border-radius:10px;display:block;margin-bottom:12px"><rect width="160" height="90" fill="${bg}" rx="10"/><style>${anim}</style>${body}</svg>`;
-
-  if(n.match(/push|liegest/))return W(
-    `${FL(75)}${H(36,52)}${L(36,59,118,59,ac,3)}${L(52,59,47,75)}${L(76,59,71,75)}${D(47,75)}${D(71,75)}${D(118,75)}
-    <g style="animation:pu 1.4s ease-in-out infinite"><text x="138" y="52" fill="${am}" font-size="19" text-anchor="middle">↕</text></g>
-    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">LIEGESTÜTZ</text>`,
-    '@keyframes pu{0%,100%{transform:translateY(0)}50%{transform:translateY(9px)}}');
-
-  if(n.match(/bridge|glute|hip|gesäß/))return W(
-    `${FL(75)}${H(24,58)}${L(24,65,75,65,ac,3)}${L(75,65,95,55,ac,3)}${L(95,55,110,65,ac,3)}${D(40,75)}${D(110,75)}${L(24,65,38,75)}
-    <path d="M50 65 Q78 33 95 55" stroke="${co}" stroke-width="2" fill="none" stroke-dasharray="5,3" style="animation:br 1.4s ease-in-out infinite"/>
-    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">GLUTE BRIDGE</text>`,
-    '@keyframes br{0%,100%{opacity:.3;transform:translateY(5px)}50%{opacity:1;transform:translateY(0)}}');
-
-  if(n.match(/plank|brett/))return W(
-    `${FL(75)}${H(28,50)}${L(28,57,128,57,ac,3)}${L(48,57,43,75)}${L(80,57,75,75)}${D(43,75)}${D(75,75)}${D(128,75)}
-    <circle cx="78" cy="57" r="5" fill="${co}" style="animation:pl 2s ease-in-out infinite"/>
-    <text x="104" y="47" fill="${am}" font-size="10" font-family="-apple-system,sans-serif">HALTEN</text>
-    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">PLANK</text>`,
-    '@keyframes pl{0%,100%{opacity:.3;r:3}50%{opacity:1;r:6}}');
-
-  if(n.match(/row|ruder|zug/))return W(
-    `${H(34,30)}${L(34,37,34,60,ac,2.5)}${L(34,42,18,52)}${L(34,42,54,52,ac,2.5)}${L(34,60,22,75)}${L(34,60,46,75)}${D(22,75)}${D(46,75)}
-    <g style="animation:ro 1.4s ease-in-out infinite">${L(54,52,105,52,am,3)}${D(105,52,5,co)}</g>
-    <text x="85" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">ROW / RUDERN</text>`,
-    '@keyframes ro{0%,100%{transform:translateX(0)}50%{transform:translateX(-18px)}}');
-
-  if(n.match(/pull|klimmzug|chin/))return W(
-    `<line x1="20" y1="8" x2="140" y2="8" stroke="${bd}" stroke-width="3"/>${D(80,8,4,am)}
-    <g style="animation:ov 1.5s ease-in-out infinite">${H(80,30)}${L(80,37,80,58,ac,2.5)}${L(80,44,63,36,ac,2)}${L(80,44,97,36,ac,2)}${L(80,58,68,72)}${L(80,58,92,72)}</g>
-    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">KLIMMZUG</text>`,
-    '@keyframes ov{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}');
-
-  if(n.match(/lunge|ausfallschritt/))return W(
-    `${FL(75)}${H(78,24)}${L(78,31,78,52,ac,2.5)}${L(78,38,62,48,ac,2)}${L(78,52,58,75,ac,3)}
-    <g style="animation:lu 1.3s ease-in-out infinite;transform-origin:78px 52px">${L(78,52,98,75,ac,3)}</g>
-    ${D(58,75)}${D(98,75)}
-    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">AUSFALLSCHRITT</text>`,
-    '@keyframes lu{0%,100%{transform:rotate(0)}50%{transform:rotate(26deg)}}');
-
-  if(n.match(/dead.*bug|käfer|crunch|core/))return W(
-    `${H(80,18)}${L(80,25,80,50,ac,2.5)}
-    <g style="animation:cr 1.5s ease-in-out infinite;transform-origin:80px 33px">${L(80,33,50,23,ac,2)}${L(50,23,38,38,ac,2)}</g>
-    <g style="animation:cr 1.5s 0.75s ease-in-out infinite;transform-origin:80px 33px">${L(80,33,110,23,ac,2)}${L(110,23,122,38,ac,2)}</g>
-    ${L(80,50,62,70,ac,2.5)}${L(80,50,98,70,ac,2.5)}
-    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">DEAD BUG / CORE</text>`,
-    '@keyframes cr{0%,100%{transform:translateY(0)rotate(0)}50%{transform:translateY(-10px)rotate(-16deg)}}');
-
-  if(n.match(/mountain|bergsteig/))return W(
-    `${FL(75)}${H(28,46)}${L(28,53,120,53,ac,3)}${D(120,75)}${D(28,75)}
-    <g style="animation:mc 0.75s ease-in-out infinite">${L(64,53,54,75,ac,2.5)}</g>
-    <g style="animation:mc 0.75s 0.375s ease-in-out infinite">${L(88,53,78,75,ac,2.5)}</g>
-    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">MOUNTAIN CLIMBER</text>`,
-    '@keyframes mc{0%,100%{transform:translateY(0)}50%{transform:translateY(-17px)}}');
-
-  if(n.match(/shoulder|schulter|overhead|pike.*push/))return W(
-    `${FL(75)}${H(80,28)}${L(80,35,80,58,ac,2.5)}
-    <g style="animation:ov 1.4s ease-in-out infinite">${L(80,42,60,33,ac,2)}${D(60,33,4,am)}${L(80,42,100,33,ac,2)}${D(100,33,4,am)}</g>
-    ${L(80,58,65,75)}${L(80,58,95,75)}${D(65,75)}${D(95,75)}
-    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">SCHULTERDRÜCKEN</text>`,
-    '@keyframes ov{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}');
-
-  if(n.match(/superman|rücken.*ext|back.*ext/))return W(
-    `${FL(60)}${H(28,53)}${L(28,60,95,60,ac,3)}
-    <g style="animation:br 1.5s ease-in-out infinite">${L(95,60,125,50,ac,2.5)}${D(125,50,4,am)}${L(32,60,10,50,am,2)}${D(10,50,4,co)}</g>
-    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">SUPERMAN</text>`,
-    '@keyframes br{0%,100%{transform:translateY(4px)}50%{transform:translateY(-5px)}}');
-
-  return W(
-    `${FL(75)}${H(80,24)}${L(80,31,80,54,ac,2.5)}
-    <g style="animation:ov 1.5s ease-in-out infinite">${L(80,40,60,32,ac,2)}${L(80,40,100,32,ac,2)}</g>
-    ${L(80,54,64,75)}${L(80,54,96,75)}${D(64,75)}${D(96,75)}
-    <circle cx="80" cy="48" r="20" stroke="${ac}" stroke-width="1" fill="none" stroke-dasharray="4,4" style="animation:pl 2s ease-in-out infinite"/>
-    <text x="80" y="87" fill="${bd}" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">ÜBUNG</text>`,
-    '@keyframes pl{0%,100%{opacity:.15}50%{opacity:.7}}');
-}
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 function updateHome(){
@@ -1030,6 +991,11 @@ function initRating(){
 }
 
 function saveWorkout(){
+  // Mark plan session as done if active
+  if(currentPlanSession&&currentPlanSession.weekIdx!==undefined){
+    markSessionDone(currentPlanSession.weekIdx,currentPlanSession.sessionIdx,true);
+    currentPlanSession=null;
+  }
   log.push({id:Date.now(),date:new Date().toISOString(),muscles:curSetup.muscles||[],durationMin:curSetup.durationMin||20,exercises:curExercises,repLog:{...tReps},rpe,note:document.getElementById('rat-note').value.trim(),intensity:'medium'});
   const wid=log[log.length-1].id;
   persist();
@@ -1411,14 +1377,235 @@ function updatePlanHomeCard(){
   }
 }
 
+
+// ─── Training Plan ────────────────────────────────────────────────────────────
+const GOALS=[
+  {id:'fitness',label:'Allgemeine Fitness',desc:'Ausgewogenes Training für Kraft, Ausdauer und Beweglichkeit',icon:'⚡'},
+  {id:'strength',label:'Kraft & Muskelaufbau',desc:'Progressive Überlastung, compound Bewegungen, Hypertrophie',icon:'💪'},
+  {id:'fatLoss',label:'Abnehmen & Körperfett',desc:'Hochintensiv, viel Core, Metabolismus ankurbeln',icon:'🔥'},
+  {id:'endurance',label:'Ausdauer & Kondition',desc:'Längere Sessions, weniger Pause, Kreislauf stärken',icon:'🏃'},
+];
+const WEEKS_OPTS=[4,6,8,12];
+const FREQ_OPTS=[2,3,4,5];
+const DAYS_DE2=['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+let planSetup={goal:'fitness',weeks:8,freq:3,endDate:''};
+let activePlan=null;
+let currentPlanSession=null;
+
+function loadActivePlan(){try{return JSON.parse(localStorage.getItem('coach_plan_v2'))||null;}catch{return null;}}
+function saveActivePlan(){localStorage.setItem('coach_plan_v2',JSON.stringify(activePlan));}
+
+function showPlan(){
+  activePlan=loadActivePlan();
+  if(activePlan&&activePlan.plan&&activePlan.plan.length){renderPlanView();show('s-plan');}
+  else show('s-plan-setup');
+}
+
+function buildPlanSetup(){
+  // Goal cards
+  const gc=document.getElementById('goal-cards');gc.innerHTML='';
+  GOALS.forEach(g=>{
+    const b=document.createElement('div');
+    b.style.cssText='padding:14px 16px;border-radius:12px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:12px';
+    b.id='gc-'+g.id;
+    b.innerHTML=`<span style="font-size:24px">${g.icon}</span><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;
+    b.onclick=()=>{planSetup.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(167,139,250,.1)';};
+    if(g.id===planSetup.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(167,139,250,.1)';}
+    gc.appendChild(b);
+  });
+  // Weeks
+  const wc=document.getElementById('weeks-chips');wc.innerHTML='';
+  WEEKS_OPTS.forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planSetup.weeks?' ac':'');b.textContent=n+' Wochen';b.onclick=()=>{planSetup.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});
+  // Freq
+  const fc=document.getElementById('freq-chips');fc.innerHTML='';
+  FREQ_OPTS.forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planSetup.freq?' co':'');b.textContent=n+'x / Wo';b.onclick=()=>{planSetup.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';};fc.appendChild(b);});
+  // Date
+  const today=new Date();today.setDate(today.getDate()+planSetup.weeks*7);
+  document.getElementById('plan-end-date').value=today.toISOString().slice(0,10);
+}
+
+async function generatePlan(){
+  if(!loadKey()){showErr('API Key fehlt');return;}
+  const btn=document.getElementById('plan-gen-btn');
+  btn.textContent='Generiere Plan...';btn.disabled=true;
+  const endDateInput=document.getElementById('plan-end-date').value;
+  if(endDateInput)planSetup.endDate=endDateInput;
+
+  const goalObj=GOALS.find(g=>g.id===planSetup.goal)||GOALS[0];
+  const startDate=new Date().toISOString().slice(0,10);
+
+  const prompt=`Du bist ein Personal Trainer. Erstelle einen ${planSetup.weeks}-Wochen Home-Workout-Plan.
+
+Ziel: ${goalObj.label} — ${goalObj.desc}
+Trainingseinheiten pro Woche: ${planSetup.freq}
+Start: ${startDate}
+Knieschonend: ja
+
+Antworte NUR mit JSON (kein Markdown):
+{
+  "title": "Planname",
+  "goal": "${planSetup.goal}",
+  "weeks": ${planSetup.weeks},
+  "freq": ${planSetup.freq},
+  "startDate": "${startDate}",
+  "plan": [
+    {
+      "week": 1,
+      "theme": "Grundlagen",
+      "sessions": [
+        {"dayOfWeek": 1, "focus": "Brust & Arme", "intensity": "easy", "duration": 25, "done": false},
+        {"dayOfWeek": 3, "focus": "Rücken & Core", "intensity": "easy", "duration": 25, "done": false},
+        {"dayOfWeek": 5, "focus": "Beine & Gesäß", "intensity": "easy", "duration": 25, "done": false}
+      ]
+    }
+  ]
+}
+
+dayOfWeek: 0=So, 1=Mo, 2=Di, 3=Mi, 4=Do, 5=Fr, 6=Sa
+intensity: easy/medium/hard
+Progressiv aufbauen: Woche 1-2 leicht, 3-4 mittel, 5+ schwer mit Deload alle 4 Wochen.
+Alle ${planSetup.weeks} Wochen ausgefüllt, jeweils ${planSetup.freq} Sessions.`;
+
+  try{
+    const raw=await callAPI([{role:'user',content:'Erstelle den Plan.'}],2500,prompt);
+    const parsed=extractJSON(raw);
+    const planData=Array.isArray(parsed)?null:parsed;
+    if(!planData||!planData.plan||!planData.plan.length)throw new Error('Kein gültiger Plan');
+
+    activePlan=planData;
+    saveActivePlan();
+    renderPlanView();
+    show('s-plan');
+    btn.textContent='Plan generieren →';btn.disabled=false;
+  }catch(e){
+    console.error(e);showErr('Fehler beim Generieren: '+e.message);
+    btn.textContent='Plan generieren →';btn.disabled=false;
+  }
+}
+
+function renderPlanView(){
+  if(!activePlan)return;
+  const today=new Date();const startDate=new Date(activePlan.startDate);
+  const weeksSinceStart=Math.floor((today-startDate)/(7*86400000));
+  const currentWeekIdx=Math.max(0,Math.min(weeksSinceStart,activePlan.plan.length-1));
+  const totalSessions=activePlan.plan.flatMap(w=>w.sessions).length;
+  const doneSessions=activePlan.plan.flatMap(w=>w.sessions).filter(s=>s.done).length;
+  const pct=totalSessions>0?Math.round(doneSessions/totalSessions*100):0;
+
+  document.getElementById('plan-title').textContent=activePlan.title||'Mein Plan';
+  document.getElementById('plan-subtitle').textContent=(GOALS.find(g=>g.id===activePlan.goal)||{label:activePlan.goal}).label+' · '+activePlan.weeks+' Wochen';
+  document.getElementById('plan-prog-label').textContent=doneSessions+' von '+totalSessions+' Sessions';
+  document.getElementById('plan-prog-pct').textContent=pct+'%';
+  document.getElementById('plan-prog-bar').style.width=pct+'%';
+
+  // Today's session
+  const todayDow=today.getDay();
+  const currentWeek=activePlan.plan[currentWeekIdx];
+  const todaySession=currentWeek?.sessions.find(s=>s.dayOfWeek===todayDow&&!s.done);
+  const todayEl=document.getElementById('plan-today');
+  if(todaySession){
+    todayEl.style.display='block';
+    document.getElementById('plan-today-focus').textContent=todaySession.focus;
+    document.getElementById('plan-today-meta').textContent=todaySession.duration+' min · '+{easy:'Leicht',medium:'Mittel',hard:'Intensiv'}[todaySession.intensity||'medium']+' · Woche '+(currentWeekIdx+1);
+    currentPlanSession={...todaySession,weekIdx:currentWeekIdx,sessionIdx:currentWeek.sessions.indexOf(todaySession)};
+  }else todayEl.style.display='none';
+
+  // Week tabs
+  const tabs=document.getElementById('week-tabs');tabs.innerHTML='';
+  activePlan.plan.forEach((w,i)=>{
+    const b=document.createElement('button');
+    const isDone=w.sessions.every(s=>s.done);const isCurrent=i===currentWeekIdx;
+    b.className='chip'+(isCurrent?' ac':isDone?' co':'');
+    b.style.whiteSpace='nowrap';
+    b.textContent='Wo '+w.week+(isDone?' ✓':'');
+    b.onclick=()=>renderWeekSessions(i);
+    tabs.appendChild(b);
+  });
+
+  renderWeekSessions(currentWeekIdx);
+}
+
+function renderWeekSessions(weekIdx){
+  const week=activePlan.plan[weekIdx];if(!week)return;
+  const today=new Date();const startDate=new Date(activePlan.startDate);
+  const weekStart=new Date(startDate);weekStart.setDate(startDate.getDate()+weekIdx*7);
+
+  document.getElementById('plan-sessions').innerHTML=`
+    <div style="font-size:11px;color:var(--mu);font-weight:600;margin-bottom:4px">WOCHE ${week.week} — ${week.theme||''}</div>
+    ${week.sessions.map((s,si)=>{
+      const sessionDate=new Date(weekStart);sessionDate.setDate(weekStart.getDate()+(s.dayOfWeek-weekStart.getDay()+7)%7);
+      const isPast=sessionDate<today&&!s.done;
+      const intColor={easy:'#34d399',medium:'#fbbf24',hard:'#fb923c'}[s.intensity||'medium'];
+      const intLabel={easy:'Leicht',medium:'Mittel',hard:'Intensiv'}[s.intensity||'medium'];
+      return`<div class="card" style="opacity:${isPast&&!s.done?.6:1}">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:38px;height:38px;border-radius:9px;background:${s.done?'rgba(52,211,153,.1)':'var(--up)'};border:1px solid ${s.done?'rgba(52,211,153,.3)':'var(--br)'};display:flex;align-items:center;justify-content:center;font-size:${s.done?'18px':'11px'};color:${s.done?'#34d399':'var(--mu)'};font-weight:600;flex-shrink:0">${s.done?'✓':DAYS_DE2[s.dayOfWeek]}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:2px">${s.duration} min · <span style="color:${intColor}">${intLabel}</span></div>
+          </div>
+          ${!s.done?`<button onclick="startPlanSessionAt(${weekIdx},${si})" style="padding:8px 12px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f);white-space:nowrap">Starten</button>`:`<button onclick="markSessionDone(${weekIdx},${si},false)" style="padding:6px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">Rückgängig</button>`}
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+function markSessionDone(weekIdx,sessionIdx,done){
+  if(!activePlan||!activePlan.plan[weekIdx]||!activePlan.plan[weekIdx].sessions[sessionIdx])return;
+  activePlan.plan[weekIdx].sessions[sessionIdx].done=done;
+  if(done)activePlan.plan[weekIdx].sessions[sessionIdx].doneDate=new Date().toISOString();
+  saveActivePlan();renderPlanView();
+}
+
+function startPlanSessionAt(weekIdx,sessionIdx){
+  const s=activePlan.plan[weekIdx].sessions[sessionIdx];
+  currentPlanSession={...s,weekIdx,sessionIdx};
+  startPlanSession();
+}
+
+function startPlanSession(){
+  if(!currentPlanSession)return;
+  const s=currentPlanSession;
+  // Pre-fill chat context and generate workout
+  chatHistory=[];chatContext={};
+  chatContext.summary=`Fokus: ${s.focus}, Dauer: ${s.duration} Minuten, Intensität: ${({easy:'leicht',medium:'mittel',hard:'intensiv'})[s.intensity||'medium']}, Nur Körpergewicht, knieschonend`;
+  show('s-gen');
+  document.getElementById('gen-text').textContent='Session wird vorbereitet';
+  generateWorkoutFromChat().then(()=>{
+    // Mark session as done after workout saved
+    // This is handled in saveWorkout()
+  });
+}
+
+// Override saveWorkout to also mark plan session done
+const _origSaveWorkout = typeof saveWorkout !== 'undefined' ? null : null;
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
   log=loadLog();library=loadLibrary();trainingPlan=loadTrainingPlan();
   updateHome();
   if(loadKey()&&log.length>=1)setTimeout(fetchCoach,800);
+  // Show plan progress on dashboard
+  activePlan=loadActivePlan();
+  if(activePlan){
+    const done=activePlan.plan.flatMap(w=>w.sessions).filter(s=>s.done).length;
+    const tot=activePlan.plan.flatMap(w=>w.sessions).length;
+    const today=new Date(),startDate=new Date(activePlan.startDate);
+    const wk=Math.floor((today-startDate)/(7*86400000));
+    const todaySession=activePlan.plan[Math.min(wk,activePlan.plan.length-1)]?.sessions.find(s=>s.dayOfWeek===today.getDay()&&!s.done);
+    if(todaySession){
+      const banner=document.createElement('div');
+      banner.style.cssText='background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);border-radius:11px;padding:12px 15px;margin-bottom:14px;cursor:pointer';
+      banner.innerHTML='<div style="font-size:10px;color:var(--ac);letter-spacing:.08em;font-weight:600;text-transform:uppercase;margin-bottom:4px">Heute geplant</div><div style="font-size:14px;font-weight:600;color:var(--tx)">${todaySession.focus}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${todaySession.duration} min · Woche ${wk+1} von ${activePlan.weeks}</div>';
+      banner.onclick=()=>showPlan();
+      document.getElementById('no-key').after(banner);
+    }
+  }
   document.querySelectorAll('.modal-ov').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&tRun)reqWL();});
   document.getElementById('s-library').addEventListener('animationstart',renderLibrary);
+  document.getElementById('s-plan-setup').addEventListener('animationstart',buildPlanSetup);
   document.getElementById('s-history').addEventListener('animationstart',()=>{});
 });
 </script>
