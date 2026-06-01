@@ -123,11 +123,14 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
 
   <!-- Last workout -->
-  <div id="last-card" class="card" style="display:none;margin-bottom:14px">
+  <div id="last-card" class="card" style="display:none;margin-bottom:14px;cursor:pointer" onclick="showHistory()">
     <div style="font-size:9px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:7px">Letztes Workout</div>
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div style="flex:1"><div id="l-name" style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:5px"></div><div id="l-tags" style="display:flex;gap:5px;flex-wrap:wrap"></div></div>
-      <div id="l-rpe" class="mono" style="font-size:28px;font-weight:500;margin-left:14px;letter-spacing:-.03em"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-left:14px">
+      <div id="l-rpe" class="mono" style="font-size:26px;font-weight:500;letter-spacing:-.03em"></div>
+      <button onclick="event.stopPropagation();delLastWorkout()" style="font-size:10px;color:var(--hot);background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);border-radius:6px;padding:3px 7px;font-family:var(--f);font-weight:600">✕ Löschen</button>
+    </div>
     </div>
   </div>
 
@@ -569,7 +572,7 @@ const RPE_L=['','sehr leicht','leicht','moderat','moderat+','anstrengend','anstr
 const DAYS=['So','Mo','Di','Mi','Do','Fr','Sa'];
 const INT_LABELS={easy:'Leicht',medium:'Mittel',hard:'Intensiv'};
 const INT_COLORS={easy:'var(--co)',medium:'var(--am)',hard:'var(--hot)'};
-const MUSCLE_DE={chest:'Brust',back:'Rücken',shoulders:'Schultern',arms:'Arme',core:'Core',glutes:'Gesäß',legs:'Beine',fullbody:'Ganzkörper'};
+const MUSCLE_DE={chest:'Brust',back:'Rücken',shoulders:'Schultern',arms:'Arme',core:'Core',glutes:'Gesäß',legs:'Beine',fullbody:'Ganzkörper',biceps:'Bizeps',triceps:'Trizeps',quads:'Quadrizeps',hamstrings:'Hamstrings',calves:'Waden',lats:'Latissimus',abs:'Bauch',lower_back:'Unterer Rücken',upper_back:'Oberer Rücken',hip_flexors:'Hüftbeuger',inner_thighs:'Innenschenkel',rear_shoulders:'Hintere Schulter'};
 
 const EQUIPMENT=[
   {id:'bodyweight',label:'Nur Körpergewicht',icon:'🤸'},
@@ -799,16 +802,67 @@ function addAIMsg(text,chips=[]){const w=document.getElementById('chat-msgs');co
 function addUserMsg(text){const w=document.getElementById('chat-msgs');const m=document.createElement('div');m.className='msg user fade';m.textContent=text;w.appendChild(m);w.scrollTop=w.scrollHeight;}
 function sendChat(){const v=document.getElementById('chat-in').value.trim();if(!v)return;document.getElementById('chat-in').value='';sendChatMsg(v);}
 
+function handleChatDelete(){
+  if(!log.length){addAIMsg('Du hast noch keine Trainings gespeichert.',['Neues Training starten']);return;}
+  const last=log[log.length-1];
+  const muscles=(last.muscles||[]).map(m=>MUSCLE_DE[m]||MUSCLE_DE_SHORT[m]||m).filter(Boolean).join(', ')||'Workout';
+  chatCtx._pendingDelete=true;
+  addAIMsg(`Letztes Training: ${muscles} · ${fmtD(last.date)} · RPE ${last.rpe}/10.
+
+Wirklich löschen?`,['Ja, löschen','Nein, behalten']);
+}
+
 async function sendChatMsg(msg){
   addUserMsg(msg);
   chatHistory.push({role:'user',content:msg});
   document.querySelectorAll('#chat-msgs .chips-row').forEach(r=>r.remove());
   if(msg==='Direkt erstellen'&&chatCtx.summary){generateWorkout(chatCtx.summary);return;}
+
+  // ── Local intent detection (no API needed) ──────────────────────────────
+  const lower=msg.toLowerCase();
+
+  // Delete last workout
+  if(lower.match(/lösch|entfern|delete|letztes.*training|training.*lösch/)){
+    handleChatDelete();return;
+  }
+  // Confirm delete
+  if(msg==='Ja, löschen'&&chatCtx._pendingDelete){
+    const idx=log.length-1;if(idx>=0){log.splice(idx,1);persist();updateHome();}
+    chatCtx._pendingDelete=false;
+    addAIMsg('✓ Training gelöscht.',['Neues Training starten','Verlauf anzeigen']);return;
+  }
+  // Navigate to history
+  if(lower.match(/verlauf|history|alle trainings|meine workouts/)){
+    addAIMsg('Zeige deinen Verlauf:',[]); setTimeout(()=>showHistory(),400);return;
+  }
+  // Navigate to plan
+  if(lower.match(/trainingsplan|meinen plan|zum plan/)){
+    addAIMsg('Hier ist dein Trainingsplan:',[]); setTimeout(()=>showPlan(),400);return;
+  }
+  // Streak / stats question
+  if(lower.match(/streak|wie oft|wie viele|statistik|fortschritt/)){
+    const s=streak();const tot=log.length;const last=log[log.length-1];
+    addAIMsg(`Du hast ${tot} Workouts gespeichert${s>0?', aktueller Streak: '+s+' Tag(e)':''}. Letztes Training: ${last?fmtD(last.date)+' (RPE '+last.rpe+'/10)':'noch keins'}.`,['Neues Training starten','Verlauf anzeigen']);return;
+  }
+  // ── End local intents ────────────────────────────────────────────────────
+
   if(!loadKey()){addAIMsg('Bitte zuerst den API Key eintragen.',['Einstellungen →']);return;}
   const typing=document.createElement('div');typing.className='msg ai';typing.style.cssText='color:var(--mu);font-size:20px;letter-spacing:3px';typing.textContent='···';
   document.getElementById('chat-msgs').appendChild(typing);document.getElementById('chat-msgs').scrollTop=9999;
   const prof=profileTxt();
-  const sys=`Du bist persönlicher Fitness-Coach. ${prof?'Nutzer-Profil: '+prof+'. ':''}Kurzes Gespräch (max 4 Fragen): Muskelgruppe/Ziel, Zeit, Equipment, Intensität. Berücksichtige Einschränkungen aus dem Profil. Wenn du genug weißt → ready:true. Antworte NUR mit JSON (kein Markdown): {"message":"DE","chips":[],"ready":false,"summary":""}. Letztes Training: ${histTxt().split('\n')[0]||'keines'}.`;
+  const sys=`Du bist ein intelligenter persönlicher Fitness-Coach. ${prof?'Nutzer-Profil: '+prof+'. ':''}Letztes Training: ${histTxt().split('\n')[0]||'keines'}.
+
+WICHTIG: Verstehe die ABSICHT des Nutzers — nicht immer will er trainieren.
+- Wenn er ein Workout plant: Frage kurz nach (max 3 Fragen): Fokus/Ziel, Zeit, Intensität. Dann ready:true.
+- Wenn er etwas löschen/abbrechen/beenden will: Erkläre wo das geht (z.B. "Im Verlauf kannst du Trainings löschen") und biete Alternativen an. ready:false.
+- Wenn er eine Fitness-Frage stellt: Beantworte sie direkt und frage dann ob er trainieren möchte.
+- Wenn er "zurück", "abbruch", "nein", "cancel" sagt: Verabschiede dich freundlich, schlage vor zurückzugehen. ready:false.
+- Berücksichtige immer Einschränkungen aus dem Profil (z.B. Knie) ohne extra zu fragen.
+- Sei natürlich und persönlich, nicht roboterhaft. Kein starres Schema.
+
+Antworte IMMER NUR mit JSON (kein Markdown, kein Text davor/danach):
+{"message":"Antwort auf Deutsch","chips":["Option1","Option2"],"ready":false,"summary":""}
+Wenn ready:true, fülle summary mit allem nötigen für das Workout.`;
   try{
     const raw=await callAPI(chatHistory,400,sys);
     typing.remove();
@@ -978,6 +1032,7 @@ function addAsExtraSession(wi,muscles){if(!plan?.weeks[wi])return;const todayDow
 // ─── History ──────────────────────────────────────────────────────────────────
 function showHistory(){const rd=log.slice(-8).map(w=>({l:fmtD(w.date),v:w.rpe,c:rpc(w.rpe)}));const hw=document.getElementById('hist-chart');if(rd.length>1){hw.style.display='block';setTimeout(()=>drawBars('rpe-chart',rd,60),30);}else hw.style.display='none';document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.values(w.repLog||{}).reduce((s,v)=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${(w.muscles||[]).map(m=>MUSCLE_DE_SHORT[m]||m).join(', ')||'Workout'}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'#64748b')} ${mkT((w.durationMin||'?')+' min','#64748b')}${tot>0?' '+mkT(tot+' Wdh','#059669'):''}${w.note?' '+mkT('📝','#64748b'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${w.note}</div>`:''}</div>`;}).join('');show('s-history');}
 function delW(idx){if(!confirm('Löschen?'))return;log.splice(idx,1);persist();updateHome();showHistory();}
+function delLastWorkout(){if(!log.length)return;if(!confirm('Letztes Workout löschen?'))return;log.pop();persist();updateHome();}
 function openEdit(idx){const w=log[idx];if(!w)return;document.getElementById('edit-idx').value=idx;document.getElementById('edit-note').value=w.note||'';editRpe=w.rpe||6;const wrap=document.getElementById('edit-rpe-btns');wrap.innerHTML='';for(let n=1;n<=10;n++){const nc=rpc(n),btn=document.createElement('button');btn.style.cssText=`flex:1;padding:8px 0;border-radius:7px;font-size:12px;font-family:var(--m);cursor:pointer;border:1.5px solid ${n===editRpe?nc:'var(--br)'};background:${n===editRpe?nc+'18':'var(--up)'};color:${n===editRpe?nc:'var(--mu)'};font-weight:${n===editRpe?700:400}`;btn.textContent=n;btn.onclick=()=>{editRpe=n;wrap.querySelectorAll('button').forEach((b,i)=>{const bc=rpc(i+1);b.style.borderColor=(i+1)===n?bc:'var(--br)';b.style.background=(i+1)===n?bc+'18':'var(--up)';b.style.color=(i+1)===n?bc:'var(--mu)';b.style.fontWeight=(i+1)===n?700:400;});document.getElementById('edit-rpe-lbl').textContent=RPE_L[n];document.getElementById('edit-rpe-lbl').style.color=nc;};wrap.appendChild(btn);}document.getElementById('edit-rpe-lbl').textContent=RPE_L[editRpe];document.getElementById('edit-rpe-lbl').style.color=rpc(editRpe);document.getElementById('modal-edit').classList.add('open');}
 function saveEdit(){const idx=parseInt(document.getElementById('edit-idx').value);if(isNaN(idx)||!log[idx])return;log[idx].rpe=editRpe;log[idx].note=document.getElementById('edit-note').value.trim();persist();closeModal('modal-edit');showHistory();updateHome();}
 
@@ -1046,8 +1101,9 @@ function chatFromPlan(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;pendingPlanSession={wi,si};chatHistory=[];chatCtx={};
   const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Körpergewicht';
   show('s-chat');document.getElementById('chat-msgs').innerHTML='';
-  addAIMsg(`Bereit für "${sess.focus}"! ${sess.durationMin||30} Minuten, ${INT_LABELS[sess.intensity||'medium']}, ${equip}. Direkt starten oder noch Wünsche?`,['Direkt erstellen','Ich hab noch Wünsche']);
-  chatCtx.summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}`;
+  const focusClean=sess.focus.split('&').map(p=>p.trim()).map(p=>MUSCLE_DE[p]||MUSCLE_DE_SHORT[p]||p).join(' & ');
+  addAIMsg(`Bereit für "${focusClean}"! ${sess.durationMin||30} Minuten, ${INT_LABELS[sess.intensity||'medium']}, ${equip}. Direkt starten oder noch Wünsche?`,['Direkt erstellen','Ich hab noch Wünsche']);
+  chatCtx.summary=`${focusClean}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}`;
   chatHistory.push({role:'assistant',content:`Bereit für "${sess.focus}"!`});
 }
 
