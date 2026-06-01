@@ -870,15 +870,14 @@ async function generatePlan(){
   const goalObj=GOALS.find(g=>g.id===planOpts.goal)||GOALS[0];
   const endDateVal=document.getElementById('plan-end-date').value;
   const weeks=endDateVal?Math.max(1,Math.ceil((new Date(endDateVal+'T12:00:00')-new Date(todayIso()+'T12:00:00'))/(7*86400000))):planOpts.weeks;
-  const sys=`Personal Trainer. ${weeks}-Wochen-Plan. Ziel: ${goalObj.label}. ${planOpts.freq}x/Woche, Knieschonend. Progressiv. Deload jede 4. Woche.
-Session-Dauer variiert zwischen ${planOpts.durMin} und ${planOpts.durMax} Minuten je nach Trainingstyp und Intensität:
-- Leichte Sessions (easy, Mobility, Core): eher ${planOpts.durMin}-${Math.round((planOpts.durMin+planOpts.durMax)/2)} min
-- Mittlere Sessions (medium, Kraft, Ganzkörper): eher ${Math.round((planOpts.durMin+planOpts.durMax)/2)} min
-- Intensive Sessions (hard, HIIT, Ausdauer): eher ${Math.round((planOpts.durMin+planOpts.durMax)/2)}-${planOpts.durMax} min
-NUR JSON: {"title":"...","goal":"${planOpts.goal}","freq":${planOpts.freq},"durMin":${planOpts.durMin},"durMax":${planOpts.durMax},"startDate":"${todayIso()}","weeks":[{"week":1,"theme":"Grundlagen","sessions":[{"dow":1,"focus":"Brust & Arme","intensity":"easy","durationMin":25,"done":false}]}]}
-dow: 0=So,1=Mo,2=Di,3=Mi,4=Do,5=Fr,6=Sa. Alle ${weeks} Wochen, je ${planOpts.freq} Sessions. intensity: easy/medium/hard. durationMin für jede Session individuell setzen.`;
+  const mid=Math.round((planOpts.durMin+planOpts.durMax)/2);
+  const sys=`Fitness-Trainer. Erstelle kompakten ${weeks}-Wochen-Trainingsplan. Ziel: ${goalObj.label}. ${planOpts.freq}x/Woche. Knieschonend. Progressiv steigern. Deload Woche 4 und 8.
+Dauer: easy=${planOpts.durMin}-${mid}min, medium=${mid}min, hard=${mid}-${planOpts.durMax}min.
+Antworte NUR mit minimalem JSON (keine Leerzeichen, keine Zeilenumbrüche):
+{"title":"Kurzname","goal":"${planOpts.goal}","freq":${planOpts.freq},"durMin":${planOpts.durMin},"durMax":${planOpts.durMax},"startDate":"${todayIso()}","weeks":[{"week":1,"theme":"Grundlagen","sessions":[{"dow":1,"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.durMin},"done":false}]}]}
+Regeln: dow 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. Alle ${weeks} Wochen. Je ${planOpts.freq} Sessions. intensity: easy/medium/hard. Verschiedene Muskelgruppen pro Woche abwechseln.`;
   try{
-    const raw=await callAPI([{role:'user',content:'Erstelle den Plan.'}],2500,sys);
+    const raw=await callAPI([{role:'user',content:'Erstelle den Plan jetzt.'}],1500,sys);
     const parsed=extractJSON(raw);
     const planData=Array.isArray(parsed)?null:(parsed?.weeks?parsed:null);
     if(!planData?.weeks?.length)throw new Error('Ungültiger Plan');
