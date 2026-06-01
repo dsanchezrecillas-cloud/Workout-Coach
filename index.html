@@ -601,6 +601,7 @@ function extractJSON(t){
     const p=JSON.parse(t);
     if(Array.isArray(p))return p;
     if(p&&typeof p==='object'){
+      if(p.message!==undefined)return p; // chat/coach response — return as-is
       const arr=p.exercises||p.workout||p.sessions||p.plan||p.weeks||Object.values(p).find(v=>Array.isArray(v));
       if(arr&&Array.isArray(arr))return arr;
     }
