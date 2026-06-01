@@ -172,7 +172,10 @@ button:active:not(:disabled){transform:scale(.96)}
   <div style="font-size:21px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px">Dein Workout</div>
   <div id="rev-meta" style="font-size:13px;color:var(--mu);margin-bottom:18px"></div>
   <div id="wu-sec" style="display:none;margin-bottom:14px">
-    <div style="font-size:10px;color:var(--am);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Warmup</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:10px;color:var(--am);letter-spacing:.08em;text-transform:uppercase;font-weight:600">Warmup</div>
+      <button onclick="toggleWarmup()" id="wu-toggle" style="font-size:11px;padding:4px 9px;border-radius:7px;background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.2);color:var(--am);font-family:var(--f);font-weight:600">✕ Überspringen</button>
+    </div>
     <div id="wu-list" style="display:flex;flex-direction:column;gap:6px"></div>
   </div>
   <div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Haupttraining</div>
@@ -342,7 +345,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <button class="back" onclick="show('s-home')">← zurück</button>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
     <div style="font-size:21px;font-weight:700;letter-spacing:-.02em">Übungsverzeichnis</div>
-    <button onclick="aiLoadExercises()" style="padding:7px 12px;border-radius:9px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)" id="lib-load-btn">+ KI lädt mehr</button>
+    <div style="display:flex;gap:7px"><button onclick="openAddEx()" style="padding:7px 12px;border-radius:9px;background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.2);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f)">+ Eigene</button><button onclick="aiLoadExercises()" style="padding:7px 12px;border-radius:9px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)" id="lib-load-btn">✦ KI lädt mehr</button></div>
   </div>
   <div style="font-size:13px;color:var(--mu);margin-bottom:12px" id="lib-count"></div>
   <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px" id="lib-filter"></div>
@@ -394,6 +397,46 @@ button:active:not(:disabled){transform:scale(.96)}
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Sessions/Woche</div>
     <div style="display:flex;gap:7px;margin-bottom:18px" id="edit-freq-chips"></div>
     <button onclick="applyFreqChange()" class="btn" style="border:1.5px solid var(--br);color:var(--mu);padding:12px;margin-bottom:4px">Sessions/Woche übernehmen</button>
+  </div>
+</div>
+
+<!-- MODAL: Swap Exercise -->
+<div class="modal-ov" id="modal-swap">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:700" id="swap-title">Übung tauschen</div>
+      <button onclick="closeModal('modal-swap')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <input type="hidden" id="swap-idx"/>
+    <div style="display:flex;gap:7px;margin-bottom:14px">
+      <button onclick="swapTab('library')" id="swap-tab-lib" style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--ac);background:rgba(124,58,237,.08);color:var(--ac);font-size:13px;font-weight:600;font-family:var(--f)">Aus Verzeichnis</button>
+      <button onclick="swapTab('ai')" id="swap-tab-ai" style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--br);background:var(--up);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">KI-Vorschlag</button>
+    </div>
+    <div id="swap-lib-list" style="max-height:55vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+    <div id="swap-ai-area" style="display:none;text-align:center;padding:20px 0">
+      <button onclick="getAISwap()" class="btn btn-ac" style="margin-bottom:10px">KI-Vorschlag holen</button>
+      <div id="swap-ai-result" style="font-size:13px;color:var(--mu)"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add Custom Exercise -->
+<div class="modal-ov" id="modal-add-ex">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:700">Übung hinzufügen</div>
+      <button onclick="closeModal('modal-add-ex')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <input id="add-ex-name" class="inp" placeholder="Übungsname *" style="margin-bottom:10px"/>
+    <input id="add-ex-tip" class="inp" placeholder="Kurz-Tipp (optional)" style="margin-bottom:10px"/>
+    <input id="add-ex-detail" class="inp" placeholder="Ausführung (optional)" style="margin-bottom:14px"/>
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Muskelgruppen</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="add-ex-muscles"></div>
+    <label style="display:flex;align-items:center;gap:10px;margin-bottom:16px;cursor:pointer">
+      <input type="checkbox" id="add-ex-bilateral" style="width:16px;height:16px;accent-color:var(--ac)"/>
+      <span style="font-size:13px;color:var(--tx)">Beidseitig (Links/Rechts getrennt)</span>
+    </label>
+    <button onclick="saveCustomEx()" class="btn btn-ac">Hinzufügen</button>
   </div>
 </div>
 <!-- MODAL: Exercise Info -->
@@ -557,9 +600,17 @@ function extractJSON(t){
   throw new Error('Kein gültiges JSON');
 }
 
+const MUSCLE_DE_SHORT={chest:'Brust',back:'Rücken',shoulders:'Schultern',arms:'Arme',core:'Core',glutes:'Gesäß',legs:'Beine',fullbody:'Ganzkörper',biceps:'Bizeps',triceps:'Trizeps',quads:'Quadrizeps',hamstrings:'Hamstrings',calves:'Waden'};
 function histTxt(){
   if(!log.length)return'Keine Workouts.';
-  return log.slice(-8).map(w=>`${fmtD(w.date)} | ${(w.muscles||[]).join(', ')||'?'} | RPE ${w.rpe}/10`).join('\n');
+  const now=new Date(todayIso()+'T12:00:00');
+  return log.slice(-8).map(w=>{
+    const d=new Date(w.date.split('T')[0]+'T12:00:00');
+    const daysAgo=Math.round((now-d)/86400000);
+    const when=daysAgo===0?'heute':daysAgo===1?'gestern':`vor ${daysAgo} Tagen`;
+    const muscles=(w.muscles||[]).map(m=>MUSCLE_DE_SHORT[m]||m).join(', ')||'?';
+    return`${when} | ${muscles} | RPE ${w.rpe}/10`+(w.note?` | "${w.note}"`:'')+` | ${w.durationMin||'?'} min`;
+  }).join('\n');
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
@@ -643,7 +694,8 @@ async function fetchCoach(){
   document.getElementById('c-spinner').style.display='block';
   document.getElementById('c-text').textContent='Analysiere...';
   try{
-    const raw=await callAPI([{role:'user',content:'Kurze Analyse und Empfehlung für heute.\n\nHistorie:\n'+histTxt()+'\n\nJSON: {"message":"2-3 Sätze DE","tip":"1 Tipp"}'}],300);
+    const h=new Date().getHours(),timeOfDay=h<12?'Morgen':h<18?'Mittag':'Abend';
+    const raw=await callAPI([{role:'user',content:`Heute ist ${todayIso()}, ${timeOfDay}. Analysiere als persönlicher Fitness-Coach auf Deutsch.\n\nTrainingsverlauf (aktuellste zuerst):\n${histTxt()}\n\nGib eine intelligente, individuelle Empfehlung. Berücksichtige: Erholung nach letztem Training, Muskelgruppen die fehlen, eventuelle Notizen des Nutzers, Trainingsrhythmus. Wenn Notizen vorhanden, kommentiere diese.\n\nNUR JSON: {"message":"2-3 persönliche Sätze DE","tip":"1 konkreter Tipp DE"}`}],400);
     const s=extractJSON(raw);const obj=Array.isArray(s)?s[0]:s;
     document.getElementById('c-text').textContent=obj.message||'—';
     if(obj.tip){document.getElementById('c-tip').style.display='block';document.getElementById('c-tip').textContent='💡 '+obj.tip;}
@@ -715,12 +767,126 @@ async function generateWorkout(summaryOverride){
   }
 }
 
+
+// ─── Review controls ──────────────────────────────────────────────────────────
+let wuVisible=true;
+function toggleWarmup(){
+  wuVisible=!wuVisible;
+  const sec=document.getElementById('wu-sec');
+  sec.querySelector('div[id=wu-list]').style.display=wuVisible?'flex':'none';
+  sec.querySelector('div[id=wu-list]').style.flexDirection='column';
+  document.getElementById('wu-toggle').textContent=wuVisible?'✕ Überspringen':'✓ Einschließen';
+  document.getElementById('wu-toggle').style.background=wuVisible?'rgba(217,119,6,.1)':'rgba(5,150,105,.1)';
+  document.getElementById('wu-toggle').style.borderColor=wuVisible?'rgba(217,119,6,.2)':'rgba(5,150,105,.2)';
+  document.getElementById('wu-toggle').style.color=wuVisible?'var(--am)':'var(--co)';
+}
+
+function adjEx(idx,field,delta){
+  if(!curExercises[idx])return;
+  const min=field==='duration'?10:5,max=field==='duration'?300:120;
+  curExercises[idx][field]=Math.min(max,Math.max(min,(curExercises[idx][field]||20)+delta));
+  const el=document.getElementById(field==='duration'?`dur-val-${idx}`:`rest-val-${idx}`);
+  if(el)el.textContent=curExercises[idx][field]+'s';
+}
+
+function deleteEx(idx){
+  curExercises.splice(idx,1);showReview();
+}
+
+// ─── Swap modal ───────────────────────────────────────────────────────────────
+let swapIdx=0,swapCurrentTab='library';
+function openSwapModal(idx){
+  swapIdx=idx;
+  const ex=curExercises[idx];
+  document.getElementById('swap-title').textContent=ex.name+' tauschen';
+  document.getElementById('swap-idx').value=idx;
+  swapTab('library');
+  document.getElementById('modal-swap').classList.add('open');
+}
+function swapTab(tab){
+  swapCurrentTab=tab;
+  const libBtn=document.getElementById('swap-tab-lib'),aiBtn=document.getElementById('swap-tab-ai');
+  const libList=document.getElementById('swap-lib-list'),aiArea=document.getElementById('swap-ai-area');
+  libBtn.style.borderColor=tab==='library'?'var(--ac)':'var(--br)';libBtn.style.background=tab==='library'?'rgba(124,58,237,.08)':'var(--up)';libBtn.style.color=tab==='library'?'var(--ac)':'var(--mu)';
+  aiBtn.style.borderColor=tab==='ai'?'var(--ac)':'var(--br)';aiBtn.style.background=tab==='ai'?'rgba(124,58,237,.08)':'var(--up)';aiBtn.style.color=tab==='ai'?'var(--ac)':'var(--mu)';
+  libList.style.display=tab==='library'?'flex':'none';aiArea.style.display=tab==='ai'?'block':'none';
+  if(tab==='library'){
+    const ex=curExercises[swapIdx];const muscles=ex.muscles||[];
+    const all=[...DEFAULT_LIB,...library];
+    // Show matching muscle group first, then rest
+    const matching=all.filter(e=>e.name!==ex.name&&(e.muscles||[]).some(m=>muscles.includes(m)));
+    const others=all.filter(e=>e.name!==ex.name&&!(e.muscles||[]).some(m=>muscles.includes(m)));
+    const list=[...matching,...others];
+    libList.innerHTML='';
+    if(matching.length){const lbl=document.createElement('div');lbl.style.cssText='font-size:10px;color:var(--ac);letter-spacing:.08em;text-transform:uppercase;font-weight:600;padding:4px 2px';lbl.textContent='Gleiche Muskelgruppe';libList.appendChild(lbl);}
+    list.forEach((e,i)=>{
+      if(i===matching.length&&others.length){const lbl=document.createElement('div');lbl.style.cssText='font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;padding:8px 2px 4px';lbl.textContent='Andere';libList.appendChild(lbl);}
+      const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);cursor:pointer;transition:all .12s';
+      row.innerHTML=`<div style="font-size:12px;color:var(--ac);flex-shrink:0;width:22px">${getExIcon(e.name)}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx)">${e.name}${e.bilateral?' ↔':''}</div><div style="font-size:11px;color:var(--mu)">${(e.muscles||[]).map(m=>MUSCLE_DE[m]||m).join(', ')}</div></div>`;
+      row.onclick=()=>{applySwap(e);};libList.appendChild(row);
+    });
+  }
+}
+function applySwap(ex){
+  const old=curExercises[swapIdx];
+  curExercises[swapIdx]={...ex,duration:old.duration,rest:old.rest,icon:getExIcon(ex.name)};
+  closeModal('modal-swap');showReview();
+}
+async function getAISwap(){
+  if(!loadKey()){showErr('API Key fehlt');return;}
+  const ex=curExercises[swapIdx];const muscles=ex.muscles||[];
+  document.getElementById('swap-ai-result').textContent='Lädt...';
+  try{
+    const raw=await callAPI([{role:'user',content:`Schlage 3 Alternativen für "${ex.name}" (Muskelgruppen: ${muscles.join(',')}) vor. Kein Equipment, knieschonend. NUR JSON-Array: [{"name":"...","tip":"DE","muscles":["core"],"bilateral":false}]`}],400);
+    const parsed=extractJSON(raw);const arr=Array.isArray(parsed)?parsed:[parsed];
+    document.getElementById('swap-ai-result').innerHTML='';
+    arr.filter(e=>e&&e.name).forEach(e=>{const b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;cursor:pointer;font-family:var(--f)';b.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx)">${e.name}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${e.tip||''}</div>`;b.onclick=()=>applySwap({...e,icon:getExIcon(e.name)});document.getElementById('swap-ai-result').appendChild(b);});
+  }catch(err){document.getElementById('swap-ai-result').textContent='Fehler: '+err.message;}
+}
+
+// ─── Custom exercise creation ─────────────────────────────────────────────────
+let addExMuscles=[];
+function openAddEx(){
+  addExMuscles=[];
+  document.getElementById('add-ex-name').value='';document.getElementById('add-ex-tip').value='';
+  document.getElementById('add-ex-detail').value='';document.getElementById('add-ex-bilateral').checked=false;
+  const mw=document.getElementById('add-ex-muscles');mw.innerHTML='';
+  ['chest','back','shoulders','arms','core','glutes','legs'].forEach(m=>{const b=document.createElement('button');b.className='chip';b.textContent=MUSCLE_DE[m]||m;b.onclick=()=>{if(addExMuscles.includes(m)){addExMuscles=addExMuscles.filter(x=>x!==m);b.className='chip';}else{addExMuscles.push(m);b.className='chip ac';};};mw.appendChild(b);});
+  document.getElementById('modal-add-ex').classList.add('open');
+}
+function saveCustomEx(){
+  const name=document.getElementById('add-ex-name').value.trim();if(!name){showErr('Name fehlt');return;}
+  const ex={name,tip:document.getElementById('add-ex-tip').value.trim(),details:document.getElementById('add-ex-detail').value.trim(),muscles:addExMuscles.length?addExMuscles:['core'],bilateral:document.getElementById('add-ex-bilateral').checked,custom:true};
+  library=[...library,ex];saveLibrary();closeModal('modal-add-ex');renderLibrary();
+}
+
 // ─── Review ───────────────────────────────────────────────────────────────────
 function showReview(){
   document.getElementById('rev-meta').textContent=curExercises.length+' Übungen'+(wuExercises.length?' + '+wuExercises.length+' Warmup':'');
   const ws=document.getElementById('wu-sec');
   if(wuExercises.length){ws.style.display='block';document.getElementById('wu-list').innerHTML=wuExercises.map(ex=>`<div class="card" style="border-color:rgba(251,191,36,.15)"><div style="display:flex;align-items:center;gap:10px"><div style="width:33px;height:33px;border-radius:8px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--am)">${ex.icon||'○'}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}</div><div style="font-size:11px;color:var(--mu)">${ex.tip||''}</div></div><span style="font-size:11px;color:var(--mu);font-family:var(--m)">${ex.duration}s</span></div></div>`).join('');}else ws.style.display='none';
-  document.getElementById('rev-list').innerHTML=curExercises.map((ex,i)=>`<div class="card" id="rev-${i}"><div style="display:flex;align-items:center;gap:10px"><button onclick="showExDetail(${i})" style="width:36px;height:36px;border-radius:8px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);font-size:14px;color:var(--ac);flex-shrink:0">${ex.icon||'ℹ'}</button><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:2px">${ex.name}${ex.bilateral?' ↔':''}</div><div style="font-size:11px;color:var(--mu)">${ex.tip||''}</div></div><button onclick="cycleAlt(${i})" style="padding:7px 11px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f);white-space:nowrap;flex-shrink:0">↻ Alt</button></div><div id="alt-info-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--br);font-size:12px;color:var(--mu)"></div></div>`).join('');
+  document.getElementById('rev-list').innerHTML=curExercises.map((ex,i)=>`<div class="card" id="rev-${i}">
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onclick="showExDetail(${i})" style="width:34px;height:34px;border-radius:8px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.15);font-size:13px;color:var(--ac);flex-shrink:0">${ex.icon||'ℹ'}</button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}${ex.bilateral?' ↔':''}</div>
+        <div style="font-size:11px;color:var(--mu)">${ex.tip||''}</div>
+      </div>
+      <button onclick="openSwapModal(${i})" style="padding:5px 9px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:11px;font-weight:600;font-family:var(--f);flex-shrink:0">↻</button>
+      <button onclick="deleteEx(${i})" style="width:28px;height:28px;border-radius:8px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:var(--hot);font-size:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center">×</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid var(--br)">
+      <span style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.06em;width:36px">Zeit</span>
+      <button onclick="adjEx(${i},'duration',-5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
+      <span id="dur-val-${i}" style="font-size:13px;font-weight:600;color:var(--tx);min-width:34px;text-align:center">${ex.duration}s</span>
+      <button onclick="adjEx(${i},'duration',5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>
+      <span style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.06em;width:38px;margin-left:6px">Pause</span>
+      <button onclick="adjEx(${i},'rest',-5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
+      <span id="rest-val-${i}" style="font-size:13px;font-weight:600;color:var(--tx);min-width:34px;text-align:center">${ex.rest||20}s</span>
+      <button onclick="adjEx(${i},'rest',5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>
+    </div>
+    <div id="alt-info-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--br);font-size:12px;color:var(--mu)"></div>
+  </div>`).join('');
   show('s-review');
 }
 
