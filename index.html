@@ -371,6 +371,15 @@ button:active:not(:disabled){transform:scale(.96)}
     </div>
     <input type="file" id="imp-inp" accept=".json" style="display:none" onchange="doImport(event)"/>
   </div>
+  <div class="card" style="margin-bottom:13px">
+    <div style="font-size:10px;letter-spacing:.1em;color:var(--ac);text-transform:uppercase;font-weight:600;margin-bottom:11px">Coach-Profil</div>
+    <div style="font-size:12px;color:var(--mu);margin-bottom:12px">Je mehr der Coach über dich weiß, desto besser seine Empfehlungen.</div>
+    <input id="prof-name" class="inp" placeholder="Dein Name" style="margin-bottom:9px"/>
+    <textarea id="prof-goals" class="inp" placeholder="Ziele (z.B. 4 kg abnehmen bis Juni, Kraft aufbauen...)" style="resize:none;height:60px;margin-bottom:9px"></textarea>
+    <textarea id="prof-limits" class="inp" placeholder="Einschränkungen (z.B. Knieschmerzen, IT-Band, Rückenproblem...)" style="resize:none;height:60px;margin-bottom:9px"></textarea>
+    <textarea id="prof-notes" class="inp" placeholder="Sonstiges (z.B. Vegetarier, trainiere morgens, Heimtraining...)" style="resize:none;height:55px;margin-bottom:11px"></textarea>
+    <button onclick="saveCoachProfile()" class="btn btn-ac" id="prof-btn" style="padding:12px">Profil speichern</button>
+  </div>
   <div class="card"><div style="font-size:12px;color:var(--mu)">Schema v5 · claude-sonnet-4-6</div></div>
 </div>
 
@@ -565,6 +574,8 @@ function savePlan(){localStorage.setItem(PK,JSON.stringify(plan));}
 function loadLibrary(){try{return JSON.parse(localStorage.getItem(LK))||[];}catch{return[];}}
 function saveLibrary(){localStorage.setItem(LK,JSON.stringify(library));}
 function loadKey(){return localStorage.getItem(AK)||'';}
+function loadProfile(){try{return JSON.parse(localStorage.getItem('coach_profile'))||{};}catch{return{};}}
+function saveProfile(p){localStorage.setItem('coach_profile',JSON.stringify(p));}
 function saveApiKey(k){localStorage.setItem(AK,k);}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -676,6 +687,7 @@ function updateHome(){
   document.getElementById('hist-btn').style.display=log.length>0?'block':'none';
   document.getElementById('bk-info').textContent=log.length+' Workouts';
   const key=loadKey();if(key)document.getElementById('key-inp').value=key;
+  const prof=loadProfile();if(prof){if(prof.name)document.getElementById('prof-name').value=prof.name;if(prof.goals)document.getElementById('prof-goals').value=prof.goals;if(prof.limits)document.getElementById('prof-limits').value=prof.limits;if(prof.notes)document.getElementById('prof-notes').value=prof.notes;}
   const h=new Date().getHours();
   document.getElementById('greeting').textContent=(h<12?'Guten Morgen':h<18?'Guten Tag':'Guten Abend')+', Dario.';
   if(last){
@@ -695,7 +707,9 @@ async function fetchCoach(){
   document.getElementById('c-text').textContent='Analysiere...';
   try{
     const h=new Date().getHours(),timeOfDay=h<12?'Morgen':h<18?'Mittag':'Abend';
-    const raw=await callAPI([{role:'user',content:`Heute ist ${todayIso()}, ${timeOfDay}. Analysiere als persönlicher Fitness-Coach auf Deutsch.\n\nTrainingsverlauf (aktuellste zuerst):\n${histTxt()}\n\nGib eine intelligente, individuelle Empfehlung. Berücksichtige: Erholung nach letztem Training, Muskelgruppen die fehlen, eventuelle Notizen des Nutzers, Trainingsrhythmus. Wenn Notizen vorhanden, kommentiere diese.\n\nNUR JSON: {"message":"2-3 persönliche Sätze DE","tip":"1 konkreter Tipp DE"}`}],400);
+    const profCtx=profileTxt();
+    const planCtx=plan?`Aktiver Plan: ${plan.title||''}, Woche ${getCurrentWeekIdx()+1}/${plan.weeks.length}, ${plan.weeks.flatMap(w=>w.sessions).filter(s=>s.done).length} Sessions abgeschlossen.`:'Kein aktiver Trainingsplan.';
+    const raw=await callAPI([{role:'user',content:`Heute ist ${todayIso()}, ${timeOfDay}. Du bist persönlicher Fitness-Coach.${profCtx?'\n\nNutzer-Profil: '+profCtx:''}\n\nAktiver Trainingsplan: ${planCtx}\n\nTrainingsverlauf (neueste zuerst):\n${histTxt()}\n\nGib eine kurze, intelligente, persönliche Empfehlung für heute. Berücksichtige Erholung, Muster, Notizen und Einschränkungen aus dem Profil. Sprich den Nutzer direkt an${profCtx.includes('Name:')?(' mit seinem Namen'):''}. Sei konkret, nicht generisch.\n\nNUR JSON: {"message":"2-3 persönliche Sätze DE","tip":"1 konkreter Tipp DE"}`}],500);
     const s=extractJSON(raw);const obj=Array.isArray(s)?s[0]:s;
     document.getElementById('c-text').textContent=obj.message||'—';
     if(obj.tip){document.getElementById('c-tip').style.display='block';document.getElementById('c-tip').textContent='💡 '+obj.tip;}
@@ -727,13 +741,19 @@ async function sendChatMsg(msg){
   if(!loadKey()){addAIMsg('Bitte zuerst den API Key eintragen.',['Einstellungen →']);return;}
   const typing=document.createElement('div');typing.className='msg ai';typing.style.cssText='color:var(--mu);font-size:20px;letter-spacing:3px';typing.textContent='···';
   document.getElementById('chat-msgs').appendChild(typing);document.getElementById('chat-msgs').scrollTop=9999;
-  const sys=`Du bist ein Personal Trainer. Kurzes Gespräch, max 4 Fragen: Muskel, Zeit, Equipment, Intensität. Wenn genug Info → ready:true mit summary. Antworte NUR mit JSON: {"message":"DE","chips":[],"ready":false,"summary":""}. Historie: ${histTxt()}`;
+  const prof=profileTxt();
+  const sys=`Du bist persönlicher Fitness-Coach. ${prof?'Nutzer-Profil: '+prof+'. ':''}Kurzes Gespräch (max 4 Fragen): Muskelgruppe/Ziel, Zeit, Equipment, Intensität. Berücksichtige Einschränkungen aus dem Profil automatisch. Wenn du genug weißt → ready:true. Antworte NUR mit JSON (kein Markdown): {"message":"DE","chips":[],"ready":false,"summary":""}. Letztes Training: ${histTxt().split('\n')[0]||'keines'}.`;
   try{
     const raw=await callAPI(chatHistory,400,sys);
     typing.remove();
-    const parsed=extractJSON(raw);
-    const resp=Array.isArray(parsed)?parsed[0]:parsed;
-    if(!resp||!resp.message)throw new Error('Keine Antwort');
+    let resp=null;
+    try{const parsed=extractJSON(raw);resp=Array.isArray(parsed)?parsed[0]:parsed;}catch{}
+    // Fallback: model returned plain text instead of JSON
+    if(!resp?.message){
+      const cleaned=raw.replace(/```json?/g,'').replace(/```/g,'').trim();
+      if(cleaned.length>3)resp={message:cleaned,chips:[],ready:false,summary:''};
+      else throw new Error('Keine Antwort vom Modell');
+    }
     chatHistory.push({role:'assistant',content:resp.message});
     addAIMsg(resp.message,resp.chips||[]);
     if(resp.ready){
@@ -1395,6 +1415,21 @@ async function aiLoadExercises(){
   btn.textContent='+ KI lädt mehr';btn.disabled=false;
 }
 
+
+function saveCoachProfile(){
+  const p={name:document.getElementById('prof-name').value.trim(),goals:document.getElementById('prof-goals').value.trim(),limits:document.getElementById('prof-limits').value.trim(),notes:document.getElementById('prof-notes').value.trim()};
+  saveProfile(p);const btn=document.getElementById('prof-btn');btn.textContent='✓ Gespeichert';setTimeout(()=>btn.textContent='Profil speichern',2000);
+}
+
+function profileTxt(){
+  const p=loadProfile();if(!p||(!p.name&&!p.goals&&!p.limits))return'';
+  const parts=[];
+  if(p.name)parts.push('Name: '+p.name);
+  if(p.goals)parts.push('Ziele: '+p.goals);
+  if(p.limits)parts.push('Einschränkungen: '+p.limits);
+  if(p.notes)parts.push('Sonstiges: '+p.notes);
+  return parts.join(' | ');
+}
 // ─── Settings ─────────────────────────────────────────────────────────────────
 function saveKey(){const k=document.getElementById('key-inp').value.trim();saveApiKey(k);const btn=document.getElementById('key-btn');btn.textContent='✓ Gespeichert';setTimeout(()=>btn.textContent='Speichern',2000);updateHome();}
 function doExport(){const b=new Blob([JSON.stringify({version:5,data:log,plan,library,exportedAt:todayIso()},null,2)],{type:'application/json'});const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='coach-'+todayIso()+'.json';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);}
