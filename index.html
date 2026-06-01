@@ -442,9 +442,13 @@ button:active:not(:disabled){transform:scale(.96)}
     <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap" id="sess-day-picker"></div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Intensität</div>
     <div style="display:flex;gap:8px;margin-bottom:18px" id="sess-int-picker"></div>
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Equipment</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px" id="sess-equip-picker"></div>
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Anzahl Übungen</div>
+    <div style="display:flex;gap:7px;margin-bottom:20px" id="sess-count-picker"></div>
     <div style="display:flex;gap:8px">
       <button onclick="saveSessEdit()" class="btn btn-ac" style="flex:1">Speichern</button>
-      <button onclick="markSessionDone(parseInt(document.getElementById('sess-wi').value),parseInt(document.getElementById('sess-si').value),true);closeModal('modal-session');renderPlanView(currentViewWeek)" style="flex:1;padding:15px;border-radius:13px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:var(--co);font-size:14px;font-weight:600;font-family:var(--f);text-transform:uppercase;letter-spacing:.04em">✓ Erledigt</button>
+      <button onclick="markSessionDone(parseInt(document.getElementById('sess-wi').value),parseInt(document.getElementById('sess-si').value),true);closeModal('modal-session');renderPlanView(currentViewWeek)" style="flex:1;padding:15px;border-radius:13px;background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.2);color:var(--co);font-size:14px;font-weight:600;font-family:var(--f);text-transform:uppercase;letter-spacing:.04em">✓ Erledigt</button>
     </div>
   </div>
 </div>
@@ -461,6 +465,16 @@ const DAYS=['So','Mo','Di','Mi','Do','Fr','Sa'];
 const INT_LABELS={easy:'Leicht',medium:'Mittel',hard:'Intensiv'};
 const INT_COLORS={easy:'var(--co)',medium:'var(--am)',hard:'var(--hot)'};
 const MUSCLE_DE={chest:'Brust',back:'Rücken',shoulders:'Schultern',arms:'Arme',core:'Core',glutes:'Gesäß',legs:'Beine',fullbody:'Ganzkörper'};
+
+const EQUIPMENT=[
+  {id:'bodyweight',label:'Nur Körpergewicht',icon:'🤸'},
+  {id:'bar',label:'Klimmzugstange',icon:'🏋️'},
+  {id:'dumbbells',label:'Kurzhanteln',icon:'💪'},
+  {id:'resistance_band',label:'Widerstandsband',icon:'🪢'},
+  {id:'kettlebell',label:'Kettlebell',icon:'⚫'},
+  {id:'bench',label:'Bank / Sofa',icon:'🛋️'},
+];
+const EQUIP_LABELS={'bodyweight':'Körpergewicht','bar':'Klimmzugstange','dumbbells':'Kurzhanteln','resistance_band':'Widerstandsband','kettlebell':'Kettlebell','bench':'Bank/Sofa'};
 const GOALS=[
   {id:'fitness',label:'Allgemeine Fitness',desc:'Ausgewogen — Kraft, Ausdauer, Beweglichkeit',icon:'⚡'},
   {id:'strength',label:'Kraft & Muskelaufbau',desc:'Progressive Überlastung, Compound-Bewegungen',icon:'💪'},
@@ -1016,7 +1030,9 @@ function startPlanSession(){
   const sess=week?.sessions[pendingPlanSession.si];
   if(!sess)return;
   chatCtx={};chatHistory=[];
-  const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, nur Körpergewicht`;
+  const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';
+  const count=sess.exerciseCount||5;
+  const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;
   generateWorkout(summary);
 }
 
@@ -1084,7 +1100,7 @@ function renderPlanView(wi=0){
   const todayDow=new Date().getDay();
   document.getElementById('plan-sessions').innerHTML=week.sessions.map((s,si)=>{
     const isToday=s.dow===todayDow,c=isToday?'rgba(167,139,250,.15)':'var(--card)',bc=isToday?'rgba(167,139,250,.35)':'var(--br)',ic=INT_COLORS[s.intensity||'medium'];
-    return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:38px;height:38px;border-radius:9px;background:${s.done?'rgba(52,211,153,.1)':isToday?'rgba(167,139,250,.15)':'var(--up)'};border:1px solid ${s.done?'rgba(52,211,153,.3)':isToday?'rgba(167,139,250,.3)':'var(--br)'};display:flex;align-items:center;justify-content:center;font-size:${s.done?18:12}px;font-weight:600;color:${s.done?'var(--co)':isToday?'var(--ac)':'var(--mu)'};flex-shrink:0">${s.done?'✓':DAYS[s.dow]}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}${isToday&&!s.done?' 📍':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span></div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<button onclick="startSessAt(${wi},${si})" style="padding:7px 11px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">Start</button>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
+    return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:38px;height:38px;border-radius:9px;background:${s.done?'rgba(52,211,153,.1)':isToday?'rgba(167,139,250,.15)':'var(--up)'};border:1px solid ${s.done?'rgba(52,211,153,.3)':isToday?'rgba(167,139,250,.3)':'var(--br)'};display:flex;align-items:center;justify-content:center;font-size:${s.done?18:12}px;font-weight:600;color:${s.done?'var(--co)':isToday?'var(--ac)':'var(--mu)'};flex-shrink:0">${s.done?'✓':DAYS[s.dow]}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}${isToday&&!s.done?' 📍':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${s.exerciseCount?' · '+s.exerciseCount+' Üb.':''}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${(s.equipment||['bodyweight']).map(e=>EQUIP_LABELS[e]||e).join(' · ')}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<button onclick="startSessAt(${wi},${si})" style="padding:7px 11px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">Start</button>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
   }).join('');
 }
 
@@ -1099,27 +1115,52 @@ function markSessDone(wi,si,done){
 function startSessAt(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;
   pendingPlanSession={wi,si};
-  const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, nur Körpergewicht`;
+  const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';
+  const count=sess.exerciseCount||5;
+  const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;
   generateWorkout(summary);
 }
 
-let sessEditWi=0,sessEditSi=0,sessEditDow2=1,sessEditInt2='medium';
+let sessEditWi=0,sessEditSi=0,sessEditDow2=1,sessEditInt2='medium',sessEditEquip=['bodyweight'],sessEditCount=5;
 function openSessEdit(wi,si){
   sessEditWi=wi;sessEditSi=si;
   const sess=plan.weeks[wi].sessions[si];
   sessEditDow2=sess.dow;sessEditInt2=sess.intensity||'medium';
+  sessEditEquip=sess.equipment?[...sess.equipment]:['bodyweight'];
+  sessEditCount=sess.exerciseCount||5;
   document.getElementById('sess-wi').value=wi;document.getElementById('sess-si').value=si;
   document.getElementById('sess-modal-title').textContent=sess.focus;
+  // Day picker
   const dp=document.getElementById('sess-day-picker');dp.innerHTML='';
   DAYS.forEach((d,dow)=>{const b=document.createElement('button');b.className='day-pill'+(dow===sessEditDow2?' active':'');b.textContent=d;b.onclick=()=>{sessEditDow2=dow;dp.querySelectorAll('.day-pill').forEach(x=>x.className='day-pill');b.className='day-pill active';};dp.appendChild(b);});
+  // Intensity picker
   const ip=document.getElementById('sess-int-picker');ip.innerHTML='';
   ['easy','medium','hard'].forEach(int=>{const b=document.createElement('button');b.className='chip'+(int===sessEditInt2?' '+(int==='easy'?'co':int==='medium'?'am':'hot'):'');b.textContent=INT_LABELS[int];b.onclick=()=>{sessEditInt2=int;ip.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip '+(int==='easy'?'co':int==='medium'?'am':'hot');};ip.appendChild(b);});
+  // Equipment picker (multi-select)
+  const ep=document.getElementById('sess-equip-picker');ep.innerHTML='';
+  EQUIPMENT.forEach(eq=>{
+    const b=document.createElement('button');
+    const active=sessEditEquip.includes(eq.id);
+    b.className='chip'+(active?' ac':'');
+    b.innerHTML=`${eq.icon} ${eq.label}`;
+    b.onclick=()=>{
+      if(sessEditEquip.includes(eq.id)){
+        if(sessEditEquip.length===1)return; // always keep at least one
+        sessEditEquip=sessEditEquip.filter(e=>e!==eq.id);b.className='chip';
+      }else{sessEditEquip=[...sessEditEquip,eq.id];b.className='chip ac';}
+    };
+    ep.appendChild(b);
+  });
+  // Exercise count picker
+  const cp=document.getElementById('sess-count-picker');cp.innerHTML='';
+  [3,4,5,6,7,8].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===sessEditCount?' ac':'');b.textContent=n+' Übungen';b.onclick=()=>{sessEditCount=n;cp.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};cp.appendChild(b);});
   document.getElementById('modal-session').classList.add('open');
 }
 function saveSessEdit(){
   if(!plan?.weeks[sessEditWi]?.sessions[sessEditSi])return;
-  plan.weeks[sessEditWi].sessions[sessEditSi].dow=sessEditDow2;
-  plan.weeks[sessEditWi].sessions[sessEditSi].intensity=sessEditInt2;
+  const s=plan.weeks[sessEditWi].sessions[sessEditSi];
+  s.dow=sessEditDow2;s.intensity=sessEditInt2;
+  s.equipment=[...sessEditEquip];s.exerciseCount=sessEditCount;
   savePlan();closeModal('modal-session');renderPlanView(currentViewWeek);updatePlanHome();
 }
 
