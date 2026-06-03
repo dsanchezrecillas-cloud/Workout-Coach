@@ -242,7 +242,7 @@ button:active:not(:disabled){transform:scale(.96)}
         <div style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Wiederholungen</div>
         <div id="rep-uni" style="display:flex;align-items:center;justify-content:center;gap:20px">
           <button class="rep-btn" style="background:var(--up);border-color:var(--br);color:var(--su)" onclick="addRep('',-1)">−</button>
-          <div id="rep-n" class="mono" style="font-size:38px;font-weight:500;color:var(--co);min-width:52px;text-align:center">0</div>
+          <input id="rep-n" type="text" inputmode="numeric" pattern="[0-9]*" value="0" onchange="setRepDirect(this.value)" style="font-size:42px;font-weight:700;color:var(--co);width:80px;text-align:center;background:none;border:none;outline:none;font-family:var(--m);-webkit-appearance:none;border-bottom:2px solid rgba(5,150,105,.3);padding-bottom:2px"/>
           <button class="rep-btn" style="background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:var(--co)" onclick="addRep('',1)">+</button>
         </div>
         <div id="rep-bi" style="display:none;margin-top:4px">
@@ -250,14 +250,14 @@ button:active:not(:disabled){transform:scale(.96)}
             <div style="text-align:center"><div style="font-size:9px;color:var(--mu);margin-bottom:7px;letter-spacing:.06em;font-weight:600">LINKS</div>
               <div style="display:flex;align-items:center;justify-content:center;gap:8px">
                 <button class="rep-btn" style="width:40px;height:40px;font-size:20px;background:var(--up);border-color:var(--br);color:var(--su)" onclick="addRep('L',-1)">−</button>
-                <div id="rep-L" class="mono" style="font-size:26px;font-weight:500;color:var(--co);min-width:34px;text-align:center">0</div>
+                <input id="rep-L" type="text" inputmode="numeric" pattern="[0-9]*" value="0" onchange="setRepDirectSide('L',this.value)" style="font-size:28px;font-weight:700;color:var(--co);width:52px;text-align:center;background:none;border:none;outline:none;font-family:var(--m);-webkit-appearance:none;border-bottom:2px solid rgba(5,150,105,.3)"/>
                 <button class="rep-btn" style="width:40px;height:40px;font-size:20px;background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:var(--co)" onclick="addRep('L',1)">+</button>
               </div>
             </div>
             <div style="text-align:center"><div style="font-size:9px;color:var(--mu);margin-bottom:7px;letter-spacing:.06em;font-weight:600">RECHTS</div>
               <div style="display:flex;align-items:center;justify-content:center;gap:8px">
                 <button class="rep-btn" style="width:40px;height:40px;font-size:20px;background:var(--up);border-color:var(--br);color:var(--su)" onclick="addRep('R',-1)">−</button>
-                <div id="rep-R" class="mono" style="font-size:26px;font-weight:500;color:var(--co);min-width:34px;text-align:center">0</div>
+                <input id="rep-R" type="text" inputmode="numeric" pattern="[0-9]*" value="0" onchange="setRepDirectSide('R',this.value)" style="font-size:28px;font-weight:700;color:var(--co);width:52px;text-align:center;background:none;border:none;outline:none;font-family:var(--m);-webkit-appearance:none;border-bottom:2px solid rgba(5,150,105,.3)"/>
                 <button class="rep-btn" style="width:40px;height:40px;font-size:20px;background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:var(--co)" onclick="addRep('R',1)">+</button>
               </div>
             </div>
@@ -1019,6 +1019,14 @@ async function generateWorkout(summaryOverride){
     const raw=await callAPI([{role:'user',content:'Erstelle das Workout.'}],2000,sys);
     const arr=extractJSON(raw);const exArr=Array.isArray(arr)?arr:[arr].filter(Boolean);
     if(!exArr.length)throw new Error('Leeres Workout');
+    // Post-process: fix hold/reps types based on name if AI got it wrong
+    exArr.forEach(ex=>{
+      const n=(ex.name||'').toLowerCase();
+      if(!ex.type||ex.type==='time'){
+        if(n.match(/plank|wall sit|hollow|dead hang|l-sit|handstand/))ex.type='hold';
+        else if(n.match(/push|liegest|klimmzug|pull.up|dip|curl|lunge|ausfallschritt|squat|kniebeug|row|raise/))ex.type='reps';
+      }
+    });
     curExercises=exArr.filter(e=>!e.warmup);wuExercises=exArr.filter(e=>e.warmup);
     if(!curExercises.length)throw new Error('Keine Hauptübungen');
     curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:Math.round((wuExercises.length*35+curExercises.length*60)/60)};
@@ -1170,7 +1178,8 @@ function updateTimer(){
     if(tStatus==='round_rest'){name='Kurz durchatmen';tip='';}
     else{name=ex.name||'—';if(tStatus==='work'){if(exType==='reps')tip=`Ziel: ${ex.reps||10} Wiederholungen`;else if(exType==='hold')tip='Halten — so lange wie möglich';else if(exType==='amrap')tip='So viele Wdh wie möglich';else tip=ex.tip||'';}else if(tStatus==='rest'&&exList[tIdx+1])tip='Nächste: '+exList[tIdx+1].name;}
     document.getElementById('ex-name').textContent=name;document.getElementById('ex-tip').textContent=tip;
-    rc.style.display=tStatus==='rest'&&!isWU?'block':'none';
+    const showRC=tStatus==='rest'&&!isWU&&(exType==='reps'||exType==='amrap');
+    rc.style.display=showRC?'block':'none';
     // Weight input visibility
     const wi2=document.getElementById('weight-input-wrap');
     if(wi2){
@@ -1178,7 +1187,17 @@ function updateTimer(){
       wi2.style.display=showW?'block':'none';
       if(showW){const wRk=tRound+'_'+tIdx+'_s'+tSet+'_w';const wEl=document.getElementById('weight-n');if(wEl)wEl.value=tReps[wRk]||0;}
     }
-    if(tStatus==='rest'){const isBi=ex.bilateral===true;document.getElementById('rep-uni').style.display=isBi?'none':'flex';document.getElementById('rep-bi').style.display=isBi?'block':'none';const rk=tRound+'_'+tIdx+'_s'+tSet;if(isBi){document.getElementById('rep-L').value=tReps[rk+'_L']||0;document.getElementById('rep-R').value=tReps[rk+'_R']||0;}else{const rn=document.getElementById('rep-n');if(rn)rn.value=tReps[rk]||0;}}
+    if(tStatus==='rest'){
+    const isBi=ex.bilateral===true;
+    document.getElementById('rep-uni').style.display=isBi?'none':'flex';
+    document.getElementById('rep-bi').style.display=isBi?'block':'none';
+    const rk=tRound+'_'+tIdx+'_s'+tSet;
+    if(isBi){const el_L=document.getElementById('rep-L');const el_R=document.getElementById('rep-R');if(el_L)el_L.value=tReps[rk+'_L']||0;if(el_R)el_R.value=tReps[rk+'_R']||0;}
+    else{const rn=document.getElementById('rep-n');if(rn)rn.value=tReps[rk]||0;}
+    const lbl=document.getElementById('rep-set-label');
+    const totalS=(curExercises[tIdx]?.sets)||1;
+    if(lbl)lbl.textContent=totalS>1?'Satz '+tSet+' von '+totalS+' — Wdh eingeben':'Wdh eingeben';
+  }
   }
   renderExList();
   exList.forEach((_,i)=>{const row=document.getElementById('erow-'+i),dot=document.getElementById('edot-'+i);if(!row||!dot)return;const done=i<tIdx,cur=i===tIdx&&(tStatus==='work'||tStatus==='rest');row.style.opacity=done?.3:1;row.style.background=cur?pc+'10':'transparent';dot.style.borderColor=done?'var(--br)':cur?pc:'var(--br)';dot.style.color=done?'transparent':cur?pc:'var(--mu)';dot.textContent=done?'✓':(i+1);});
@@ -1561,7 +1580,12 @@ function buildFromSelection(){
   const selected=[];
   libSelected.forEach(name=>{
     const ex=allEx.find(e=>e.name===name);
-    if(ex)selected.push({...ex,type:ex.bilateral?'reps':'time',duration:40,rest:20,reps:10,sets:1,icon:getExIcon(ex.name)});
+    if(!ex)return;
+    const n=(ex.name||'').toLowerCase();
+    let type='time';
+    if(n.match(/plank|hold|wall sit|hollow|l-sit|handstand|dead hang|isometr/))type='hold';
+    else if(n.match(/push|pull|klimmzug|lunge|ausfallschritt|squat|kniebeug|curl|dip|row|ruder|raise|lift|press|crunch|sit.up|liegest|wdh|rep/)||ex.bilateral)type='reps';
+    selected.push({...ex,type,duration:type==='hold'?45:40,rest:20,reps:10,sets:1,icon:getExIcon(ex.name)});
   });
   if(!selected.length)return;
   curExercises=selected;wuExercises=[];
@@ -1996,7 +2020,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     log=loadLog();plan=loadPlan();library=loadLibrary();
     updateHome();
     if(loadKey()&&log.length>=1)setTimeout(fetchCoach,800);
-    document.querySelectorAll('.modal-ov').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
+    document.querySelectorAll('.modal-ov').forEach(el=>el.addEventListener('click',e=>{
+    if(e.target===el){
+      if(el.id==='modal-confirm'){resolveConfirm(false);}  // resolve promise, don't just close
+      else el.classList.remove('open');
+    }
+  }));
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&tRun)reqWL();});
     document.getElementById('s-library').addEventListener('animationstart',()=>{libSelected.clear();renderLibrary();});
     document.getElementById('s-plan-create').addEventListener('animationstart',buildPlanCreate);
