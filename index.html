@@ -1577,9 +1577,31 @@ function renderLibrary(){
   mGroups.forEach(g=>{const b=document.createElement('button');b.className='chip'+(g===libFilter?' ac':'');b.textContent=mLabels[g];b.onclick=()=>{libFilter=g;renderLibrary();};fw.appendChild(b);});
   const filtered=libFilter==='all'?allEx:allEx.filter(e=>(e.muscles||[]).includes(libFilter));
   document.getElementById('lib-count').textContent=filtered.length+' Übungen';
-  document.getElementById('lib-list').innerHTML=filtered.map(ex=>{
-    const exStr=JSON.stringify({name:ex.name,muscles:ex.muscles,bilateral:ex.bilateral,tip:ex.tip,details:ex.details,mistakes:ex.mistakes}).replace(/'/g,"\'");
-    return`<div class="card" onclick="showLibDetail('${exStr}')" style="cursor:pointer"><div style="display:flex;align-items:center;gap:11px"><div style="width:38px;height:38px;border-radius:9px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--ac);flex-shrink:0">${getExIcon(ex.name)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:3px">${ex.name}${ex.bilateral?' ↔':''}</div><div style="display:flex;gap:4px;flex-wrap:wrap">${(ex.muscles||[]).map(m=>mkT(MUSCLE_DE[m]||m,'#64748b')).join('')}</div></div><span style="color:var(--mu);font-size:12px">→</span></div></div>`;
+  // Store filtered list globally for index-based access
+  window._libFiltered = filtered;
+  // Update FAB
+  const fab=document.getElementById('lib-fab');
+  if(fab){
+    fab.style.display=libSelected.size>0?'block':'none';
+    const fc=document.getElementById('lib-fab-count');
+    if(fc)fc.textContent=libSelected.size;
+  }
+  document.getElementById('lib-list').innerHTML=filtered.map((ex,idx)=>{
+    const sel=libSelected.has(ex.name);
+    return`<div class="card" onclick="toggleLibSelect(event,${idx})" style="cursor:pointer;transition:all .15s;${sel?'border-color:rgba(124,58,237,.4);background:rgba(124,58,237,.04);':''}">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:26px;height:26px;border-radius:50%;border:2px solid ${sel?'var(--ac)':'var(--br)'};background:${sel?'var(--ac)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s">
+          ${sel?'<span style="color:#fff;font-size:13px;font-weight:700;line-height:1">✓</span>':''}
+        </div>
+        <div style="width:38px;height:38px;border-radius:10px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.15);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--ac);flex-shrink:0">${getExIcon(ex.name)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:3px">${ex.name}${ex.bilateral?' ↔':''}</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">${(ex.muscles||[]).map(m=>mkT(MUSCLE_DE[m]||m,'#7c3aed')).join('')}</div>
+          ${ex.tip?`<div style="font-size:11px;color:var(--mu);margin-top:3px">${ex.tip}</div>`:''}
+        </div>
+        <button onclick="event.stopPropagation();showLibByIdx(${idx})" style="width:32px;height:32px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">ℹ</button>
+      </div>
+    </div>`;
   }).join('');
 }
 
