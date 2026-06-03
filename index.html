@@ -604,6 +604,18 @@ button:active:not(:disabled){transform:scale(.96)}
     <button onclick="saveNewChallenge()" class="btn btn-ac">Challenge starten</button>
   </div>
 </div>
+
+<!-- MODAL: Custom confirm (replaces confirm() which fails in iOS PWA) -->
+<div class="modal-ov" id="modal-confirm">
+  <div class="modal-box" style="padding:22px 20px">
+    <div id="confirm-msg" style="font-size:16px;font-weight:600;color:var(--tx);margin-bottom:6px;line-height:1.4"></div>
+    <div id="confirm-sub" style="font-size:13px;color:var(--mu);margin-bottom:20px"></div>
+    <div style="display:flex;gap:9px">
+      <button id="confirm-cancel-btn" onclick="resolveConfirm(false)" style="flex:1;padding:13px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;font-weight:600;font-family:var(--f)">Abbrechen</button>
+      <button id="confirm-ok-btn" onclick="resolveConfirm(true)" style="flex:1;padding:13px;border-radius:12px;background:rgba(244,63,94,.9);border:none;color:#fff;font-size:14px;font-weight:700;font-family:var(--f)">Löschen</button>
+    </div>
+  </div>
+</div>
 <!-- MODAL: Exercise Info -->
 <div class="modal-ov" id="modal-info">
   <div class="modal-box">
@@ -1196,7 +1208,7 @@ function advance(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{
       }}else if(tStatus==='round_rest'){tStatus='work';tLeft=curExercises[0].duration||40;beep(880,.1);}tRun=true;updateTimer();tIv=setInterval(tick,1000);}
 function skipEx(){if(tStatus!=='work')return;clearInterval(tIv);tRun=false;tStatus='rest';tLeft=3;beep(440,.1);tRun=true;updateTimer();tIv=setInterval(tick,1000);}
 function repsDone(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};clearInterval(tIv);tRun=false;tStatus='rest';tLeft=ex.rest||20;beep(660,.15);tRun=true;updateTimer();tIv=setInterval(tick,1000);}
-function endEarly(){if(!confirm('Training beenden?'))return;clearInterval(tIv);tRun=false;tStatus='done';relWL();updateTimer();}
+async function endEarly(){const ok=await appConfirm('Training beenden?','Dein Fortschritt wird gespeichert.','Beenden','rgba(244,63,94,.9)');if(!ok)return;clearInterval(tIv);tRun=false;tStatus='done';relWL();updateTimer();}
 function addRep(side,d){
   const rk=tRound+'_'+tIdx+'_s'+tSet+(side?'_'+side:'');
   tReps[rk]=Math.max(0,(tReps[rk]||0)+d);
@@ -1278,8 +1290,8 @@ function addAsExtraSession(wi,muscles){if(!plan?.weeks[wi])return;const todayDow
 
 // ─── History ──────────────────────────────────────────────────────────────────
 function showHistory(){const rd=log.slice(-8).map(w=>({l:fmtD(w.date),v:w.rpe,c:rpc(w.rpe)}));const hw=document.getElementById('hist-chart');if(rd.length>1){hw.style.display='block';setTimeout(()=>drawBars('rpe-chart',rd,60),30);}else hw.style.display='none';document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.values(w.repLog||{}).reduce((s,v)=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${(w.muscles||[]).map(m=>MUSCLE_DE_SHORT[m]||m).join(', ')||'Workout'}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'#64748b')} ${mkT((w.durationMin||'?')+' min','#64748b')}${tot>0?' '+mkT(tot+' Wdh','#059669'):''}${w.note?' '+mkT('📝','#64748b'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${w.note}</div>`:''}</div>`;}).join('');show('s-history');}
-function delW(idx){if(!confirm('Löschen?'))return;log.splice(idx,1);persist();updateHome();showHistory();}
-function delLastWorkout(){if(!log.length)return;if(!confirm('Letztes Workout löschen?'))return;log.pop();persist();updateHome();}
+async function delW(idx){const ok=await appConfirm('Training löschen?','Diese Aktion kann nicht rückgängig gemacht werden.');if(!ok)return;log.splice(idx,1);persist();updateHome();showHistory();}
+async function delLastWorkout(){if(!log.length)return;const last=log[log.length-1];const ok=await appConfirm('Letztes Training löschen?','RPE '+(last.rpe||'?')+'/10 · '+fmtD(last.date));if(!ok)return;log.pop();persist();updateHome();}
 function openEdit(idx){const w=log[idx];if(!w)return;document.getElementById('edit-idx').value=idx;document.getElementById('edit-note').value=w.note||'';editRpe=w.rpe||6;const wrap=document.getElementById('edit-rpe-btns');wrap.innerHTML='';for(let n=1;n<=10;n++){const nc=rpc(n),btn=document.createElement('button');btn.style.cssText=`flex:1;padding:8px 0;border-radius:7px;font-size:12px;font-family:var(--m);cursor:pointer;border:1.5px solid ${n===editRpe?nc:'var(--br)'};background:${n===editRpe?nc+'18':'var(--up)'};color:${n===editRpe?nc:'var(--mu)'};font-weight:${n===editRpe?700:400}`;btn.textContent=n;btn.onclick=()=>{editRpe=n;wrap.querySelectorAll('button').forEach((b,i)=>{const bc=rpc(i+1);b.style.borderColor=(i+1)===n?bc:'var(--br)';b.style.background=(i+1)===n?bc+'18':'var(--up)';b.style.color=(i+1)===n?bc:'var(--mu)';b.style.fontWeight=(i+1)===n?700:400;});document.getElementById('edit-rpe-lbl').textContent=RPE_L[n];document.getElementById('edit-rpe-lbl').style.color=nc;};wrap.appendChild(btn);}document.getElementById('edit-rpe-lbl').textContent=RPE_L[editRpe];document.getElementById('edit-rpe-lbl').style.color=rpc(editRpe);document.getElementById('modal-edit').classList.add('open');}
 function saveEdit(){const idx=parseInt(document.getElementById('edit-idx').value);if(isNaN(idx)||!log[idx])return;log[idx].rpe=editRpe;log[idx].note=document.getElementById('edit-note').value.trim();persist();closeModal('modal-edit');showHistory();updateHome();}
 
@@ -1409,10 +1421,10 @@ function saveSessEdit(){
   }
   savePlan();closeModal('modal-session');renderPlanView(currentViewWeek);updatePlanHome();
 }
-function deleteSessEdit(){
+async function deleteSessEdit(){
   if(!plan?.weeks[sessEditWi]?.sessions[sessEditSi])return;
   const focus=plan.weeks[sessEditWi].sessions[sessEditSi].focus;
-  if(!confirm('"'+focus+'" löschen?'))return;
+  const ok=await appConfirm('"'+focus+'" löschen?','Wird aus dem Trainingsplan entfernt.');if(!ok)return;
   plan.weeks[sessEditWi].sessions.splice(sessEditSi,1);
   savePlan();closeModal('modal-session');renderPlanView(currentViewWeek);updatePlanHome();
 }
@@ -1428,7 +1440,7 @@ function applyPlanEndDate(){const startV=document.getElementById('edit-start-dat
   const days=Math.ceil((new Date(v+'T12:00:00')-startRef)/86400000);
   if(days<3){showErr('Zeitraum zu kurz.');return;}const targetWeeks=Math.max(1,Math.ceil(days/7));const cur=plan.weeks.length;if(targetWeeks>cur){const lastWeek=plan.weeks[cur-1];for(let i=cur;i<targetWeeks;i++){const w=i+1;const theme=w%4===0?'Deload':w<=2?'Aufbau':w<=5?'Steigerung':'Maximierung';const intensity=w%4===0?'easy':w<=3?'medium':'hard';plan.weeks.push({week:w,theme,sessions:lastWeek.sessions.map(s=>({...s,done:false,doneDate:undefined,intensity}))});}}else if(targetWeeks<cur){plan.weeks=plan.weeks.slice(0,targetWeeks);}savePlan();closeModal('modal-plan-edit');renderPlanView(Math.min(currentViewWeek,plan.weeks.length-1));}
 function addPlanWeek(){if(!plan)return;const cur=plan.weeks.length;const lastWeek=plan.weeks[cur-1];const w=cur+1;const theme=w%4===0?'Deload':w<=3?'Aufbau':w<=6?'Steigerung':'Maximierung';const intensity=w%4===0?'easy':w<=4?'medium':'hard';plan.weeks.push({week:w,theme,sessions:lastWeek.sessions.map(s=>({...s,done:false,doneDate:undefined,intensity}))});savePlan();renderPlanView(plan.weeks.length-1);closeModal('modal-plan-edit');}
-function removePlanWeek(){if(!plan||plan.weeks.length<=1){showErr('Mindestens 1 Woche nötig.');return;}if(!confirm('Letzte Woche entfernen?'))return;plan.weeks.pop();savePlan();renderPlanView(Math.min(currentViewWeek,plan.weeks.length-1));closeModal('modal-plan-edit');}
+async function removePlanWeek(){if(!plan||plan.weeks.length<=1){showErr('Mindestens 1 Woche nötig.');return;}const ok=await appConfirm('Letzte Woche entfernen?','Alle Sessions dieser Woche werden gelöscht.');if(!ok)return;plan.weeks.pop();savePlan();renderPlanView(Math.min(currentViewWeek,plan.weeks.length-1));closeModal('modal-plan-edit');}
 function applyFreqChange(){if(!plan)return;const newFreq=window._editFreq||plan.freq;plan.freq=newFreq;savePlan();closeModal('modal-plan-edit');renderPlanView(currentViewWeek);}
 
 // Templates & Save for later
@@ -1436,7 +1448,7 @@ function loadTemplates(){try{return JSON.parse(localStorage.getItem('coach_templ
 function saveTemplates(t){localStorage.setItem('coach_templates',JSON.stringify(t));}
 function saveAsTemplate(){const name=prompt('Name für diese Vorlage:',curSetup.muscles?.map(m=>MUSCLE_DE_SHORT[m]||m).join(', ')||'Mein Workout');if(!name)return;const templates=loadTemplates();templates.push({id:Date.now(),name,muscles:curSetup.muscles||[],exercises:[...curExercises],warmup:[...wuExercises],createdAt:todayIso()});saveTemplates(templates);const btn=document.querySelector('button[onclick="saveAsTemplate()"]');if(btn){btn.textContent='✓ Gespeichert';setTimeout(()=>btn.textContent='💾 Als Vorlage speichern',2000);}document.getElementById('tpl-btn').style.display='block';}
 function openTemplates(){const templates=loadTemplates();const el=document.getElementById('templates-list');if(!templates.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--mu);font-size:13px">Noch keine Vorlagen gespeichert.</div>';document.getElementById('modal-templates').classList.add('open');return;}el.innerHTML=templates.map((t,i)=>`<div class="card" style="margin-bottom:9px"><div style="display:flex;align-items:flex-start;gap:10px"><div style="flex:1"><div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:3px">${t.name}</div><div style="font-size:11px;color:var(--mu)">${t.exercises.length} Übungen${t.warmup?.length?' + '+t.warmup.length+' Warmup':''} · ${t.createdAt}</div></div><button onclick="deleteTpl(${i})" style="width:26px;height:26px;border-radius:7px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:var(--hot);font-size:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center">✕</button></div><div style="display:flex;gap:7px;margin-top:11px"><button onclick="startFromTemplate(${i})" class="btn btn-ac" style="flex:1;padding:10px;font-size:13px;text-transform:none">Jetzt starten</button><button onclick="planFromTemplate(${i})" style="flex:1;padding:10px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">📅 Einplanen</button></div></div>`).join('');document.getElementById('modal-templates').classList.add('open');}
-function deleteTpl(idx){const templates=loadTemplates();templates.splice(idx,1);saveTemplates(templates);openTemplates();}
+async function deleteTpl(idx){const ok=await appConfirm('Vorlage löschen?');if(!ok)return;const templates=loadTemplates();templates.splice(idx,1);saveTemplates(templates);openTemplates();}
 function startFromTemplate(idx){const templates=loadTemplates();const t=templates[idx];if(!t)return;curExercises=[...t.exercises];wuExercises=[...(t.warmup||[])];curSetup={muscles:t.muscles,durationMin:Math.round(((t.warmup||[]).length*35+t.exercises.length*60)/60)};closeModal('modal-templates');startWorkout();}
 function planFromTemplate(idx){closeModal('modal-templates');window._planningTemplate=idx;openSaveForLater(loadTemplates()[idx]);}
 function openSaveForLater(template){if(!plan?.weeks?.length){showErr('Kein aktiver Trainingsplan.');return;}const wi=getCurrentWeekIdx();let html=`<div style="font-size:12px;color:var(--mu);margin-bottom:14px">Wähle eine Session, zu der dieses Workout gespeichert wird.</div>`;html+=`<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none">`;plan.weeks.forEach((w,i)=>{html+=`<button onclick="renderSaveLaterWeek(${i},${!!template})" id="sl-tab-${i}" style="white-space:nowrap;padding:7px 13px;border-radius:9px;border:1.5px solid ${i===wi?'var(--ac)':'var(--br)'};background:${i===wi?'rgba(124,58,237,.08)':'var(--up)'};color:${i===wi?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f)">Wo ${i+1}</button>`;});html+=`</div><div id="sl-sessions"></div>`;html+=`<div style="margin-top:10px;border-top:1px solid var(--br);padding-top:12px"><button onclick="addNewSessionWithWorkout(${wi},${!!template})" class="btn" style="border:1.5px solid var(--br);color:var(--mu);padding:12px;font-size:13px;font-family:var(--f)">+ Neue Session erstellen</button></div>`;document.getElementById('save-later-body').innerHTML=html;renderSaveLaterWeek(wi,!!template);document.getElementById('modal-save-later').classList.add('open');}
@@ -1873,7 +1885,7 @@ function renderGoals(){
   document.getElementById('challenge-templates').innerHTML=CHALLENGE_TEMPLATES.map(t=>`<button onclick="openNewChallenge(${JSON.stringify(t).replace(/"/g,'&quot;')})" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 13px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;font-family:var(--f);cursor:pointer"><span style="font-size:18px">${t.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${t.name}</div><div style="font-size:11px;color:var(--mu)">${t.target} ${t.type==='workouts'?'Workouts':'Wdh'} · ${t.days} Tage</div></div><span style="margin-left:auto;color:var(--ac);font-size:14px">+</span></button>`).join('');
 }
 
-function deleteChallenge(idx){if(!confirm('Challenge löschen?'))return;const challenges=loadChallenges();challenges.splice(idx,1);saveChallenges(challenges);renderGoals();}
+async function deleteChallenge(idx){const ok=await appConfirm('Challenge löschen?');if(!ok)return;const challenges=loadChallenges();challenges.splice(idx,1);saveChallenges(challenges);renderGoals();}
 
 // ─── Analytics / Rückblick ───────────────────────────────────────────────────
 let currentAnalyticsRange='week';
@@ -1935,6 +1947,25 @@ function renderAnalytics(range){
 
   // Draw RPE chart after DOM update
   if(rpeData.length>1)setTimeout(()=>drawBars('ana-rpe',rpeData,60),30);
+}
+
+
+// ─── Custom confirm (iOS PWA safe) ────────────────────────────────────────────
+let _confirmResolve=null;
+function appConfirm(msg,sub,okLabel,okColor){
+  return new Promise(res=>{
+    _confirmResolve=res;
+    document.getElementById('confirm-msg').textContent=msg;
+    document.getElementById('confirm-sub').textContent=sub||'';
+    const okBtn=document.getElementById('confirm-ok-btn');
+    okBtn.textContent=okLabel||'Löschen';
+    okBtn.style.background=okColor||'rgba(244,63,94,.9)';
+    document.getElementById('modal-confirm').classList.add('open');
+  });
+}
+function resolveConfirm(v){
+  document.getElementById('modal-confirm').classList.remove('open');
+  if(_confirmResolve){_confirmResolve(v);_confirmResolve=null;}
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
