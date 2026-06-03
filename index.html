@@ -1082,7 +1082,9 @@ function showReview(){
     </div>
     <div id="alt-info-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--br);font-size:12px;color:var(--mu)"></div>
   </div>`).join('');
-  show('s-review');
+  // If already on review, don't jump to top
+  const alreadyActive=document.getElementById('s-review').classList.contains('active');
+  if(!alreadyActive){show('s-review');}
   // Init training mode UI
   const mode=curSetup.trainingMode||'sets';
   const sBtn2=document.getElementById('mode-sets');const cBtn2=document.getElementById('mode-circuit');const rWrap2=document.getElementById('circuit-rounds-wrap');
@@ -1097,10 +1099,57 @@ function applyAlt(idx){const ex=curExercises[idx];const muscles=ex.muscles||[];c
 function deleteEx(idx){curExercises.splice(idx,1);showReview();}
 function adjEx(idx,field,delta){if(!curExercises[idx])return;const ex=curExercises[idx];if(field==='reps'){ex.reps=Math.max(1,Math.min(100,(ex.reps||10)+delta));const el=document.getElementById(`dur-val-${idx}`);if(el)el.textContent=ex.reps;}else if(field==='duration'){ex.duration=Math.min(300,Math.max(10,(ex.duration||40)+delta));const el=document.getElementById(`dur-val-${idx}`);if(el)el.textContent=ex.duration+'s';}else if(field==='rest'){ex.rest=Math.min(120,Math.max(5,(ex.rest||20)+delta));const el=document.getElementById(`rest-val-${idx}`);if(el)el.textContent=ex.rest+'s';}}
 
+
+function _updateRevCard(i){
+  const card=document.getElementById('rev-'+i);if(!card)return;
+  const ex=curExercises[i];if(!ex)return;
+  // Build new card HTML (same as in showReview map)
+  const newCard=document.createElement('div');
+  newCard.className='card';newCard.id='rev-'+i;
+  newCard.innerHTML=_revCardHTML(ex,i);
+  card.parentNode.replaceChild(newCard,card);
+}
+
+function _revCardHTML(ex,i){
+  return `<div style="display:flex;align-items:center;gap:8px">
+      <button onclick="openInfoModal(curExercises[${i}])" style="width:34px;height:34px;border-radius:8px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.15);font-size:13px;color:var(--ac);flex-shrink:0">${ex.icon||'ℹ'}</button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}${ex.bilateral?' ↔':''}</div>
+        <div style="font-size:11px;color:var(--mu)">${ex.tip||''}</div>
+      </div>
+      <button onclick="openSwapModal(${i})" style="padding:5px 9px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:11px;font-weight:600;font-family:var(--f);flex-shrink:0">↻</button>
+      <button onclick="deleteEx(${i})" style="width:28px;height:28px;border-radius:8px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:var(--hot);font-size:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center">×</button>
+    </div>
+    <!-- Bilateral toggle -->
+    <div style="display:flex;align-items:center;gap:7px;margin-top:9px;margin-bottom:7px">
+      <button onclick="toggleBilateral(${i})" style="padding:5px 10px;border-radius:8px;border:1.5px solid ${ex.bilateral?'var(--ac)':'var(--br)'};background:${ex.bilateral?'rgba(124,58,237,.1)':'var(--up)'};color:${ex.bilateral?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">↔ Beidseitig${ex.bilateral?' AN':' AUS'}</button>
+      <span style="font-size:11px;color:var(--mu)">${ex.bilateral?'Zählt L und R getrennt':'Zählt zusammen'}</span>
+    </div>
+    <div style="display:flex;gap:5px;margin-bottom:8px">
+      <button onclick="setExType(${i},'time')" style="flex:1;padding:6px;border-radius:8px;border:1.5px solid ${(ex.type||'time')==='time'?'var(--ac)':'var(--br)'};background:${(ex.type||'time')==='time'?'rgba(124,58,237,.1)':'var(--up)'};color:${(ex.type||'time')==='time'?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">⏱ Zeit</button>
+      <button onclick="setExType(${i},'reps')" style="flex:1;padding:6px;border-radius:8px;border:1.5px solid ${ex.type==='reps'?'var(--ac)':'var(--br)'};background:${ex.type==='reps'?'rgba(124,58,237,.1)':'var(--up)'};color:${ex.type==='reps'?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)"># Wdh</button>
+      <button onclick="setExType(${i},'amrap')" style="flex:1;padding:6px;border-radius:8px;border:1.5px solid ${ex.type==='amrap'?'var(--ac)':'var(--br)'};background:${ex.type==='amrap'?'rgba(124,58,237,.1)':'var(--up)'};color:${ex.type==='amrap'?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">∞ AMRAP</button>
+      <button onclick="setExType(${i},'hold')" style="flex:1;padding:6px;border-radius:8px;border:1.5px solid ${ex.type==='hold'?'var(--ac)':'var(--br)'};background:${ex.type==='hold'?'rgba(124,58,237,.1)':'var(--up)'};color:${ex.type==='hold'?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">🧘 Hold</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <span style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Sätze</span>
+      ${[1,2,3,4,5].map(n=>`<button onclick="setExSets(${i},${n})" style="width:32px;height:28px;border-radius:7px;border:1.5px solid ${(ex.sets||1)===n?'var(--ac)':'var(--br)'};background:${(ex.sets||1)===n?'rgba(124,58,237,.1)':'var(--up)'};color:${(ex.sets||1)===n?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f)">${n}</button>`).join('')}
+      <span style="font-size:11px;color:var(--mu);margin-left:2px">${(ex.sets||1)>1?`= ${(ex.sets||1)} × ${ex.type==='reps'?(ex.reps||10)+' Wdh':(ex.duration||40)+'s'}`:'(1 Satz)'}</span>
+      <button onclick="toggleExWeight(${i})" style="margin-left:auto;padding:4px 9px;border-radius:7px;border:1.5px solid ${ex.trackWeight?'var(--am)':'var(--br)'};background:${ex.trackWeight?'rgba(217,119,6,.1)':'var(--up)'};color:${ex.trackWeight?'var(--am)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">⚖ ${ex.trackWeight?'Gewicht AN':'Gewicht'}</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      ${ex.type==='reps'?`<span style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;width:30px">Wdh</span><button onclick="adjEx(${i},'reps',-1)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">−</button><span id="dur-val-${i}" style="font-size:13px;font-weight:600;color:var(--tx);min-width:30px;text-align:center">${ex.reps||10}</span><button onclick="adjEx(${i},'reps',1)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>`:`<span style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;width:30px">Sek</span><button onclick="adjEx(${i},'duration',-5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">−</button><span id="dur-val-${i}" style="font-size:13px;font-weight:600;color:var(--tx);min-width:34px;text-align:center">${ex.duration}s</span><button onclick="adjEx(${i},'duration',5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>`}
+      <span style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;margin-left:4px;width:38px">Pause</span>
+      <button onclick="adjEx(${i},'rest',-5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
+      <span id="rest-val-${i}" style="font-size:13px;font-weight:600;color:var(--tx);min-width:34px;text-align:center">${ex.rest||20}s</span>
+      <button onclick="adjEx(${i},'rest',5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>
+    </div>
+    <div id="alt-info-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--br);font-size:12px;color:var(--mu)"></div>`;
+}
 function toggleBilateral(idx){
   if(!curExercises[idx])return;
   curExercises[idx].bilateral=!curExercises[idx].bilateral;
-  showReview();
+  _updateRevCard(idx);
 }
 
 function setTrainingMode(mode){
@@ -1119,9 +1168,9 @@ function setTrainingMode(mode){
     if(!curSetup.rounds)curSetup.rounds=3;
   }
 }
-function setExType(idx,type){if(!curExercises[idx])return;curExercises[idx].type=type;if(type==='reps'&&!curExercises[idx].reps)curExercises[idx].reps=10;showReview();}
-function setExSets(idx,n){if(!curExercises[idx])return;curExercises[idx].sets=n;showReview();}
-function toggleExWeight(idx){if(!curExercises[idx])return;curExercises[idx].trackWeight=!curExercises[idx].trackWeight;showReview();}
+function setExType(idx,type){if(!curExercises[idx])return;curExercises[idx].type=type;if(type==='reps'&&!curExercises[idx].reps)curExercises[idx].reps=10;_updateRevCard(idx);}
+function setExSets(idx,n){if(!curExercises[idx])return;curExercises[idx].sets=n;_updateRevCard(idx);}
+function toggleExWeight(idx){if(!curExercises[idx])return;curExercises[idx].trackWeight=!curExercises[idx].trackWeight;_updateRevCard(idx);}
 function startWorkout(){initTimer();show('s-timer');}
 
 // ─── Swap modal ───────────────────────────────────────────────────────────────
