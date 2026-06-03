@@ -198,6 +198,10 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
   <div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Haupttraining</div>
   <div id="rev-list" style="display:flex;flex-direction:column;gap:7px;margin-bottom:22px"></div>
+  <!-- Add exercise button -->
+  <button onclick="openAddExToWorkout()" style="width:100%;padding:12px;border-radius:12px;border:1.5px dashed var(--br);background:transparent;color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f);margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:7px">
+    <span style="font-size:18px;line-height:1">＋</span> Übung hinzufügen
+  </button>
   <div style="display:flex;gap:8px">
     <button onclick="startWorkout()" class="btn btn-ac" style="flex:2">Training starten →</button>
     <button onclick="openSaveForLater()" style="flex:1;padding:15px;border-radius:13px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f);display:flex;align-items:center;justify-content:center;gap:5px">📅 Einplanen</button>
@@ -614,6 +618,22 @@ button:active:not(:disabled){transform:scale(.96)}
       <button id="confirm-cancel-btn" onclick="resolveConfirm(false)" style="flex:1;padding:13px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;font-weight:600;font-family:var(--f)">Abbrechen</button>
       <button id="confirm-ok-btn" onclick="resolveConfirm(true)" style="flex:1;padding:13px;border-radius:12px;background:rgba(244,63,94,.9);border:none;color:#fff;font-size:14px;font-weight:700;font-family:var(--f)">Löschen</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL: Add exercise to workout -->
+<div class="modal-ov" id="modal-add-to-workout">
+  <div class="modal-box" style="max-height:82vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-shrink:0">
+      <div style="font-size:16px;font-weight:700">Übung hinzufügen</div>
+      <button onclick="closeModal('modal-add-to-workout')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <!-- Search -->
+    <input id="add-ex-search" type="text" class="inp" placeholder="Suchen..." style="margin-bottom:10px;flex-shrink:0" oninput="filterAddExList(this.value)"/>
+    <!-- Filter chips -->
+    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;flex-shrink:0;scrollbar-width:none" id="add-ex-filter-chips"></div>
+    <!-- List -->
+    <div id="add-ex-list" style="overflow-y:auto;display:flex;flex-direction:column;gap:6px;flex:1"></div>
   </div>
 </div>
 <!-- MODAL: Exercise Info -->
@@ -1797,6 +1817,62 @@ function profileTxt(){
   if(p.notes)parts.push('Sonstiges: '+p.notes);
   return parts.join(' | ');
 }
+
+// ─── Add exercise to workout ─────────────────────────────────────────────────
+let _addExFilter='all';
+
+function openAddExToWorkout(){
+  _addExFilter='all';
+  renderAddExList('');
+  // Filter chips
+  const fc=document.getElementById('add-ex-filter-chips');fc.innerHTML='';
+  const groups=['all','chest','back','shoulders','arms','core','glutes','legs'];
+  const labels={all:'Alle',chest:'Brust',back:'Rücken',shoulders:'Schultern',arms:'Arme',core:'Core',glutes:'Gesäß',legs:'Beine'};
+  groups.forEach(g=>{const b=document.createElement('button');b.className='chip'+(g==='all'?' ac':'');b.textContent=labels[g];b.onclick=()=>{_addExFilter=g;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';renderAddExList(document.getElementById('add-ex-search').value);};fc.appendChild(b);});
+  document.getElementById('add-ex-search').value='';
+  document.getElementById('modal-add-to-workout').classList.add('open');
+}
+
+function filterAddExList(query){renderAddExList(query);}
+
+function renderAddExList(query){
+  const all=[...DEFAULT_LIB,...library];
+  const q=(query||'').toLowerCase();
+  const existing=new Set(curExercises.map(e=>e.name.toLowerCase()));
+  let filtered=all.filter(ex=>{
+    if(_addExFilter!=='all'&&!(ex.muscles||[]).includes(_addExFilter))return false;
+    if(q&&!(ex.name.toLowerCase().includes(q)||(ex.tip||'').toLowerCase().includes(q)))return false;
+    return true;
+  });
+  const el=document.getElementById('add-ex-list');if(!el)return;
+  el.innerHTML=filtered.map((ex,idx)=>{
+    const already=existing.has(ex.name.toLowerCase());
+    return`<div style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:11px;border:1px solid ${already?'var(--co)':'var(--br)'};background:${already?'rgba(5,150,105,.05)':'var(--card)'};opacity:${already?'.7':'1'}">
+      <div style="width:34px;height:34px;border-radius:9px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.12);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--ac);flex-shrink:0">${getExIcon(ex.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}${ex.bilateral?' ↔':''}</div>
+        <div style="font-size:11px;color:var(--mu)">${(ex.muscles||[]).map(m=>MUSCLE_DE[m]||m).join(', ')}</div>
+      </div>
+      ${already
+        ?'<span style="font-size:11px;color:var(--co);font-weight:600">✓ drin</span>'
+        :`<button onclick="addExToWorkout(${JSON.stringify(ex).replace(/"/g,'&quot;')})" style="padding:7px 13px;border-radius:9px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2);color:var(--ac);font-size:12px;font-weight:700;font-family:var(--f);flex-shrink:0">+ Hinzu</button>`
+      }
+    </div>`;
+  }).join('');
+  if(!filtered.length)el.innerHTML='<div style="text-align:center;padding:20px;color:var(--mu);font-size:13px">Keine Übungen gefunden.</div>';
+}
+
+function addExToWorkout(exOrStr){
+  let ex;try{ex=typeof exOrStr==='object'?exOrStr:JSON.parse(exOrStr);}catch{return;}
+  const n=(ex.name||'').toLowerCase();
+  let type='time';
+  if(n.match(/plank|wall sit|hollow|dead hang|l-sit/))type='hold';
+  else if(n.match(/push|liegest|klimmzug|pull.up|dip|curl|lunge|squat|kniebeug|row|raise/)||ex.bilateral)type='reps';
+  curExercises.push({...ex,type,duration:type==='hold'?45:40,rest:20,reps:10,sets:1,icon:getExIcon(ex.name)});
+  closeModal('modal-add-to-workout');
+  showReview();
+}
+
 // ─── Settings ─────────────────────────────────────────────────────────────────
 function saveKey(){const k=document.getElementById('key-inp').value.trim();saveApiKey(k);const btn=document.getElementById('key-btn');btn.textContent='✓ Gespeichert';setTimeout(()=>btn.textContent='Speichern',2000);updateHome();}
 function doExport(){const b=new Blob([JSON.stringify({version:5,data:log,plan,library,exportedAt:todayIso()},null,2)],{type:'application/json'});const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='coach-'+todayIso()+'.json';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);}
