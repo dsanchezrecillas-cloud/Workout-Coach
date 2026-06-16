@@ -1123,9 +1123,15 @@ async function generateWorkout(summaryOverride){
 // ─── Review ───────────────────────────────────────────────────────────────────
 let wuVisible=true;
 function showReview(){
+  if(wuVisible===undefined)wuVisible=true;
   document.getElementById('rev-meta').textContent=curExercises.length+' Übungen'+(wuExercises.length?' + '+wuExercises.length+' Warmup':'');
   const ws=document.getElementById('wu-sec');
-  if(wuExercises.length){ws.style.display='block';document.getElementById('wu-list').innerHTML=wuExercises.map(ex=>`<div class="card" style="border-color:rgba(217,119,6,.15)"><div style="display:flex;align-items:center;gap:10px"><div style="width:33px;height:33px;border-radius:8px;background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.2);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--am)">${ex.icon||'○'}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}</div><div style="font-size:11px;color:var(--mu)">${ex.tip||''}</div></div><span style="font-size:11px;color:var(--mu)">${ex.duration||30}s</span></div></div>`).join('');}else ws.style.display='none';
+  if(wuExercises.length){ws.style.display='block';
+    // Sync toggle button state
+    const wuBtn=document.getElementById('wu-toggle');
+    if(wuBtn){wuBtn.textContent=wuVisible?'✕ Überspringen':'✓ Einschließen';wuBtn.style.background=wuVisible?'rgba(217,119,6,.1)':'rgba(5,150,105,.1)';wuBtn.style.borderColor=wuVisible?'rgba(217,119,6,.2)':'rgba(5,150,105,.2)';wuBtn.style.color=wuVisible?'var(--am)':'var(--co)';}
+    const wuList2=document.getElementById('wu-list');if(wuList2)wuList2.style.display=wuVisible?'flex':'none';
+    document.getElementById('wu-list').innerHTML=wuExercises.map(ex=>`<div class="card" style="border-color:rgba(217,119,6,.15)"><div style="display:flex;align-items:center;gap:10px"><div style="width:33px;height:33px;border-radius:8px;background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.2);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--am)">${ex.icon||'○'}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}</div><div style="font-size:11px;color:var(--mu)">${ex.tip||''}</div></div><span style="font-size:11px;color:var(--mu)">${ex.duration||30}s</span></div></div>`).join('');}else ws.style.display='none';
   document.getElementById('rev-list').innerHTML=curExercises.map((ex,i)=>`<div class="card" id="rev-${i}">
     <div style="display:flex;align-items:center;gap:8px">
       <button onclick="openInfoModal(curExercises[${i}])" style="width:34px;height:34px;border-radius:8px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.15);font-size:13px;color:var(--ac);flex-shrink:0">${ex.icon||'ℹ'}</button>
@@ -1264,7 +1270,7 @@ async function getAISwap(){if(!loadKey()){showErr('API Key fehlt');return;}const
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
 const RREST=60;let isWU=false;
-function initTimer(){tStatus='idle';tRound=1;tIdx=0;tSet=1;tRun=false;tReps={};isWU=wuExercises.length>0;clearInterval(tIv);const f=isWU?wuExercises[0]:curExercises[0];tLeft=f?.duration||40;renderBars();renderExList();updateTimer();document.getElementById('reps-done-btn').style.display='none';}
+function initTimer(){tStatus='idle';tRound=1;tIdx=0;tSet=1;tRun=false;tReps={};isWU=(wuVisible!==false)&&wuExercises.length>0;clearInterval(tIv);const f=isWU?wuExercises[0]:curExercises[0];tLeft=f?.duration||40;renderBars();renderExList();updateTimer();document.getElementById('reps-done-btn').style.display='none';}
 function renderBars(){const w=document.getElementById('prog-bars');w.innerHTML='';const totalR=curSetup.trainingMode==='circuit'?(curSetup.rounds||1):1;for(let i=0;i<totalR;i++){const b=document.createElement('div');b.id='bar-'+i;b.style.cssText='flex:1;height:3px;border-radius:2px;background:var(--br);transition:background .4s';w.appendChild(b);}const l=document.createElement('div');l.id='bar-lbl';l.style.cssText='font-size:11px;color:var(--mu);margin-left:8px;font-weight:500;white-space:nowrap';w.appendChild(l);}
 function renderExList(){const exList=isWU?wuExercises:curExercises;document.getElementById('ex-list').innerHTML=exList.map((e,i)=>{const rk=tRound+'_'+i,tot=(tReps[rk]||0)+(tReps[rk+'_L']||0)+(tReps[rk+'_R']||0);return`<div id="erow-${i}" style="display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:8px;transition:all .25s"><div id="edot-${i}" style="width:18px;height:18px;border-radius:50%;flex-shrink:0;border:1.5px solid var(--br);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:var(--mu)">${i+1}</div><div style="font-size:12px;font-weight:500;flex:1;color:${e.warmup?'var(--am)':'var(--mu)'}">${e.name}${e.bilateral?' ↔':''}</div>${tot>0?`<span class="tag" style="background:rgba(5,150,105,.12);color:var(--co)">${tot}</span>`:''}<div style="font-size:11px;color:var(--mu)">${e.type==='reps'?(e.reps||10)+' Wdh':e.duration+'s'}</div></div>`;}).join('');}
 
@@ -1278,10 +1284,21 @@ function updateTimer(){
   const pg=mt>0?((mt-tLeft)/mt)*100:0;
   const arc=document.getElementById('timer-arc');arc.setAttribute('stroke',pc);
   const isRM=exType==='reps'&&tStatus==='work';
-  if(isRM){arc.setAttribute('stroke-dashoffset',CIRC*.75);}else{arc.setAttribute('stroke-dashoffset',CIRC-(pg/100)*CIRC);}
+  if(isRM){arc.setAttribute('stroke-dashoffset',CIRC);}else{arc.setAttribute('stroke-dashoffset',CIRC-(pg/100)*CIRC);}
   arc.style.filter=`drop-shadow(0 0 9px ${pc}55)`;
   document.getElementById('ph-label').textContent=pl;document.getElementById('ph-label').style.color=pc;
-  document.getElementById('t-disp').textContent=isRM?(ex.reps||10)+' Wdh':fmtT(tLeft);
+  const tDisp=document.getElementById('t-disp');
+  if(isRM){
+    tDisp.textContent=(ex.reps||10);
+    tDisp.style.fontSize='44px';
+    const unit=document.getElementById('t-disp-unit');
+    if(unit)unit.style.display='block';
+  }else{
+    tDisp.textContent=fmtT(tLeft);
+    tDisp.style.fontSize='';
+    const unit=document.getElementById('t-disp-unit');
+    if(unit)unit.style.display='none';
+  }
   const exListC=isWU?wuExercises:curExercises;
   const curExC=exListC[tIdx]||{};const totalSetsC=isWU?1:(curExC.sets||1);
   let ctrTxt='';
@@ -1339,7 +1356,13 @@ function updateTimer(){
   // Reps-done button: only during work phase of reps mode
   rd.style.display=tStatus==='work'&&isRepsMode?'block':'none';
   // Skip: during work phase, hidden in reps mode (use Satz fertig instead), hidden in done
-  if(skipExBtn){skipExBtn.style.display=isActive&&tStatus!=='done'?'flex':'none';skipExBtn.style.opacity=tStatus==='work'&&!isRepsMode?'1':tStatus==='rest'?'1':'.4';}
+  if(skipExBtn){
+    skipExBtn.style.display=isActive&&tStatus!=='done'?'flex':'none';
+    skipExBtn.style.opacity='1';
+    // Change label based on phase
+    if(tStatus==='rest'||tStatus==='round_rest')skipExBtn.innerHTML='⏭ Pause überspringen';
+    else skipExBtn.innerHTML='⏭ Übung skippen';
+  }
   // Pause reps-mode timer
   if(tStatus==='work'&&isRepsMode&&tRun){clearInterval(tIv);tRun=false;}
   const card=document.getElementById('ex-card');card.style.borderColor=tStatus!=='idle'&&tStatus!=='done'?pc+'44':'var(--br)';card.style.boxShadow=tStatus!=='idle'&&tStatus!=='done'?`0 0 16px ${pc}10`:'none';
@@ -1356,7 +1379,19 @@ function advance(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{
         if(tRound<totalRounds){tRound++;tIdx=0;tSet=1;tStatus='round_rest';tLeft=RREST;beep(880,.2);}
         else{tStatus='done';beep(1100,.5);updateTimer();return;}
       }}else if(tStatus==='round_rest'){tStatus='work';tLeft=curExercises[0].duration||40;beep(880,.1);}tRun=true;updateTimer();tIv=setInterval(tick,1000);}
-function skipEx(){if(tStatus!=='work')return;clearInterval(tIv);tRun=false;tStatus='rest';tLeft=3;beep(440,.1);tRun=true;updateTimer();tIv=setInterval(tick,1000);}
+function skipEx(){
+  clearInterval(tIv);tRun=false;
+  if(tStatus==='rest'||tStatus==='round_rest'){
+    // Skip the pause — advance immediately to next work
+    tLeft=1;advance();return;
+  }
+  if(tStatus==='work'){
+    // Skip exercise → jump to rest then next
+    beep(440,.1);
+    tSet=(isWU?1:(curExercises[tIdx]?.sets||1)); // jump past all remaining sets
+    tStatus='rest';tLeft=1;advance();return;
+  }
+}
 function repsDone(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};clearInterval(tIv);tRun=false;tStatus='rest';tLeft=ex.rest||20;beep(660,.15);tRun=true;updateTimer();tIv=setInterval(tick,1000);}
 async function endEarly(){const ok=await appConfirm('Training beenden?','Dein Fortschritt wird gespeichert.','Beenden','rgba(244,63,94,.9)');if(!ok)return;clearInterval(tIv);tRun=false;tStatus='done';relWL();updateTimer();}
 function addRep(side,d){
