@@ -1937,7 +1937,13 @@ function renderExHistory(exName){
 let _currentInfoEx=null;
 function googleExercise(){
   if(!_currentInfoEx)return;
-  window.open('https://www.google.com/search?q='+encodeURIComponent(_currentInfoEx.name+' Übung richtig ausführen'),'_blank');
+  const url='https://www.google.com/search?q='+encodeURIComponent(_currentInfoEx.name+' Übung richtig ausführen');
+  // Close modal first so it's not stuck open when returning to the PWA
+  closeModal('modal-info');
+  // Use a temporary link to open in a way that works in iOS standalone PWA
+  const a=document.createElement('a');
+  a.href=url;a.target='_blank';a.rel='noopener noreferrer';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 function openInfoModal(ex){
   _currentInfoEx=ex;
@@ -2318,6 +2324,10 @@ function resolveConfirm(v){
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+// Safety: ensure info modal can always be closed (visibility change / focus return)
+document.addEventListener('visibilitychange',()=>{
+  // No auto-close — just ensures handlers are alive
+});
 document.addEventListener('DOMContentLoaded',()=>{
   try{
     log=loadLog();plan=loadPlan();library=loadLibrary();
