@@ -106,6 +106,7 @@ button:active:not(:disabled){transform:scale(.96)}
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="10.5" y="3" width="3" height="18" rx="1" fill="#a78bfa"/><rect x="4" y="7" width="6.5" height="10" rx="2" fill="#a78bfa"/><rect x="13.5" y="7" width="6.5" height="10" rx="2" fill="#a78bfa"/><rect x="1.5" y="9" width="3" height="6" rx="1" fill="#fb923c"/><rect x="19.5" y="9" width="3" height="6" rx="1" fill="#fb923c"/></svg>
       <span style="font-size:10px;letter-spacing:.1em;color:var(--ac);text-transform:uppercase;font-weight:600">Coach</span>
       <div id="c-spinner" style="display:none;margin-left:auto;width:14px;height:14px;border:2px solid var(--br);border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite"></div>
+      <button id="c-refresh" onclick="fetchCoach(true)" style="margin-left:auto;width:26px;height:26px;border-radius:7px;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);color:var(--ac);font-size:13px;display:flex;align-items:center;justify-content:center">↻</button>
     </div>
     <div id="c-text" style="font-size:13px;color:var(--su);line-height:1.65">Starte dein erstes Workout — dann analysiere ich dein Training.</div>
     <div id="c-tip" style="display:none;font-size:12px;color:var(--mu);line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px solid var(--br)"></div>
@@ -994,26 +995,51 @@ function updateHome(){
   updatePlanHome();
 }
 
-async function fetchCoach(){
+async function fetchCoach(force){
   if(!loadKey()||log.length<1)return;
+  // Cache: key on date + time-block + workout count + plan progress
+  const h0=new Date().getHours();
+  const timeBlock=h0<12?'m':h0<18?'a':'e';
+  const planProg=plan?plan.weeks.flatMap(w=>w.sessions).filter(s=>s.done).length:0;
+  const cacheKey=`${todayIso()}_${timeBlock}_${log.length}_${planProg}_${log[log.length-1]?.id||0}`;
+  if(!force){
+    try{
+      const cached=JSON.parse(localStorage.getItem('coach_cache')||'null');
+      if(cached&&cached.key===cacheKey){
+        document.getElementById('c-text').textContent=cached.message||'—';
+        if(cached.tip){document.getElementById('c-tip').style.display='block';document.getElementById('c-tip').textContent='💡 '+cached.tip;}
+        document.getElementById('coach-card').style.borderColor='rgba(124,58,237,.25)';
+        document.getElementById('c-spinner').style.display='none';
+        return;
+      }
+    }catch{}
+  }
   document.getElementById('c-spinner').style.display='block';
+  const cr=document.getElementById('c-refresh');if(cr)cr.style.display='none';
   document.getElementById('c-text').textContent='Analysiere...';
   try{
     const h=new Date().getHours(),timeOfDay=h<12?'Morgen':h<18?'Mittag':'Abend';
     const profCtx=profileTxt();
     const planCtx=plan?`Aktiver Plan: ${plan.title||''}, Woche ${getCurrentWeekIdx()+1}/${plan.weeks.length}, ${plan.weeks.flatMap(w=>w.sessions).filter(s=>s.done).length} Sessions abgeschlossen.`:'Kein aktiver Trainingsplan.';
-    const raw=await callAPI([{role:'user',content:`Heute ist ${todayIso()}, ${timeOfDay}. Du bist persönlicher Fitness-Coach.${profCtx?'\n\nNutzer-Profil: '+profCtx:''}\n\nAktiver Trainingsplan: ${planCtx}\n\nTrainingsverlauf (neueste zuerst):\n${histTxt()}\n\nGib eine kurze, intelligente, persönliche Empfehlung für heute. Berücksichtige Erholung, Muster, Notizen und Einschränkungen. Sei konkret.\n\nNUR JSON: {"message":"2-3 persönliche Sätze DE","tip":"1 konkreter Tipp DE"}`}],500);
+    /*COACH*/const raw=await callAPI([{role:'user',content:`Heute ist ${todayIso()}, ${timeOfDay}. Du bist persönlicher Fitness-Coach.${profCtx?'\n\nNutzer-Profil: '+profCtx:''}\n\nAktiver Trainingsplan: ${planCtx}\n\nTrainingsverlauf (neueste zuerst):\n${histTxt()}\n\nGib eine kurze, intelligente, persönliche Empfehlung für heute. Berücksichtige Erholung, Muster, Notizen und Einschränkungen. Sei konkret.\n\nNUR JSON: {"message":"2-3 persönliche Sätze DE","tip":"1 konkreter Tipp DE"}`}],500);
     const s=extractJSON(raw);const obj=Array.isArray(s)?s[0]:s;
     document.getElementById('c-text').textContent=obj.message||'—';
     if(obj.tip){document.getElementById('c-tip').style.display='block';document.getElementById('c-tip').textContent='💡 '+obj.tip;}
     document.getElementById('coach-card').style.borderColor='rgba(124,58,237,.25)';
+    // Cache result
+    try{localStorage.setItem('coach_cache',JSON.stringify({key:cacheKey,message:obj.message,tip:obj.tip}));}catch{}
   }catch(e){document.getElementById('c-text').textContent='Coach: '+e.message;}
   document.getElementById('c-spinner').style.display='none';
 }
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 function startChat(){chatHistory=[];chatCtx={};document.getElementById('chat-msgs').innerHTML='';show('s-chat');setTimeout(()=>addAIMsg('Hey! Ich bin dein Personal Coach. 💪 Was willst du heute trainieren?',['Ganzkörper','Oberkörper','Rücken & Core','Beine & Gesäß','Überrasch mich']),200);}
-function addAIMsg(text,chips=[]){const w=document.getElementById('chat-msgs');const m=document.createElement('div');m.className='msg ai fade';m.textContent=text;w.appendChild(m);if(chips.length){const r=document.createElement('div');r.className='chips-row fade';chips.forEach(c=>{const b=document.createElement('button');b.className='chip';b.textContent=c;b.onclick=()=>sendChatMsg(c);r.appendChild(b);});w.appendChild(r);}w.scrollTop=w.scrollHeight;}
+function addAIMsg(text,chips=[]){const w=document.getElementById('chat-msgs');const m=document.createElement('div');m.className='msg ai fade';
+  // Render basic markdown: **bold**, line breaks, • bullets
+  const safe=(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const formatted=safe.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+  m.innerHTML=formatted;
+  w.appendChild(m);if(chips.length){const r=document.createElement('div');r.className='chips-row fade';chips.forEach(c=>{const b=document.createElement('button');b.className='chip';b.textContent=c;b.onclick=()=>sendChatMsg(c);r.appendChild(b);});w.appendChild(r);}w.scrollTop=w.scrollHeight;}
 function addUserMsg(text){const w=document.getElementById('chat-msgs');const m=document.createElement('div');m.className='msg user fade';m.textContent=text;w.appendChild(m);w.scrollTop=w.scrollHeight;}
 function sendChat(){const v=document.getElementById('chat-in').value.trim();if(!v)return;document.getElementById('chat-in').value='';sendChatMsg(v);}
 
@@ -1074,16 +1100,38 @@ WICHTIG: Verstehe die ABSICHT des Nutzers — nicht immer will er trainieren.
 - Wenn er "zurück", "abbruch", "nein", "cancel" sagt: Verabschiede dich freundlich, schlage vor zurückzugehen. ready:false.
 - Berücksichtige immer Einschränkungen aus dem Profil (z.B. Knie) ohne extra zu fragen.
 - Sei natürlich und persönlich, nicht roboterhaft. Kein starres Schema.
+- HALTE DICH KURZ: max 2-3 Sätze pro Antwort. Erstelle KEINE kompletten Workout-Pläne oder Übungslisten im Chat — das passiert separat beim "Workout erstellen". Sammle nur die Infos.
+- Verwende KEIN Markdown (kein **, keine Listen mit •) in der message.
 
 Antworte IMMER NUR mit JSON (kein Markdown, kein Text davor/danach):
 {"message":"Antwort auf Deutsch","chips":["Option1","Option2"],"ready":false,"summary":""}
 Wenn ready:true, fülle summary mit allem nötigen für das Workout.`;
   try{
-    const raw=await callAPI(chatHistory,400,sys);
+    const raw=await callAPI(chatHistory,700,sys);
     typing.remove();
     let resp=null;
     try{const parsed=extractJSON(raw);resp=Array.isArray(parsed)?parsed[0]:parsed;}catch{}
-    if(!resp?.message){const cleaned=raw.replace(/```json?/g,'').replace(/```/g,'').trim();if(cleaned.length>3)resp={message:cleaned,chips:[],ready:false,summary:''};else throw new Error('Keine Antwort vom Modell');}
+    // If parse failed or no message, try to extract just the message string (handles truncated JSON)
+    if(!resp?.message){
+      let cleaned=raw.replace(/```json?/gi,'').replace(/```/g,'').trim();
+      // Try to pull out "message":"..." content even if JSON is broken/truncated
+      const mMatch=cleaned.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      if(mMatch){
+        let msg=mMatch[1].replace(/\\n/g,'\n').replace(/\\"/g,'"').replace(/\\\\/g,'\\');
+        // Try to extract chips array too
+        let chips=[];const cMatch=cleaned.match(/"chips"\s*:\s*\[([^\]]*)\]/);
+        if(cMatch){try{chips=JSON.parse('['+cMatch[1]+']');}catch{}}
+        const ready=/"ready"\s*:\s*true/.test(cleaned);
+        let summary='';const sMatch=cleaned.match(/"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+        if(sMatch)summary=sMatch[1].replace(/\\n/g,'\n').replace(/\\"/g,'"');
+        resp={message:msg,chips,ready,summary};
+      }else if(cleaned.length>3 && !cleaned.startsWith('{')){
+        // Plain text response (not JSON at all)
+        resp={message:cleaned,chips:[],ready:false,summary:''};
+      }else{
+        throw new Error('Antwort unvollständig — nochmal versuchen');
+      }
+    }
     chatHistory.push({role:'assistant',content:resp.message});
     addAIMsg(resp.message,resp.chips||[]);
     if(resp.ready){
