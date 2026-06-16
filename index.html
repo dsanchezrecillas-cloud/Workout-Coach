@@ -267,6 +267,17 @@ button:active:not(:disabled){transform:scale(.96)}
             </div>
           </div>
         </div>
+        <div id="weight-input-wrap" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--br)">
+          <div style="font-size:10px;color:var(--am);font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px;text-align:center">⚖ Gewicht dieses Satzes</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:12px">
+            <button class="rep-btn" style="background:var(--up);border-color:var(--br);color:var(--mu)" onclick="adjWeight(-1.25)">−</button>
+            <div style="display:flex;align-items:baseline;gap:5px">
+              <input id="weight-n" type="text" inputmode="decimal" pattern="[0-9.]*" value="0" onchange="setWeightDirect(this.value)" style="font-size:34px;font-weight:700;color:var(--am);width:78px;text-align:center;background:none;border:none;outline:none;font-family:var(--m);-webkit-appearance:none;border-bottom:2px solid rgba(217,119,6,.3)"/>
+              <span style="font-size:15px;color:var(--mu);font-weight:600">kg</span>
+            </div>
+            <button class="rep-btn" style="background:rgba(217,119,6,.1);border-color:rgba(217,119,6,.3);color:var(--am)" onclick="adjWeight(1.25)">+</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -358,6 +369,10 @@ button:active:not(:disabled){transform:scale(.96)}
     <input type="date" id="plan-end-date" class="inp" style="margin-bottom:6px" oninput="onEndDateChange()"/>
     <div id="dur-date-calc" style="font-size:12px;color:var(--ac);margin-top:6px"></div>
   </div>
+
+  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Startdatum</div>
+  <input type="date" id="plan-start-date" class="inp" style="margin-bottom:4px" oninput="onStartDateChange()"/>
+  <div id="start-date-note" style="font-size:11px;color:var(--mu);margin-bottom:20px">= Heute</div>
 
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Workouts pro Woche</div>
   <div style="display:flex;gap:8px;margin-bottom:20px" id="freq-chips"></div>
@@ -708,7 +723,7 @@ button:active:not(:disabled){transform:scale(.96)}
     <!-- Actions -->
     <div style="display:flex;gap:8px;margin-bottom:8px">
       <button onclick="saveSessEdit()" class="btn btn-ac" style="flex:1">Speichern</button>
-      <button onclick="markSessionDone(parseInt(document.getElementById('sess-wi').value),parseInt(document.getElementById('sess-si').value),true);closeModal('modal-session');renderPlanView(currentViewWeek)" style="flex:1;padding:15px;border-radius:13px;background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.2);color:var(--co);font-size:14px;font-weight:600;font-family:var(--f);text-transform:uppercase;letter-spacing:.04em">✓ Erledigt</button>
+      <button onclick="markSessDone(parseInt(document.getElementById('sess-wi').value),parseInt(document.getElementById('sess-si').value),true);closeModal('modal-session');renderPlanView(currentViewWeek)" style="flex:1;padding:15px;border-radius:13px;background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.2);color:var(--co);font-size:14px;font-weight:600;font-family:var(--f);text-transform:uppercase;letter-spacing:.04em">✓ Erledigt</button>
     </div>
     <button onclick="deleteSessEdit()" style="width:100%;padding:11px;border-radius:11px;background:rgba(244,63,94,.06);border:1px solid rgba(244,63,94,.2);color:var(--hot);font-size:13px;font-weight:600;font-family:var(--f)">✕ Session löschen</button>
   </div>
@@ -806,18 +821,65 @@ function streak(){
 
 function extractJSON(t){
   t=(t||'').replace(/```(?:json)?\n?/g,'').replace(/```/g,'').trim();
-  try{
-    const p=JSON.parse(t);
+  function unwrap(p){
     if(Array.isArray(p))return p;
     if(p&&typeof p==='object'){
-      if(p.message!==undefined)return p; // chat/coach response — return as-is
-      const arr=p.exercises||p.workout||p.sessions||p.plan||p.weeks||Object.values(p).find(v=>Array.isArray(v));
+      if(p.message!==undefined)return p;       // chat/coach response
+      if(p.weeks&&Array.isArray(p.weeks))return p; // PLAN — keep whole object
+      if(p.title&&p.goal)return p;             // plan-like — keep whole
+      const arr=p.exercises||p.workout||p.sessions||p.plan||Object.values(p).find(v=>Array.isArray(v));
       if(arr&&Array.isArray(arr))return arr;
     }
     return p;
+  }
+  // Try direct parse first
+  try{return unwrap(JSON.parse(t));}catch{}
+  // Try to extract a JSON object (greedy) — handle plan with weeks
+  const o=t.match(/\{[\s\S]*\}/);
+  if(o){try{return unwrap(JSON.parse(o[0]));}catch{}}
+  // Try to extract a JSON array
+  const a=t.match(/\[[\s\S]*\]/);
+  if(a){try{return JSON.parse(a[0]);}catch{}}
+  // Last resort: repair truncated JSON
+  try{
+    let s=t;
+    // Walk through and track bracket depth, find last position where we had a balanced complete object inside an array
+    // Strategy: progressively trim from the end until valid JSON with closed brackets
+    // First, cut any trailing incomplete token (string/number/key)
+    // Find the last '}' that closes a complete session object
+    let depth=0,inStr=false,esc=false,lastSafe=-1;
+    const stack=[];
+    for(let i=0;i<s.length;i++){
+      const ch=s[i];
+      if(esc){esc=false;continue;}
+      if(ch==='\\'){esc=true;continue;}
+      if(ch==='"'){inStr=!inStr;continue;}
+      if(inStr)continue;
+      if(ch==='{'||ch==='[')stack.push(ch);
+      else if(ch==='}'||ch===']'){stack.pop();
+        // After closing an object/array, this is a safe truncation point
+        if(stack.length>=1)lastSafe=i;
+      }
+    }
+    if(lastSafe>0){
+      let head=s.slice(0,lastSafe+1);
+      // Close remaining open brackets based on stack at lastSafe
+      // Recompute stack up to lastSafe
+      const st2=[];inStr=false;esc=false;
+      for(let i=0;i<=lastSafe;i++){const ch=head[i];if(esc){esc=false;continue;}if(ch==='\\'){esc=true;continue;}if(ch==='"'){inStr=!inStr;continue;}if(inStr)continue;if(ch==='{'||ch==='[')st2.push(ch);else if(ch==='}'||ch===']')st2.pop();}
+      while(st2.length){const open=st2.pop();head+=(open==='['?']':'}');}
+      return unwrap(JSON.parse(head));
+    }
   }catch{}
-  const a=t.match(/\[[\s\S]+\]/);if(a){try{return JSON.parse(a[0]);}catch{}}
-  const o=t.match(/\{[\s\S]+\}/);if(o){try{const p=JSON.parse(o[0]);const arr=p.exercises||p.workout||p.plan||Object.values(p).find(v=>Array.isArray(v));return arr||p;}catch{}}
+  // Simpler fallback: just balance brackets
+  try{
+    let repaired=t.replace(/,\s*$/,'');
+    const openB=(t.match(/\{/g)||[]).length, closeB=(t.match(/\}/g)||[]).length;
+    const openA=(t.match(/\[/g)||[]).length, closeA=(t.match(/\]/g)||[]).length;
+    for(let i=0;i<openA-closeA;i++)repaired+=']';
+    for(let i=0;i<openB-closeB;i++)repaired+='}';
+    return unwrap(JSON.parse(repaired));
+  }catch{}
   throw new Error('Kein gültiges JSON');
 }
 
@@ -1388,7 +1450,7 @@ function showPlan(){plan=loadPlan();if(!plan){buildPlanCreate();show('s-plan-cre
 function getCurrentWeekIdx(){if(!plan?.weeks?.length)return 0;const today=todayIso(),start=plan.startDate;const startMs=new Date(start+'T12:00:00').getTime();const todayMs=new Date(today+'T12:00:00').getTime();const daysDiff=Math.max(0,Math.floor((todayMs-startMs)/86400000));return Math.min(Math.floor(daysDiff/7),plan.weeks.length-1);}
 function updatePlanHome(){if(!plan?.weeks?.length){document.getElementById('plan-home').style.display='none';return;}const wi=getCurrentWeekIdx();const week=plan.weeks[wi];if(!week){document.getElementById('plan-home').style.display='none';return;}const todayDow=new Date().getDay();const sess=week.sessions.find(s=>s.dow===todayDow&&!s.done);if(!sess){document.getElementById('plan-home').style.display='none';return;}document.getElementById('plan-home').style.display='block';document.getElementById('plan-home-focus').textContent=sess.focus;document.getElementById('plan-home-meta').textContent=(sess.durationMin||30)+' min · '+INT_LABELS[sess.intensity||'medium'];document.getElementById('plan-home-week').textContent='Woche '+(wi+1)+' / '+plan.weeks.length;pendingPlanSession={wi,si:week.sessions.indexOf(sess)};}
 function startPlanSession(){if(!pendingPlanSession||!plan)return;const week=plan.weeks[pendingPlanSession.wi];const sess=week?.sessions[pendingPlanSession.si];if(!sess)return;chatCtx={};chatHistory=[];const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);}
-function buildPlanCreate(){const gc=document.getElementById('goal-cards');gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<span style="font-size:22px">${g.icon}</span><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');wc.innerHTML='';[4,6,8,12].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});const fc=document.getElementById('freq-chips');fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' co':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';};fc.appendChild(b);});const durRanges=[{min:15,max:25,label:'15-25 min'},{min:20,max:35,label:'20-35 min'},{min:30,max:50,label:'30-50 min'},{min:45,max:65,label:'45-65 min'},{min:60,max:80,label:'60-80 min'}];const dc=document.getElementById('dur-chips');dc.innerHTML='';durRanges.forEach(r=>{const b=document.createElement('button');b.className='chip'+(r.min===planOpts.durMin&&r.max===planOpts.durMax?' am':'');b.textContent=r.label;b.onclick=()=>{planOpts.durMin=r.min;planOpts.durMax=r.max;dc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip am';};dc.appendChild(b);});const sc=document.getElementById('style-cards');sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<span style="font-size:18px">${s.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}sc.appendChild(b);});document.getElementById('plan-end-date').value='';document.getElementById('plan-start-date').value=todayIso();document.getElementById('start-date-note').textContent='= Heute';}
+function buildPlanCreate(){const gc=document.getElementById('goal-cards');gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<span style="font-size:22px">${g.icon}</span><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');wc.innerHTML='';[4,6,8,12].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});const fc=document.getElementById('freq-chips');fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' co':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';};fc.appendChild(b);});const durRanges=[{min:15,max:25,label:'15-25 min'},{min:20,max:35,label:'20-35 min'},{min:30,max:50,label:'30-50 min'},{min:45,max:65,label:'45-65 min'},{min:60,max:80,label:'60-80 min'}];const dc=document.getElementById('dur-chips');dc.innerHTML='';durRanges.forEach(r=>{const b=document.createElement('button');b.className='chip'+(r.min===planOpts.durMin&&r.max===planOpts.durMax?' am':'');b.textContent=r.label;b.onclick=()=>{planOpts.durMin=r.min;planOpts.durMax=r.max;dc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip am';};dc.appendChild(b);});const sc=document.getElementById('style-cards');sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<span style="font-size:18px">${s.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}sc.appendChild(b);});const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';}
 
 let durMode='weeks';
 function setDurMode(mode){durMode=mode;document.getElementById('dur-weeks-wrap').style.display=mode==='weeks'?'block':'none';document.getElementById('dur-date-wrap').style.display=mode==='date'?'block':'none';document.getElementById('tog-weeks').style.borderColor=mode==='weeks'?'var(--ac)':'var(--br)';document.getElementById('tog-weeks').style.background=mode==='weeks'?'rgba(124,58,237,.12)':'var(--up)';document.getElementById('tog-weeks').style.color=mode==='weeks'?'var(--ac)':'var(--mu)';document.getElementById('tog-date').style.borderColor=mode==='date'?'var(--ac)':'var(--br)';document.getElementById('tog-date').style.background=mode==='date'?'rgba(124,58,237,.12)':'var(--up)';document.getElementById('tog-date').style.color=mode==='date'?'var(--ac)':'var(--mu)';}
@@ -1443,14 +1505,21 @@ async function generatePlan(){
 NUR minifiziertes JSON ohne Leerzeichen: {"title":"Kurzname","goal":"${planOpts.goal}","weeks":[{"week":1,"theme":"Grundlagen","sessions":[{"dow":1,"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.durMin},"done":false}]}]}
 dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. Alle ${aiWeeks} Wochen, je ${planOpts.freq} Sessions. intensity: easy/medium/hard.`;
 
+  const startDateVal=(document.getElementById('plan-start-date')?.value)||todayIso();
   try{
-    const raw=await callAPI([{role:'user',content:'Erstelle den Plan jetzt.'}],1500,sys);
+    const raw=await callAPI([{role:'user',content:'Erstelle den Plan jetzt. Antworte NUR mit JSON.'}],1800,sys);
     const parsed=extractJSON(raw);
     let planData=null;
-    if(Array.isArray(parsed)&&parsed[0]?.sessions){planData={title:'Trainingsplan',goal:planOpts.goal,freq:planOpts.freq,durMin:planOpts.durMin,durMax:planOpts.durMax,style:planOpts.style,startDate:todayIso(),weeks:parsed};}
-    else if(!Array.isArray(parsed)&&parsed?.weeks?.length){planData=parsed;}
-    if(!planData?.weeks?.length)throw new Error('Kein gültiger Plan erhalten');
-    if(!planData.startDate||planData.startDate===todayIso()){planData.startDate=(document.getElementById('plan-start-date')?.value)||todayIso();}plan=planData;savePlan();renderPlanView(0);show('s-plan');
+    if(Array.isArray(parsed)&&parsed[0]?.sessions){
+      planData={title:'Trainingsplan',goal:planOpts.goal,freq:planOpts.freq,durMin:planOpts.durMin,durMax:planOpts.durMax,style:planOpts.style,startDate:startDateVal,weeks:parsed};
+    }else if(!Array.isArray(parsed)&&parsed?.weeks?.length){
+      planData=parsed;
+      planData.freq=planOpts.freq;planData.durMin=planOpts.durMin;planData.durMax=planOpts.durMax;planData.style=planOpts.style;planData.goal=planOpts.goal;planData.startDate=startDateVal;
+    }
+    if(!planData?.weeks?.length)throw new Error('Kein gültiger Plan — bitte nochmal versuchen');
+    // Extend locally if more weeks requested than AI generated
+    if(weeks>planData.weeks.length)extendPlanWeeks(planData,weeks);
+    plan=planData;savePlan();renderPlanView(0);show('s-plan');
   }catch(e){showErr('Fehler: '+e.message);}
   btn.textContent='Plan generieren →';btn.disabled=false;
 }
