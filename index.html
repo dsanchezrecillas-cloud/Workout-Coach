@@ -332,7 +332,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div id="plan-subtitle" style="font-size:13px;color:var(--mu);margin-bottom:16px"></div>
 
   <!-- Progress -->
-  <div class="card" style="margin-bottom:14px">
+  <div class="card" style="margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div id="plan-prog-lbl" style="font-size:13px;color:var(--tx)"></div>
       <div id="plan-prog-pct" style="font-size:13px;font-weight:700;color:var(--ac)"></div>
@@ -340,6 +340,16 @@ button:active:not(:disabled){transform:scale(.96)}
     <div style="height:5px;background:var(--br);border-radius:3px"><div id="plan-prog-bar" style="height:100%;background:linear-gradient(90deg,#7c3aed,#a855f7);border-radius:3px;transition:width .5s;width:0"></div></div>
   </div>
 
+  <!-- View toggle -->
+  <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--up);border-radius:10px;padding:4px">
+    <button onclick="setPlanView('weeks')" id="pv-weeks" class="btn btn-ac" style="flex:1;padding:9px;font-size:13px;border-radius:7px;text-transform:none">📋 Wochen</button>
+    <button onclick="setPlanView('calendar')" id="pv-calendar" style="flex:1;padding:9px;border-radius:7px;font-size:13px;background:none;border:none;color:var(--mu);font-family:var(--f);font-weight:600">📅 Kalender</button>
+  </div>
+  <!-- Calendar container -->
+  <div id="plan-calendar" style="display:none"></div>
+
+  <!-- Week view container -->
+  <div id="plan-weeks-view">
   <!-- Week tabs -->
   <div id="week-tabs" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
 
@@ -1607,8 +1617,109 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. Alle ${aiWeeks} Wochen, je ${planOpts.f
   btn.textContent='Plan generieren →';btn.disabled=false;
 }
 
+
+// ─── Plan calendar view ───────────────────────────────────────────────────────
+let _planView='weeks';
+function setPlanView(v){
+  _planView=v;
+  document.getElementById('plan-weeks-view').style.display=v==='weeks'?'block':'none';
+  document.getElementById('plan-calendar').style.display=v==='calendar'?'block':'none';
+  const wBtn=document.getElementById('pv-weeks'),cBtn=document.getElementById('pv-calendar');
+  if(v==='weeks'){wBtn.className='btn btn-ac';wBtn.style.cssText='flex:1;padding:9px;font-size:13px;border-radius:7px;text-transform:none';cBtn.className='';cBtn.style.cssText='flex:1;padding:9px;border-radius:7px;font-size:13px;background:none;border:none;color:var(--mu);font-family:var(--f);font-weight:600';}
+  else{cBtn.className='btn btn-ac';cBtn.style.cssText='flex:1;padding:9px;font-size:13px;border-radius:7px;text-transform:none';wBtn.className='';wBtn.style.cssText='flex:1;padding:9px;border-radius:7px;font-size:13px;background:none;border:none;color:var(--mu);font-family:var(--f);font-weight:600';if(plan)renderPlanCalendar();}
+}
+
+
+function _sessDateShort(wi,dow){
+  const d=getSessionDate(wi,dow);
+  if(!d)return '';
+  return d.getDate()+'.'+(d.getMonth()+1)+'.';
+}
+function getSessionDate(weekIdx, dow){
+  // Returns Date object for a session in a given week with given day-of-week
+  if(!plan?.startDate)return null;
+  const start=new Date(plan.startDate+'T12:00:00');
+  // Find the Monday of the start week (or start day itself)
+  const startDow=start.getDay(); // 0=Sun
+  // Days from start to first day of week 0
+  // Week 0 begins at startDate. Each session's actual date = startDate's week-start + weekIdx*7 + offset to dow
+  // Simplify: treat startDate as day 0, compute the date of the given dow in the given week relative to start's week
+  const startMonday=new Date(start);
+  const diff=(startDow===0?-6:1-startDow); // shift back to Monday
+  startMonday.setDate(start.getDate()+diff);
+  const target=new Date(startMonday);
+  const dowOffset=(dow===0?6:dow-1); // Mon=0..Sun=6
+  target.setDate(startMonday.getDate()+weekIdx*7+dowOffset);
+  return target;
+}
+
+function renderPlanCalendar(){
+  const cal=document.getElementById('plan-calendar');if(!cal||!plan)return;
+  // Build a map: dateStr -> {weekIdx, si, session}
+  const sessionMap={};
+  plan.weeks.forEach((w,wi)=>{
+    w.sessions.forEach((s,si)=>{
+      const d=getSessionDate(wi,s.dow);
+      if(d){const key=d.toISOString().slice(0,10);sessionMap[key]={wi,si,session:s};}
+    });
+  });
+  // Determine month range: from start month to end month
+  const start=new Date(plan.startDate+'T12:00:00');
+  const lastWeek=plan.weeks.length-1;
+  const end=getSessionDate(lastWeek,6)||new Date(start.getTime()+plan.weeks.length*7*86400000);
+  // Render each month from start to end
+  let html='';
+  const monthNames=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  const dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  let cursor=new Date(start.getFullYear(),start.getMonth(),1);
+  const endMonth=new Date(end.getFullYear(),end.getMonth(),1);
+  const todayKey=todayIso();
+  while(cursor<=endMonth){
+    const year=cursor.getFullYear(),month=cursor.getMonth();
+    const firstDay=new Date(year,month,1);
+    const daysInMonth=new Date(year,month+1,0).getDate();
+    let startWeekday=firstDay.getDay();startWeekday=startWeekday===0?6:startWeekday-1; // Mon=0
+    html+=`<div style="margin-bottom:20px">
+      <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:12px">${monthNames[month]} ${year}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px">
+        ${dayNames.map(d=>`<div style="text-align:center;font-size:10px;color:var(--mu);font-weight:600">${d}</div>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">`;
+    // Empty cells before day 1
+    for(let i=0;i<startWeekday;i++)html+='<div></div>';
+    for(let day=1;day<=daysInMonth;day++){
+      const date=new Date(year,month,day);
+      const key=date.toISOString().slice(0,10);
+      const sess=sessionMap[key];
+      const isToday=key===todayKey;
+      const isPast=key<todayKey;
+      let cellBg='transparent',cellBorder='transparent',dot='';
+      if(sess){
+        const ic=INT_COLORS[sess.session.intensity||'medium'];
+        cellBg=sess.session.done?'rgba(5,150,105,.12)':'rgba(124,58,237,.08)';
+        cellBorder=sess.session.done?'rgba(5,150,105,.3)':'rgba(124,58,237,.25)';
+        dot=`<div style="width:5px;height:5px;border-radius:50%;background:${sess.session.done?'var(--co)':ic};margin:2px auto 0"></div>`;
+      }
+      html+=`<div onclick="${sess?`openSessEdit(${sess.wi},${sess.si})`:''}" style="aspect-ratio:1;border-radius:9px;background:${cellBg};border:1.5px solid ${isToday?'var(--ac)':cellBorder};display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${sess?'pointer':'default'};position:relative;${isToday?'box-shadow:0 0 0 1px var(--ac)':''}">
+        <span style="font-size:12px;font-weight:${isToday?700:sess?600:400};color:${isToday?'var(--ac)':isPast&&!sess?.session.done?'var(--mu)':'var(--tx)'}">${day}</span>
+        ${dot}
+      </div>`;
+    }
+    html+='</div></div>';
+    cursor=new Date(year,month+1,1);
+  }
+  // Legend
+  html+=`<div style="display:flex;gap:14px;justify-content:center;padding:12px 0;border-top:1px solid var(--br);font-size:11px;color:var(--mu)">
+    <span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:var(--ac)"></span>Geplant</span>
+    <span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:var(--co)"></span>Erledigt</span>
+    <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:3px;border:1.5px solid var(--ac)"></span>Heute</span>
+  </div>`;
+  cal.innerHTML=html;
+}
+
 function renderPlanView(wi=0){
   if(!plan?.weeks?.length){show('s-plan-create');return;}
+  if(_planView==='calendar'){renderPlanCalendar();}
   currentViewWeek=wi;
   const total=plan.weeks.flatMap(w=>w.sessions).length;const done=plan.weeks.flatMap(w=>w.sessions).filter(s=>s.done).length;const pct=total?Math.round(done/total*100):0;
   document.getElementById('plan-title').textContent=plan.title||'Trainingsplan';
@@ -1621,11 +1732,15 @@ function renderPlanView(wi=0){
   const week=plan.weeks[wi];document.getElementById('plan-week-title').textContent='WOCHE '+(wi+1)+' — '+(week.theme||'');
   const todayDow=new Date().getDay();
   document.getElementById('plan-sessions').innerHTML=week.sessions.map((s,si)=>{const isToday=s.dow===todayDow,ic=INT_COLORS[s.intensity||'medium'];const c=isToday?'rgba(124,58,237,.08)':'var(--card)',bc=isToday?'rgba(124,58,237,.25)':'var(--br)';
-    return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:38px;height:38px;border-radius:9px;background:${s.done?'rgba(5,150,105,.1)':isToday?'rgba(124,58,237,.12)':'var(--up)'};border:1px solid ${s.done?'rgba(5,150,105,.3)':isToday?'rgba(124,58,237,.2)':'var(--br)'};display:flex;align-items:center;justify-content:center;font-size:${s.done?18:12}px;font-weight:600;color:${s.done?'var(--co)':isToday?'var(--ac)':'var(--mu)'};flex-shrink:0">${s.done?'✓':DAYS[s.dow]}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}${isToday&&!s.done?' 📍':''}${s.savedWorkout?' 💾':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${s.exerciseCount?' · '+s.exerciseCount+' Üb.':''}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">⚡</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">💬</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
+    return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:44px;height:44px;border-radius:9px;background:${s.done?'rgba(5,150,105,.1)':isToday?'rgba(124,58,237,.12)':'var(--up)'};border:1px solid ${s.done?'rgba(5,150,105,.3)':isToday?'rgba(124,58,237,.2)':'var(--br)'};display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
+      ${s.done?`<span style="font-size:18px;color:var(--co)">✓</span>`:`<span style="font-size:12px;font-weight:700;color:${isToday?'var(--ac)':'var(--mu)'};line-height:1.1">${DAYS[s.dow]}</span><span style="font-size:10px;color:${isToday?'var(--ac)':'var(--mu)'};line-height:1.2">${_sessDateShort(wi,s.dow)}</span>`}
+    </div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}${isToday&&!s.done?' 📍':''}${s.savedWorkout?' 💾':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${s.exerciseCount?' · '+s.exerciseCount+' Üb.':''}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">⚡</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">💬</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
   }).join('');
 }
 
-function markSessDone(wi,si,done){if(!plan?.weeks[wi]?.sessions[si])return;plan.weeks[wi].sessions[si].done=done;if(done)plan.weeks[wi].sessions[si].doneDate=todayIso();else delete plan.weeks[wi].sessions[si].doneDate;savePlan();renderPlanView(currentViewWeek);updatePlanHome();}
+function _refreshPlanCalendarIfActive(){if(_planView==='calendar'&&plan)renderPlanCalendar();}
+
+function markSessDone(wi,si,done){if(!plan?.weeks[wi]?.sessions[si])return;plan.weeks[wi].sessions[si].done=done;if(done)plan.weeks[wi].sessions[si].doneDate=todayIso();else delete plan.weeks[wi].sessions[si].doneDate;savePlan();renderPlanView(currentViewWeek);updatePlanHome();_refreshPlanCalendarIfActive();}
 
 function startSessAt(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;pendingPlanSession={wi,si};
@@ -1707,7 +1822,42 @@ function applyPlanEndDate(){const startV=document.getElementById('edit-start-dat
   if(days<3){showErr('Zeitraum zu kurz.');return;}const targetWeeks=Math.max(1,Math.ceil(days/7));const cur=plan.weeks.length;if(targetWeeks>cur){const lastWeek=plan.weeks[cur-1];for(let i=cur;i<targetWeeks;i++){const w=i+1;const theme=w%4===0?'Deload':w<=2?'Aufbau':w<=5?'Steigerung':'Maximierung';const intensity=w%4===0?'easy':w<=3?'medium':'hard';plan.weeks.push({week:w,theme,sessions:lastWeek.sessions.map(s=>({...s,done:false,doneDate:undefined,intensity}))});}}else if(targetWeeks<cur){plan.weeks=plan.weeks.slice(0,targetWeeks);}savePlan();closeModal('modal-plan-edit');renderPlanView(Math.min(currentViewWeek,plan.weeks.length-1));}
 function addPlanWeek(){if(!plan)return;const cur=plan.weeks.length;const lastWeek=plan.weeks[cur-1];const w=cur+1;const theme=w%4===0?'Deload':w<=3?'Aufbau':w<=6?'Steigerung':'Maximierung';const intensity=w%4===0?'easy':w<=4?'medium':'hard';plan.weeks.push({week:w,theme,sessions:lastWeek.sessions.map(s=>({...s,done:false,doneDate:undefined,intensity}))});savePlan();renderPlanView(plan.weeks.length-1);closeModal('modal-plan-edit');}
 async function removePlanWeek(){if(!plan||plan.weeks.length<=1){showErr('Mindestens 1 Woche nötig.');return;}const ok=await appConfirm('Letzte Woche entfernen?','Alle Sessions dieser Woche werden gelöscht.');if(!ok)return;plan.weeks.pop();savePlan();renderPlanView(Math.min(currentViewWeek,plan.weeks.length-1));closeModal('modal-plan-edit');}
-function applyFreqChange(){if(!plan)return;const newFreq=window._editFreq||plan.freq;plan.freq=newFreq;savePlan();closeModal('modal-plan-edit');renderPlanView(currentViewWeek);}
+async function applyFreqChange(){
+  if(!plan)return;
+  const newFreq=window._editFreq||plan.freq;
+  if(newFreq===plan.freq){closeModal('modal-plan-edit');return;}
+  if(!loadKey()){showErr('API Key nötig zum Neuaufbau.');return;}
+  const ok=await appConfirm('Plan neu aufbauen?','Mit '+newFreq+'× pro Woche wird der Plan intelligent neu strukturiert. Abgeschlossene Sessions gehen verloren.','Neu aufbauen','rgba(124,58,237,.9)');
+  if(!ok)return;
+  closeModal('modal-plan-edit');
+  await rebuildPlanWithFreq(newFreq);
+}
+
+async function rebuildPlanWithFreq(newFreq){
+  const oldWeeks=plan.weeks.length;
+  const goalObj=GOALS.find(g=>g.id===plan.goal)||GOALS[0];
+  const styleObj=STYLES.find(s=>s.id===plan.style)||STYLES[0];
+  const styleRule={'fullbody':'GANZKÖRPER: Jede Session Ober- & Unterkörper.','ppl':'PUSH/PULL/BEINE rotieren.','upper_lower':'OBER/UNTERKÖRPER abwechselnd.','hybrid':'Woche 1-2 Ganzkörper, dann Split.'}[plan.style]||'';
+  // Show loading
+  show('s-gen');document.getElementById('gen-text').textContent='Plan wird neu aufgebaut';
+  const aiWeeks=Math.min(4,oldWeeks);
+  const sys=`Fitness-Trainer. Erstelle kompakten ${aiWeeks}-Wochen-Trainingsplan. Ziel: ${goalObj.label}. ${newFreq}×/Woche (WICHTIG: genau ${newFreq} Sessions pro Woche). ${styleRule} Knieschonend. Progressiv. Woche 4 = Deload.
+NUR minifiziertes JSON: {"title":"${(plan.title||'Plan').replace(/"/g,'')}","goal":"${plan.goal}","weeks":[{"week":1,"theme":"Grundlagen","sessions":[{"dow":1,"focus":"Brust & Arme","intensity":"easy","durationMin":${plan.durMin||30},"done":false}]}]}
+dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. Alle ${aiWeeks} Wochen, je ${newFreq} Sessions. intensity: easy/medium/hard.`;
+  try{
+    const raw=await callAPI([{role:'user',content:'Erstelle den Plan. NUR JSON.'}],1800,sys);
+    const parsed=extractJSON(raw);
+    let planData=Array.isArray(parsed)?{weeks:parsed}:parsed;
+    if(!planData?.weeks?.length)throw new Error('Neuaufbau fehlgeschlagen');
+    // Preserve plan metadata
+    planData.title=plan.title;planData.goal=plan.goal;planData.freq=newFreq;
+    planData.durMin=plan.durMin;planData.durMax=plan.durMax;planData.style=plan.style;
+    planData.startDate=plan.startDate||todayIso();
+    if(oldWeeks>planData.weeks.length)extendPlanWeeks(planData,oldWeeks);
+    plan=planData;savePlan();renderPlanView(0);show('s-plan');
+    showErr('✓ Plan mit '+newFreq+'×/Woche neu aufgebaut.');
+  }catch(e){showErr('Fehler: '+e.message);show('s-plan');}
+}
 
 // Templates & Save for later
 function loadTemplates(){try{return JSON.parse(localStorage.getItem('coach_templates'))||[];}catch{return[];}}
