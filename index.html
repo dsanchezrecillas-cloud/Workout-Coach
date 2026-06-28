@@ -73,6 +73,14 @@ button:active:not(:disabled){transform:scale(.96)}
 </style>
 </head>
 <body>
+<div id="debug-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#f43f5e;color:#fff;font-size:11px;padding:8px;font-family:monospace;white-space:pre-wrap;word-break:break-word"></div>
+<script>
+window.onerror=function(msg,src,line,col,err){
+  var b=document.getElementById('debug-banner');
+  if(b){b.style.display='block';b.textContent='JS-Fehler: '+msg+'\nZeile '+line+':'+col;}
+  return false;
+};
+</script>
 
 <!-- HOME -->
 <div id="s-home" class="screen active">
@@ -362,7 +370,7 @@ button:active:not(:disabled){transform:scale(.96)}
 <div id="s-plan-create" class="screen">
   <button class="back" onclick="show('s-home')">← zurück</button>
   <div style="font-size:21px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px">Plan erstellen</div>
-  <div style="font-size:13px;color:var(--mu);margin-bottom:22px">Wie Runna — aber für Zuhause.</div>
+  <div style="font-size:13px;color:var(--mu);margin-bottom:22px">Stell dir deinen Plan zusammen <span style="font-size:9px;opacity:.4">v2.1</span></div>
 
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Dein Ziel</div>
   <div id="goal-cards" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px"></div>
