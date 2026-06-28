@@ -913,6 +913,12 @@ function show(id){
   const el=document.getElementById(id);
   el.classList.add('active');el.classList.remove('fade');void el.offsetWidth;el.classList.add('fade');
   window.scrollTo(0,0);
+  // Directly init screens that need rendering (don't rely on animationstart event)
+  try{
+    if(id==='s-plan-create')buildPlanCreate();
+    else if(id==='s-library'){libSelected.clear();renderLibrary();}
+    else if(id==='s-home')updateHome();
+  }catch(e){console.error('Screen init error:',e);}
 }
 function showErr(msg){document.getElementById('err-txt').textContent=msg;document.getElementById('err').style.display='flex';setTimeout(hideErr,7000);}
 function hideErr(){document.getElementById('err').style.display='none';}
@@ -1719,7 +1725,6 @@ function renderPlanCalendar(){
 
 function renderPlanView(wi=0){
   if(!plan?.weeks?.length){show('s-plan-create');return;}
-  if(_planView==='calendar'){renderPlanCalendar();}
   currentViewWeek=wi;
   const total=plan.weeks.flatMap(w=>w.sessions).length;const done=plan.weeks.flatMap(w=>w.sessions).filter(s=>s.done).length;const pct=total?Math.round(done/total*100):0;
   document.getElementById('plan-title').textContent=plan.title||'Trainingsplan';
@@ -1798,16 +1803,16 @@ function saveSessEdit(){
     plan.weeks[sessEditWi].sessions.splice(sessEditSi,1);
     plan.weeks[sessEditTargetWi].sessions.push(moved);
     plan.weeks[sessEditTargetWi].sessions.sort((a,b)=>a.dow-b.dow);
-    savePlan();closeModal('modal-session');renderPlanView(sessEditTargetWi);updatePlanHome();return;
+    savePlan();closeModal('modal-session');renderPlanView(sessEditTargetWi);updatePlanHome();_refreshPlanCalendarIfActive();return;
   }
-  savePlan();closeModal('modal-session');renderPlanView(currentViewWeek);updatePlanHome();
+  savePlan();closeModal('modal-session');renderPlanView(currentViewWeek);updatePlanHome();_refreshPlanCalendarIfActive();
 }
 async function deleteSessEdit(){
   if(!plan?.weeks[sessEditWi]?.sessions[sessEditSi])return;
   const focus=plan.weeks[sessEditWi].sessions[sessEditSi].focus;
   const ok=await appConfirm('"'+focus+'" löschen?','Wird aus dem Trainingsplan entfernt.');if(!ok)return;
   plan.weeks[sessEditWi].sessions.splice(sessEditSi,1);
-  savePlan();closeModal('modal-session');renderPlanView(currentViewWeek);updatePlanHome();
+  savePlan();closeModal('modal-session');renderPlanView(currentViewWeek);updatePlanHome();_refreshPlanCalendarIfActive();
 }
 
 // Plan edit
@@ -2490,8 +2495,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
   }));
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&tRun)reqWL();});
-    document.getElementById('s-library').addEventListener('animationstart',()=>{libSelected.clear();renderLibrary();});
-    document.getElementById('s-plan-create').addEventListener('animationstart',buildPlanCreate);
+    // s-library init handled in show()
+    // s-plan-create init handled in show()
   }catch(e){console.error('Init error:',e);}
 });
 </script>
