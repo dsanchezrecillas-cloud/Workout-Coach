@@ -479,8 +479,9 @@ button:active:not(:disabled){transform:scale(.96)}
     </div>
     <!-- Freq change -->
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Sessions/Woche</div>
-    <div style="display:flex;gap:7px;margin-bottom:18px" id="edit-freq-chips"></div>
-    <button onclick="applyFreqChange()" class="btn" style="border:1.5px solid var(--br);color:var(--mu);padding:12px;margin-bottom:4px">Sessions/Woche übernehmen</button>
+    <div style="display:flex;gap:7px;margin-bottom:8px" id="edit-freq-chips"></div>
+    <div id="freq-change-hint" style="display:none;font-size:11px;color:var(--am);background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.18);border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.4">⚡ Der Plan wird komplett neu aufgebaut (KI), um die neue Häufigkeit sinnvoll zu strukturieren.</div>
+    <button onclick="applyFreqChange()" class="btn btn-ac" style="padding:12px;margin-bottom:4px">Sessions/Woche übernehmen</button>
   </div>
 </div>
 
@@ -1816,7 +1817,22 @@ async function deleteSessEdit(){
 }
 
 // Plan edit
-function openPlanEdit(){if(!plan)return;let editFreqLocal=plan.freq||3;const endDate=new Date(plan.startDate+'T12:00:00');endDate.setDate(endDate.getDate()+plan.weeks.length*7);document.getElementById('edit-end-date').value=endDate.toISOString().slice(0,10);document.getElementById('edit-start-date').value=plan.startDate||todayIso();updateEditDateCalc();const fc=document.getElementById('edit-freq-chips');fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===editFreqLocal?' co':'');b.textContent=n+'x/Wo';b.onclick=()=>{editFreqLocal=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';window._editFreq=n;};fc.appendChild(b);});window._editFreq=editFreqLocal;document.getElementById('modal-plan-edit').classList.add('open');}
+function openPlanEdit(){if(!plan)return;let editFreqLocal=plan.freq||3;const endDate=new Date(plan.startDate+'T12:00:00');endDate.setDate(endDate.getDate()+plan.weeks.length*7);document.getElementById('edit-end-date').value=endDate.toISOString().slice(0,10);document.getElementById('edit-start-date').value=plan.startDate||todayIso();updateEditDateCalc();const fc=document.getElementById('edit-freq-chips');fc.innerHTML='';
+  window._editFreq=plan.freq;
+  [2,3,4,5].forEach(n=>{
+    const b=document.createElement('button');
+    b.className='chip'+(n===plan.freq?' co':'');
+    b.textContent=n+'x/Wo';
+    b.onclick=()=>{
+      window._editFreq=n;
+      fc.querySelectorAll('.chip').forEach(x=>x.className='chip');
+      b.className='chip co';
+      // Show hint that this will rebuild
+      const hint=document.getElementById('freq-change-hint');
+      if(hint)hint.style.display=(n!==plan.freq)?'block':'none';
+    };
+    fc.appendChild(b);
+  });document.getElementById('modal-plan-edit').classList.add('open');}
 function updateEditDateCalc(){const v=document.getElementById('edit-end-date').value;const sv=document.getElementById('edit-start-date')?.value||plan?.startDate||todayIso();if(!v){document.getElementById('edit-date-calc').textContent='';return;}const startMs=new Date(sv+'T12:00:00').getTime();const days=Math.ceil((new Date(v+'T12:00:00').getTime()-startMs)/86400000);const w=Math.max(1,Math.ceil(days/7));const cur=plan?.weeks?.length||0;const diff=w-cur;const diffTxt=diff>0?`+${diff} Wo`:diff<0?`${diff} Wo`:'gleich';document.getElementById('edit-date-calc').textContent=days<1?'Vor Startdatum':`${w} Wochen (${diffTxt})`;document.getElementById('edit-date-calc').style.color=diff>0?'var(--co)':diff<0?'var(--hot)':'var(--mu)';}
 function applyPlanEndDate(){const startV=document.getElementById('edit-start-date').value;const v=document.getElementById('edit-end-date').value;if(!plan)return;
   // Update start date if changed
@@ -1830,9 +1846,9 @@ async function removePlanWeek(){if(!plan||plan.weeks.length<=1){showErr('Mindest
 async function applyFreqChange(){
   if(!plan)return;
   const newFreq=window._editFreq||plan.freq;
-  if(newFreq===plan.freq){closeModal('modal-plan-edit');return;}
+  if(newFreq===plan.freq){showErr('Wähle zuerst eine andere Anzahl Sessions/Woche.');return;}
   if(!loadKey()){showErr('API Key nötig zum Neuaufbau.');return;}
-  const ok=await appConfirm('Plan neu aufbauen?','Mit '+newFreq+'× pro Woche wird der Plan intelligent neu strukturiert. Abgeschlossene Sessions gehen verloren.','Neu aufbauen','rgba(124,58,237,.9)');
+  const ok=await appConfirm('Plan neu aufbauen?','Von '+plan.freq+'× auf '+newFreq+'× pro Woche. Der Plan wird intelligent neu strukturiert. Abgeschlossene Sessions gehen verloren.','Neu aufbauen','rgba(124,58,237,.9)');
   if(!ok)return;
   closeModal('modal-plan-edit');
   await rebuildPlanWithFreq(newFreq);
