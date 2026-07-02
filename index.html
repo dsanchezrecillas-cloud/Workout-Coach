@@ -75,11 +75,33 @@ button:active:not(:disabled){transform:scale(.96)}
 <body>
 <div id="debug-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#f43f5e;color:#fff;font-size:11px;padding:8px;font-family:monospace;white-space:pre-wrap;word-break:break-word"></div>
 <script>
-window.onerror=function(msg,src,line,col,err){
-  var b=document.getElementById('debug-banner');
-  if(b){b.style.display='block';b.textContent='JS-Fehler: '+msg+'\nZeile '+line+':'+col;}
-  return false;
-};
+(function(){
+  function showErr(txt){
+    var b=document.getElementById('debug-banner');
+    if(b){b.style.display='block';b.textContent=txt;}
+  }
+  window.onerror=function(msg,src,line,col,err){
+    showErr('FEHLER: '+msg+' @'+line+':'+col+(err&&err.stack?'\n'+err.stack.split('\n')[1]:''));
+    return false;
+  };
+  window.addEventListener('unhandledrejection',function(e){
+    showErr('PROMISE-FEHLER: '+(e.reason&&e.reason.message?e.reason.message:e.reason));
+  });
+  // Wrap show() once it exists to catch screen-switch errors
+  window.addEventListener('load',function(){
+    setTimeout(function(){
+      if(typeof window.show==='function'){
+        var orig=window.show;
+        window.show=function(id){
+          try{return orig(id);}
+          catch(e){showErr('SHOW("'+id+'") FEHLER: '+e.message+'\n'+(e.stack?e.stack.split('\n')[1]:''));throw e;}
+        };
+      } else {
+        showErr('KRITISCH: show() ist nicht definiert — JavaScript wurde nicht vollständig geladen.');
+      }
+    },500);
+  });
+})();
 </script>
 
 <!-- HOME -->
