@@ -1600,13 +1600,22 @@ async function generatePlan(){
   const mid=Math.round((planOpts.durMin+planOpts.durMax)/2);
   const styleObj=STYLES.find(s=>s.id===planOpts.style)||STYLES[0];
   const styleRule={'fullbody':'GANZKÖRPER: Jede Session Ober- & Unterkörper kombiniert.','ppl':'PUSH/PULL/BEINE rotieren: Push=Brust+Schultern+Trizeps, Pull=Rücken+Bizeps, Beine=Quad+Hamstring+Gesäß.','upper_lower':'OBER/UNTERKÖRPER abwechselnd. Beine mind. 50%.','hybrid':'Woche 1-2 Ganzkörper, dann Split. Beine mind. 1×/Woche.'}[planOpts.style]||'';
+  const startDateVal=(document.getElementById('plan-start-date')?.value)||todayIso();
+  // Which weekdays are still available in the FIRST (partial) week — those on/after the start day
+  const startDow=new Date(startDateVal+'T12:00:00').getDay(); // 0=So..6=Sa
+  const dayNamesDe={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};
+  const weekOrder=[1,2,3,4,5,6,0]; // Monday-based
+  const startIdx=weekOrder.indexOf(startDow);
+  const week1Days=weekOrder.slice(startIdx);
+  const week1Count=Math.min(planOpts.freq, week1Days.length);
+  const week1DaysStr=week1Days.map(d=>dayNamesDe[d]).join(',');
   // Generate only first 4 weeks via AI — rest extended locally (avoids timeout)
   const aiWeeks=Math.min(4, weeks);
   const sys=`Fitness-Trainer. Erstelle kompakten ${aiWeeks}-Wochen-Trainingsplan. Ziel: ${goalObj.label}. ${planOpts.freq}×/Woche. ${styleRule} Knieschonend. Progressiv. Woche 4 = Deload.
-NUR minifiziertes JSON ohne Leerzeichen: {"title":"Kurzname","goal":"${planOpts.goal}","weeks":[{"week":1,"theme":"Grundlagen","sessions":[{"dow":1,"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.durMin},"done":false}]}]}
-dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. Alle ${aiWeeks} Wochen, je ${planOpts.freq} Sessions. intensity: easy/medium/hard.`;
+WICHTIG Woche 1: Plan startet am ${dayNamesDe[startDow]} (${startDateVal}). Verwende in Woche 1 NUR diese Wochentage: ${week1DaysStr}. Woche 1 hat daher nur ${week1Count} Session(s). Ab Woche 2 wieder volle ${planOpts.freq} Sessions über die ganze Woche.
+NUR minifiziertes JSON ohne Leerzeichen: {"title":"Kurzname","goal":"${planOpts.goal}","weeks":[{"week":1,"theme":"Start","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.durMin},"done":false}]}]}
+dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
 
-  const startDateVal=(document.getElementById('plan-start-date')?.value)||todayIso();
   try{
     const raw=await callAPI([{role:'user',content:'Erstelle den Plan jetzt. Antworte NUR mit JSON.'}],1800,sys);
     const parsed=extractJSON(raw);
@@ -1618,6 +1627,15 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. Alle ${aiWeeks} Wochen, je ${planOpts.f
       planData.freq=planOpts.freq;planData.durMin=planOpts.durMin;planData.durMax=planOpts.durMax;planData.style=planOpts.style;planData.goal=planOpts.goal;planData.startDate=startDateVal;
     }
     if(!planData?.weeks?.length)throw new Error('Kein gültiger Plan — bitte nochmal versuchen');
+    // Safety: drop week-1 sessions on weekdays before the start day (AI sometimes ignores the rule)
+    if(planData.weeks[0]?.sessions){
+      const allowed=new Set(week1Days);
+      planData.weeks[0].sessions=planData.weeks[0].sessions.filter(s=>allowed.has(s.dow));
+      // If that emptied week 1 entirely, pull the first session onto the start day
+      if(!planData.weeks[0].sessions.length){
+        planData.weeks[0].sessions=[{dow:startDow,focus:'Ganzkörper Start',intensity:'easy',durationMin:planOpts.durMin,done:false}];
+      }
+    }
     // Extend locally if more weeks requested than AI generated
     if(weeks>planData.weeks.length)extendPlanWeeks(planData,weeks);
     plan=planData;savePlan();renderPlanView(0);show('s-plan');
@@ -1860,12 +1878,21 @@ async function rebuildPlanWithFreq(newFreq){
   const goalObj=GOALS.find(g=>g.id===plan.goal)||GOALS[0];
   const styleObj=STYLES.find(s=>s.id===plan.style)||STYLES[0];
   const styleRule={'fullbody':'GANZKÖRPER: Jede Session Ober- & Unterkörper.','ppl':'PUSH/PULL/BEINE rotieren.','upper_lower':'OBER/UNTERKÖRPER abwechselnd.','hybrid':'Woche 1-2 Ganzkörper, dann Split.'}[plan.style]||'';
+  // Rebuild starts from today (a running plan changed mid-week shouldn't backfill past days)
+  const rebuildStart=todayIso();
+  const startDow=new Date(rebuildStart+'T12:00:00').getDay();
+  const dayNamesDe={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};
+  const weekOrder=[1,2,3,4,5,6,0];
+  const week1Days=weekOrder.slice(weekOrder.indexOf(startDow));
+  const week1Count=Math.min(newFreq, week1Days.length);
+  const week1DaysStr=week1Days.map(d=>dayNamesDe[d]).join(',');
   // Show loading
   show('s-gen');document.getElementById('gen-text').textContent='Plan wird neu aufgebaut';
   const aiWeeks=Math.min(4,oldWeeks);
-  const sys=`Fitness-Trainer. Erstelle kompakten ${aiWeeks}-Wochen-Trainingsplan. Ziel: ${goalObj.label}. ${newFreq}×/Woche (WICHTIG: genau ${newFreq} Sessions pro Woche). ${styleRule} Knieschonend. Progressiv. Woche 4 = Deload.
-NUR minifiziertes JSON: {"title":"${(plan.title||'Plan').replace(/"/g,'')}","goal":"${plan.goal}","weeks":[{"week":1,"theme":"Grundlagen","sessions":[{"dow":1,"focus":"Brust & Arme","intensity":"easy","durationMin":${plan.durMin||30},"done":false}]}]}
-dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. Alle ${aiWeeks} Wochen, je ${newFreq} Sessions. intensity: easy/medium/hard.`;
+  const sys=`Fitness-Trainer. Erstelle kompakten ${aiWeeks}-Wochen-Trainingsplan. Ziel: ${goalObj.label}. ${newFreq}×/Woche (genau ${newFreq} Sessions pro Woche). ${styleRule} Knieschonend. Progressiv. Woche 4 = Deload.
+WICHTIG Woche 1: Start am ${dayNamesDe[startDow]}. Woche 1 NUR diese Tage: ${week1DaysStr} (also nur ${week1Count} Session(s)). Ab Woche 2 volle ${newFreq} Sessions.
+NUR minifiziertes JSON: {"title":"${(plan.title||'Plan').replace(/"/g,'')}","goal":"${plan.goal}","weeks":[{"week":1,"theme":"Start","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${plan.durMin||30},"done":false}]}]}
+dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
   try{
     const raw=await callAPI([{role:'user',content:'Erstelle den Plan. NUR JSON.'}],1800,sys);
     const parsed=extractJSON(raw);
@@ -1874,7 +1901,13 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. Alle ${aiWeeks} Wochen, je ${newFreq} S
     // Preserve plan metadata
     planData.title=plan.title;planData.goal=plan.goal;planData.freq=newFreq;
     planData.durMin=plan.durMin;planData.durMax=plan.durMax;planData.style=plan.style;
-    planData.startDate=plan.startDate||todayIso();
+    planData.startDate=rebuildStart;
+    // Safety: drop week-1 sessions before the start day
+    if(planData.weeks[0]?.sessions){
+      const allowed=new Set(week1Days);
+      planData.weeks[0].sessions=planData.weeks[0].sessions.filter(s=>allowed.has(s.dow));
+      if(!planData.weeks[0].sessions.length)planData.weeks[0].sessions=[{dow:startDow,focus:'Ganzkörper Start',intensity:'easy',durationMin:plan.durMin||30,done:false}];
+    }
     if(oldWeeks>planData.weeks.length)extendPlanWeeks(planData,oldWeeks);
     plan=planData;savePlan();renderPlanView(0);show('s-plan');
     showErr('✓ Plan mit '+newFreq+'×/Woche neu aufgebaut.');
