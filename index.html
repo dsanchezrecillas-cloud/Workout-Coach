@@ -390,8 +390,23 @@ button:active:not(:disabled){transform:scale(.96)}
   <div style="display:flex;gap:8px;margin-bottom:20px" id="freq-chips"></div>
 
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Session-Dauer</div>
-  <div style="font-size:12px;color:var(--mu);margin-bottom:10px">Variiert je nach Trainingstyp</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px" id="dur-chips"></div>
+  <div style="font-size:12px;color:var(--mu);margin-bottom:14px">Bereich frei einstellbar — Dauer richtet sich nach Intensität</div>
+  <div style="background:var(--up);border-radius:12px;padding:16px;margin-bottom:20px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+      <span style="font-size:13px;color:var(--tx);font-weight:600">Minimum</span>
+      <span id="dur-min-val" style="font-size:16px;font-weight:700;color:var(--ac)">20 min</span>
+    </div>
+    <input type="range" id="dur-min-slider" min="10" max="70" step="5" value="20" oninput="onDurSlider('min')" style="width:100%;margin-bottom:18px;accent-color:var(--ac)"/>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+      <span style="font-size:13px;color:var(--tx);font-weight:600">Maximum</span>
+      <span id="dur-max-val" style="font-size:16px;font-weight:700;color:var(--am)">45 min</span>
+    </div>
+    <input type="range" id="dur-max-slider" min="15" max="90" step="5" value="45" oninput="onDurSlider('max')" style="width:100%;accent-color:var(--am)"/>
+  </div>
+
+  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Trainingstage</div>
+  <div style="font-size:12px;color:var(--mu);margin-bottom:10px">Tage abwählen, an denen du nicht kannst. Rest verteilt die App mit Erholung.</div>
+  <div style="display:flex;gap:6px;margin-bottom:20px" id="blocked-days-picker"></div>
 
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Trainings-Stil</div>
   <div id="style-cards" style="display:flex;flex-direction:column;gap:7px;margin-bottom:20px"></div>
@@ -786,7 +801,7 @@ let plan=null; // single plan system
 let chatHistory=[], chatCtx={};
 let curExercises=[], wuExercises=[], curSetup={};
 let pendingPlanSession=null; // session that triggered a workout
-let planOpts={goal:'fitness',weeks:8,freq:3,durMin:20,durMax:45,style:'fullbody'};
+let planOpts={goal:'fitness',weeks:8,freq:3,durMin:20,durMax:45,style:'fullbody',blockedDays:[]};
 let currentViewWeek=0;
 let sessEditDow=1, sessEditInt='medium';
 let tStatus='idle', tRound=1, tIdx=0, tSet=1, tLeft=40, tRun=false, tIv=null, tReps={}, rpe=6;
@@ -1551,7 +1566,17 @@ function showPlan(){plan=loadPlan();if(!plan){buildPlanCreate();show('s-plan-cre
 function getCurrentWeekIdx(){if(!plan?.weeks?.length)return 0;const today=todayIso(),start=plan.startDate;const startMs=new Date(start+'T12:00:00').getTime();const todayMs=new Date(today+'T12:00:00').getTime();const daysDiff=Math.max(0,Math.floor((todayMs-startMs)/86400000));return Math.min(Math.floor(daysDiff/7),plan.weeks.length-1);}
 function updatePlanHome(){if(!plan?.weeks?.length){document.getElementById('plan-home').style.display='none';return;}const wi=getCurrentWeekIdx();const week=plan.weeks[wi];if(!week){document.getElementById('plan-home').style.display='none';return;}const todayDow=new Date().getDay();const sess=week.sessions.find(s=>s.dow===todayDow&&!s.done);if(!sess){document.getElementById('plan-home').style.display='none';return;}document.getElementById('plan-home').style.display='block';document.getElementById('plan-home-focus').textContent=sess.focus;document.getElementById('plan-home-meta').textContent=(sess.durationMin||30)+' min · '+INT_LABELS[sess.intensity||'medium'];document.getElementById('plan-home-week').textContent='Woche '+(wi+1)+' / '+plan.weeks.length;pendingPlanSession={wi,si:week.sessions.indexOf(sess)};}
 function startPlanSession(){if(!pendingPlanSession||!plan)return;const week=plan.weeks[pendingPlanSession.wi];const sess=week?.sessions[pendingPlanSession.si];if(!sess)return;chatCtx={};chatHistory=[];const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);}
-function buildPlanCreate(){const gc=document.getElementById('goal-cards');if(!gc){console.error('goal-cards missing');return;}gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<span style="font-size:22px">${g.icon}</span><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');if(wc){wc.innerHTML='';[4,6,8,12].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});}const fc=document.getElementById('freq-chips');if(fc){fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' co':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';};fc.appendChild(b);});}const durRanges=[{min:15,max:25,label:'15-25 min'},{min:20,max:35,label:'20-35 min'},{min:20,max:50,label:'20-50 min'},{min:30,max:50,label:'30-50 min'},{min:45,max:65,label:'45-65 min'},{min:60,max:80,label:'60-80 min'}];const dc=document.getElementById('dur-chips');if(dc){dc.innerHTML='';durRanges.forEach(r=>{const b=document.createElement('button');b.className='chip'+(r.min===planOpts.durMin&&r.max===planOpts.durMax?' am':'');b.textContent=r.label;b.onclick=()=>{planOpts.durMin=r.min;planOpts.durMax=r.max;dc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip am';};dc.appendChild(b);});}const sc=document.getElementById('style-cards');if(sc){sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<span style="font-size:18px">${s.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}sc.appendChild(b);});}const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';if(typeof setDurMode==='function'){try{setDurMode('weeks');}catch(e){}}}
+function onDurSlider(which){
+  const minS=document.getElementById('dur-min-slider'),maxS=document.getElementById('dur-max-slider');
+  let mn=parseInt(minS.value),mx=parseInt(maxS.value);
+  if(which==='min'&&mn>mx-5){mx=mn+5;maxS.value=mx;}
+  if(which==='max'&&mx<mn+5){mn=mx-5;minS.value=mn;}
+  planOpts.durMin=mn;planOpts.durMax=mx;
+  document.getElementById('dur-min-val').textContent=mn+' min';
+  document.getElementById('dur-max-val').textContent=mx+' min';
+}
+
+function buildPlanCreate(){const gc=document.getElementById('goal-cards');if(!gc){console.error('goal-cards missing');return;}gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<span style="font-size:22px">${g.icon}</span><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');if(wc){wc.innerHTML='';[4,6,8,12].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});}const fc=document.getElementById('freq-chips');if(fc){fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' co':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';};fc.appendChild(b);});}const dmS=document.getElementById('dur-min-slider'),dxS=document.getElementById('dur-max-slider');if(dmS){dmS.value=planOpts.durMin;document.getElementById('dur-min-val').textContent=planOpts.durMin+' min';}if(dxS){dxS.value=planOpts.durMax;document.getElementById('dur-max-val').textContent=planOpts.durMax+' min';}const bdp=document.getElementById('blocked-days-picker');if(bdp){bdp.innerHTML='';const dayOrder=[1,2,3,4,5,6,0];const dayLbl={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};dayOrder.forEach(d=>{const active=!planOpts.blockedDays.includes(d);const b=document.createElement('button');b.style.cssText=`flex:1;padding:11px 0;border-radius:9px;border:1.5px solid ${active?'var(--ac)':'var(--br)'};background:${active?'rgba(124,58,237,.1)':'var(--up)'};color:${active?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f);opacity:${active?1:.5}`;b.textContent=dayLbl[d];b.onclick=()=>{if(planOpts.blockedDays.includes(d))planOpts.blockedDays=planOpts.blockedDays.filter(x=>x!==d);else planOpts.blockedDays=[...planOpts.blockedDays,d];const on=!planOpts.blockedDays.includes(d);b.style.borderColor=on?'var(--ac)':'var(--br)';b.style.background=on?'rgba(124,58,237,.1)':'var(--up)';b.style.color=on?'var(--ac)':'var(--mu)';b.style.opacity=on?1:.5;};bdp.appendChild(b);});}const sc=document.getElementById('style-cards');if(sc){sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<span style="font-size:18px">${s.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}sc.appendChild(b);});}const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';if(typeof setDurMode==='function'){try{setDurMode('weeks');}catch(e){}}}
 
 let durMode='weeks';
 function setDurMode(mode){durMode=mode;document.getElementById('dur-weeks-wrap').style.display=mode==='weeks'?'block':'none';document.getElementById('dur-date-wrap').style.display=mode==='date'?'block':'none';document.getElementById('tog-weeks').style.borderColor=mode==='weeks'?'var(--ac)':'var(--br)';document.getElementById('tog-weeks').style.background=mode==='weeks'?'rgba(124,58,237,.12)':'var(--up)';document.getElementById('tog-weeks').style.color=mode==='weeks'?'var(--ac)':'var(--mu)';document.getElementById('tog-date').style.borderColor=mode==='date'?'var(--ac)':'var(--br)';document.getElementById('tog-date').style.background=mode==='date'?'rgba(124,58,237,.12)':'var(--up)';document.getElementById('tog-date').style.color=mode==='date'?'var(--ac)':'var(--mu)';}
@@ -1568,7 +1593,47 @@ function onStartDateChange(){
 function onEndDateChange(){const v=document.getElementById('plan-end-date').value;if(!v){document.getElementById('dur-date-calc').textContent='';return;}const startVal=document.getElementById('plan-start-date').value||todayIso();const startMs=new Date(startVal+'T12:00:00').getTime();const days=Math.ceil((new Date(v+'T12:00:00').getTime()-startMs)/86400000);const w=Math.max(1,Math.ceil(days/7));document.getElementById('dur-date-calc').textContent=days<1?'Vor Startdatum':w+' Wochen';}
 
 
-function extendPlanWeeks(planData, targetWeeks){
+function redistributeWeek(sessions, allowedDays, isFullbody){
+  // allowedDays in Monday-first order [1,2,3,4,5,6,0]
+  // Returns sessions with dow reassigned so training days are spread with recovery gaps.
+  if(!sessions.length)return sessions;
+  const n=sessions.length;
+  const avail=allowedDays.slice();
+  if(avail.length<n){
+    // Not enough allowed days — just place on the first available days
+    return sessions.map((s,i)=>({...s,dow:avail[i%avail.length]}));
+  }
+  // Pick n days from avail that maximize spacing.
+  // Map available days to positions in the week (Mon=0..Sun=6) for gap math.
+  const posOf=d=>[1,2,3,4,5,6,0].indexOf(d);
+  // Greedy: evenly space picks across the available slots.
+  const picks=[];
+  const step=(avail.length-1)/(n-1||1);
+  for(let i=0;i<n;i++){
+    let idx=Math.round(i*step);
+    while(picks.includes(idx))idx=(idx+1)%avail.length;
+    picks.push(idx);
+  }
+  picks.sort((a,b)=>a-b);
+  let chosen=picks.map(i=>avail[i]);
+  // For fullbody, enforce no back-to-back (gap >=2 in week position). If violated, fall back to spreading.
+  if(isFullbody){
+    const sorted=[...chosen].sort((a,b)=>posOf(a)-posOf(b));
+    let backToBack=false;
+    for(let i=1;i<sorted.length;i++){if(posOf(sorted[i])-posOf(sorted[i-1])<2)backToBack=true;}
+    if(backToBack&&avail.length>=n){
+      // Re-pick with strict spacing from the start
+      const strict=[];let lastPos=-99;
+      for(const d of avail){if(posOf(d)-lastPos>=2){strict.push(d);lastPos=posOf(d);}if(strict.length===n)break;}
+      if(strict.length===n)chosen=strict;
+    }
+  }
+  // Assign chosen days in chronological order to sessions (keep session order/focus)
+  const chosenSorted=[...chosen].sort((a,b)=>posOf(a)-posOf(b));
+  return sessions.map((s,i)=>({...s,dow:chosenSorted[i]}));
+}
+
+function extendPlanWeeks(planData, targetWeeks, allowedDays, isFullbody){
   const base=planData.weeks;
   const dMin=planData.durMin||20, dMax=planData.durMax||50, dMid=Math.round((dMin+dMax)/2);
   const durFor=int=>int==='easy'?dMin:int==='hard'?dMax:dMid;
@@ -1579,13 +1644,14 @@ function extendPlanWeeks(planData, targetWeeks){
     const theme=isDeload?'Deload':w<=4?'Aufbau':w<=8?'Steigerung':'Maximierung';
     const intensity=isDeload?'easy':w<=4?'medium':'hard';
     const srcWeek=base[wi%base.length];
-    const newSessions=srcWeek.sessions.map(s=>({
+    let newSessions=srcWeek.sessions.map(s=>({
       ...s,
       done:false,
       doneDate:undefined,
       intensity,
       durationMin:durFor(intensity)
     }));
+    if(allowedDays)newSessions=redistributeWeek(newSessions, allowedDays, isFullbody);
     planData.weeks.push({week:w,theme,sessions:newSessions});
   }
 }
@@ -1608,14 +1674,25 @@ async function generatePlan(){
   const weekOrder=[1,2,3,4,5,6,0]; // Monday-based
   const startIdx=weekOrder.indexOf(startDow);
   const week1Days=weekOrder.slice(startIdx);
-  const week1Count=Math.min(planOpts.freq, week1Days.length);
-  const week1DaysStr=week1Days.map(d=>dayNamesDe[d]).join(',');
+  // Available training days = all days minus blocked days, in Monday-first order
+  const allowedTrainingDays=weekOrder.filter(d=>!(planOpts.blockedDays||[]).includes(d));
+  const week1DaysFiltered=week1Days.filter(d=>allowedTrainingDays.includes(d));
+  const week1Count=Math.min(planOpts.freq, week1DaysFiltered.length);
+  const week1DaysStr=week1DaysFiltered.map(d=>dayNamesDe[d]).join(',');
+  const allowedDaysStr=allowedTrainingDays.map(d=>dayNamesDe[d]).join(',');
   // Generate only first 4 weeks via AI — rest extended locally (avoids timeout)
   const aiWeeks=Math.min(4, weeks);
   const durMid=Math.round((planOpts.durMin+planOpts.durMax)/2);
+  const styleObj2=STYLES.find(s=>s.id===planOpts.style)||{};
+  const isFullbody=planOpts.style==='fullbody';
+  const regenRule=isFullbody
+    ? `ERHOLUNG (Ganzkörper): Nach jeder Ganzkörper-Session mindestens 1 Pausentag. NIE zwei Trainingstage direkt hintereinander. Verteile die Sessions gleichmäßig über die Woche (z.B. Mo/Mi/Fr).`
+    : `ERHOLUNG (Split): Trainiere dieselbe Muskelgruppe frühestens nach 48h wieder. Aufeinanderfolgende Tage sind nur erlaubt, wenn sie KOMPLETT verschiedene Muskelgruppen treffen (z.B. Mo Rücken+Bizeps, Di Beine, Mi Brust+Trizeps). Nach einer harten Session bevorzugt ein leichterer Tag oder Pause. Beine brauchen ~48h Erholung.`;
   const sys=`Fitness-Trainer. Erstelle kompakten ${aiWeeks}-Wochen-Trainingsplan. Ziel: ${goalObj.label}. ${planOpts.freq}×/Woche. ${styleRule} Knieschonend. Progressiv. Woche 4 = Deload.
+TRAININGSTAGE: Nutze NUR diese Wochentage: ${allowedDaysStr}. An anderen Tagen KEINE Session.
+${regenRule}
 DAUER: Jede Session zwischen ${planOpts.durMin} und ${planOpts.durMax} Minuten, NIE darüber oder darunter. Koppel die Dauer an die Intensität: easy≈${planOpts.durMin} min, medium≈${durMid} min, hard≈${planOpts.durMax} min.
-WICHTIG Woche 1: Plan startet am ${dayNamesDe[startDow]} (${startDateVal}). Verwende in Woche 1 NUR diese Wochentage: ${week1DaysStr}. Woche 1 hat daher nur ${week1Count} Session(s). Ab Woche 2 wieder volle ${planOpts.freq} Sessions über die ganze Woche.
+WICHTIG Woche 1: Plan startet am ${dayNamesDe[startDow]} (${startDateVal}). Verwende in Woche 1 NUR: ${week1DaysStr||allowedDaysStr}. Woche 1 hat nur ${week1Count} Session(s). Ab Woche 2 volle ${planOpts.freq} Sessions, verteilt mit Erholung.
 NUR minifiziertes JSON ohne Leerzeichen: {"title":"Kurzname","goal":"${planOpts.goal}","weeks":[{"week":1,"theme":"Start","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.durMin},"done":false}]}]}
 dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
 
@@ -1639,17 +1716,24 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
         if(typeof d!=='number'||d<dMin||d>dMax)s.durationMin=durFor(s.intensity||'medium');
       }));
     }
-    // Safety: drop week-1 sessions on weekdays before the start day (AI sometimes ignores the rule)
+    // Safety: week 1 only on allowed days that are also on/after the start day
     if(planData.weeks[0]?.sessions){
-      const allowed=new Set(week1Days);
+      const allowed=new Set(week1DaysFiltered);
       planData.weeks[0].sessions=planData.weeks[0].sessions.filter(s=>allowed.has(s.dow));
-      // If that emptied week 1 entirely, pull the first session onto the start day
       if(!planData.weeks[0].sessions.length){
-        planData.weeks[0].sessions=[{dow:startDow,focus:'Ganzkörper Start',intensity:'easy',durationMin:planOpts.durMin,done:false}];
+        planData.weeks[0].sessions=[{dow:(week1DaysFiltered[0]??startDow),focus:'Ganzkörper Start',intensity:'easy',durationMin:planOpts.durMin,done:false}];
+      }
+    }
+    // Redistribute weeks 2+ onto allowed days with recovery spacing
+    for(let wi=1;wi<planData.weeks.length;wi++){
+      const wk=planData.weeks[wi];
+      if(wk?.sessions?.length){
+        wk.sessions=redistributeWeek(wk.sessions, allowedTrainingDays, isFullbody);
       }
     }
     // Extend locally if more weeks requested than AI generated
-    if(weeks>planData.weeks.length)extendPlanWeeks(planData,weeks);
+    if(weeks>planData.weeks.length)extendPlanWeeks(planData,weeks,allowedTrainingDays,isFullbody);
+    planData.blockedDays=planOpts.blockedDays||[];
     plan=planData;savePlan();renderPlanView(0);show('s-plan');
   }catch(e){showErr('Fehler: '+e.message);}
   btn.textContent='Plan generieren →';btn.disabled=false;
@@ -1895,14 +1979,23 @@ async function rebuildPlanWithFreq(newFreq){
   const startDow=new Date(rebuildStart+'T12:00:00').getDay();
   const dayNamesDe={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};
   const weekOrder=[1,2,3,4,5,6,0];
-  const week1Days=weekOrder.slice(weekOrder.indexOf(startDow));
+  const rbBlocked=(plan.blockedDays||planOpts.blockedDays||[]);
+  const allowedTrainingDays=weekOrder.filter(d=>!rbBlocked.includes(d));
+  const rbFullbody=plan.style==='fullbody';
+  const week1Days=weekOrder.slice(weekOrder.indexOf(startDow)).filter(d=>allowedTrainingDays.includes(d));
   const week1Count=Math.min(newFreq, week1Days.length);
-  const week1DaysStr=week1Days.map(d=>dayNamesDe[d]).join(',');
+  const week1DaysStr=(week1Days.length?week1Days:allowedTrainingDays).map(d=>dayNamesDe[d]).join(',');
+  const allowedDaysStr=allowedTrainingDays.map(d=>dayNamesDe[d]).join(',');
+  const rbRegen=rbFullbody
+    ? 'ERHOLUNG (Ganzkörper): Nach jeder Session mind. 1 Pausentag, NIE zwei Trainingstage direkt hintereinander.'
+    : 'ERHOLUNG (Split): Gleiche Muskelgruppe erst nach 48h wieder. Aufeinanderfolgende Tage nur bei verschiedenen Muskelgruppen.';
   // Show loading
   show('s-gen');document.getElementById('gen-text').textContent='Plan wird neu aufgebaut';
   const aiWeeks=Math.min(4,oldWeeks);
   const sys=`Fitness-Trainer. Erstelle kompakten ${aiWeeks}-Wochen-Trainingsplan. Ziel: ${goalObj.label}. ${newFreq}×/Woche (genau ${newFreq} Sessions pro Woche). ${styleRule} Knieschonend. Progressiv. Woche 4 = Deload.
-WICHTIG Woche 1: Start am ${dayNamesDe[startDow]}. Woche 1 NUR diese Tage: ${week1DaysStr} (also nur ${week1Count} Session(s)). Ab Woche 2 volle ${newFreq} Sessions.
+TRAININGSTAGE: Nutze NUR diese Tage: ${allowedDaysStr}.
+${rbRegen}
+WICHTIG Woche 1: Start am ${dayNamesDe[startDow]}. Woche 1 NUR: ${week1DaysStr} (nur ${week1Count} Session(s)). Ab Woche 2 volle ${newFreq} Sessions mit Erholung.
 NUR minifiziertes JSON: {"title":"${(plan.title||'Plan').replace(/"/g,'')}","goal":"${plan.goal}","weeks":[{"week":1,"theme":"Start","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${plan.durMin||30},"done":false}]}]}
 dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
   try{
@@ -1923,13 +2016,19 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
         if(typeof d!=='number'||d<dMin||d>dMax)s.durationMin=durFor(s.intensity||'medium');
       }));
     }
-    // Safety: drop week-1 sessions before the start day
+    // Safety: week 1 only on allowed days on/after start
     if(planData.weeks[0]?.sessions){
-      const allowed=new Set(week1Days);
+      const allowed=new Set(week1Days.length?week1Days:allowedTrainingDays);
       planData.weeks[0].sessions=planData.weeks[0].sessions.filter(s=>allowed.has(s.dow));
-      if(!planData.weeks[0].sessions.length)planData.weeks[0].sessions=[{dow:startDow,focus:'Ganzkörper Start',intensity:'easy',durationMin:plan.durMin||30,done:false}];
+      if(!planData.weeks[0].sessions.length)planData.weeks[0].sessions=[{dow:(week1Days[0]??startDow),focus:'Ganzkörper Start',intensity:'easy',durationMin:plan.durMin||30,done:false}];
     }
-    if(oldWeeks>planData.weeks.length)extendPlanWeeks(planData,oldWeeks);
+    for(let wi=1;wi<planData.weeks.length;wi++){
+      const wk=planData.weeks[wi];
+      if(wk?.sessions?.length)wk.sessions=redistributeWeek(wk.sessions, allowedTrainingDays, rbFullbody);
+    }
+    // Persist blocked days on the plan for future rebuilds
+    planData.blockedDays=rbBlocked;
+    if(oldWeeks>planData.weeks.length)extendPlanWeeks(planData,oldWeeks,allowedTrainingDays,rbFullbody);
     plan=planData;savePlan();renderPlanView(0);show('s-plan');
     showErr('✓ Plan mit '+newFreq+'×/Woche neu aufgebaut.');
   }catch(e){showErr('Fehler: '+e.message);show('s-plan');}
