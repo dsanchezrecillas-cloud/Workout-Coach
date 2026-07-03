@@ -730,6 +730,21 @@ button:active:not(:disabled){transform:scale(.96)}
 </div>
 
 <!-- MODAL: Edit Plan Session -->
+<div class="modal-ov" id="modal-cal-sheet">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <div>
+        <div id="cal-sheet-focus" style="font-size:16px;font-weight:700;color:var(--tx)"></div>
+        <div id="cal-sheet-meta" style="font-size:12px;color:var(--mu);margin-top:2px"></div>
+      </div>
+      <button onclick="closeModal('modal-cal-sheet')" style="font-size:20px;color:var(--mu);background:none;border:none;line-height:1">×</button>
+    </div>
+    <div id="cal-sheet-warn" style="display:none;font-size:12px;color:var(--am);background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);border-radius:8px;padding:9px 11px;margin-bottom:12px;line-height:1.4"></div>
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Verschieben auf</div>
+    <div id="cal-sheet-days" style="max-height:260px;overflow-y:auto;margin-bottom:14px"></div>
+    <button onclick="deleteCalSession()" class="btn" style="border:1.5px solid rgba(244,63,94,.3);color:var(--hot);padding:12px;width:100%">Session löschen</button>
+  </div>
+</div>
 <div class="modal-ov" id="modal-session">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -1785,6 +1800,7 @@ function renderPlanCalendar(){
       if(d){const key=d.toISOString().slice(0,10);sessionMap[key]={wi,si,session:s};}
     });
   });
+  window._calSessionMap=sessionMap;
   // Determine month range: from start month to end month
   const start=new Date(plan.startDate+'T12:00:00');
   const lastWeek=plan.weeks.length-1;
@@ -1822,7 +1838,7 @@ function renderPlanCalendar(){
         cellBorder=sess.session.done?'rgba(5,150,105,.3)':'rgba(124,58,237,.25)';
         dot=`<div style="width:5px;height:5px;border-radius:50%;background:${sess.session.done?'var(--co)':ic};margin:2px auto 0"></div>`;
       }
-      html+=`<div onclick="${sess?`openSessEdit(${sess.wi},${sess.si})`:''}" style="aspect-ratio:1;border-radius:9px;background:${cellBg};border:1.5px solid ${isToday?'var(--ac)':cellBorder};display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${sess?'pointer':'default'};position:relative;${isToday?'box-shadow:0 0 0 1px var(--ac)':''}">
+      html+=`<div onclick="${sess?`openCalSheet('${key}')`:''}" style="aspect-ratio:1;border-radius:9px;background:${cellBg};border:1.5px solid ${isToday?'var(--ac)':cellBorder};display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${sess?'pointer':'default'};position:relative;${isToday?'box-shadow:0 0 0 1px var(--ac)':''}">
         <span style="font-size:12px;font-weight:${isToday?700:sess?600:400};color:${isToday?'var(--ac)':isPast&&!sess?.session.done?'var(--mu)':'var(--tx)'}">${day}</span>
         ${dot}
       </div>`;
@@ -1837,6 +1853,100 @@ function renderPlanCalendar(){
     <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:3px;border:1.5px solid var(--ac)"></span>Heute</span>
   </div>`;
   cal.innerHTML=html;
+}
+
+let _calSheetKey=null;
+function openCalSheet(dateKey){
+  const map=window._calSessionMap||{};
+  const entry=map[dateKey];
+  if(!entry)return;
+  _calSheetKey=dateKey;
+  const s=entry.session;
+  const dObj=new Date(dateKey+'T12:00:00');
+  const dfmt=dObj.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'});
+  document.getElementById('cal-sheet-focus').textContent=s.focus||'Session';
+  document.getElementById('cal-sheet-meta').textContent=`${dfmt} · ${s.durationMin||30} min · ${INT_LABELS[s.intensity||'medium']}`;
+  const warn=document.getElementById('cal-sheet-warn');warn.style.display='none';
+  // Build candidate target dates: 14 days before/after, excluding blocked days and the current date
+  const blocked=new Set(plan.blockedDays||[]);
+  const container=document.getElementById('cal-sheet-days');container.innerHTML='';
+  const todayK=todayIso();
+  const base=dObj.getTime();
+  const cands=[];
+  for(let off=-14;off<=21;off++){
+    const d=new Date(base+off*86400000);
+    const k=d.toISOString().slice(0,10);
+    if(k===dateKey)continue;
+    if(k<todayK)continue;                 // no moving into the past
+    if(blocked.has(d.getDay()))continue;  // respect blocked weekdays
+    if(map[k])continue;                   // day already has a session
+    cands.push(k);
+  }
+  cands.forEach(k=>{
+    const d=new Date(k+'T12:00:00');
+    const lbl=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+    // Recovery check: is there a session on the adjacent day?
+    const prev=new Date(d.getTime()-86400000).toISOString().slice(0,10);
+    const next=new Date(d.getTime()+86400000).toISOString().slice(0,10);
+    const adjacent=(map[prev]&&prev!==dateKey)||(map[next]&&next!==dateKey);
+    const isFullbody=plan.style==='fullbody';
+    const risky=adjacent&&isFullbody;
+    const b=document.createElement('button');
+    b.style.cssText=`display:flex;justify-content:space-between;align-items:center;width:100%;padding:11px 13px;border-radius:9px;border:1px solid ${risky?'rgba(217,119,6,.3)':'var(--br)'};background:${risky?'rgba(217,119,6,.05)':'var(--up)'};color:var(--tx);font-size:13px;font-weight:500;font-family:var(--f);margin-bottom:6px;text-align:left`;
+    b.innerHTML=`<span>${lbl}</span>${risky?'<span style="font-size:11px;color:var(--am)">⚠ kaum Erholung</span>':''}`;
+    b.onclick=()=>moveCalSession(k, risky);
+    container.appendChild(b);
+  });
+  if(!cands.length)container.innerHTML='<div style="font-size:13px;color:var(--mu);padding:10px 0">Keine freien Tage in der Nähe.</div>';
+  document.getElementById('modal-cal-sheet').classList.add('open');
+}
+
+async function moveCalSession(targetKey, risky){
+  const map=window._calSessionMap||{};
+  const entry=map[_calSheetKey];
+  if(!entry||!plan)return;
+  if(risky){
+    const ok=await appConfirm('Wenig Erholung','Am Nachbartag liegt bereits ein Training. Bei Ganzkörper solltest du mindestens einen Pausentag lassen. Trotzdem verschieben?','Trotzdem','rgba(217,119,6,.9)');
+    if(!ok)return;
+  }
+  // Determine which week + dow the target date belongs to
+  const target=new Date(targetKey+'T12:00:00');
+  const startMonday=(()=>{const st=new Date(plan.startDate+'T12:00:00');const sd=st.getDay();const m=new Date(st);m.setDate(st.getDate()+(sd===0?-6:1-sd));return m;})();
+  const daysDiff=Math.floor((target-startMonday)/86400000);
+  const targetWeek=Math.floor(daysDiff/7);
+  const targetDow=target.getDay();
+  const sess={...entry.session};
+  // Remove from old location
+  plan.weeks[entry.wi].sessions.splice(entry.si,1);
+  // Ensure target week exists
+  if(targetWeek<0||targetWeek>=plan.weeks.length){
+    // Out of plan range: re-insert original and abort
+    plan.weeks[entry.wi].sessions.splice(entry.si,0,sess);
+    showErr('Zieltag liegt außerhalb des Plans.');
+    return;
+  }
+  sess.dow=targetDow;
+  plan.weeks[targetWeek].sessions.push(sess);
+  plan.weeks[targetWeek].sessions.sort((a,b)=>{const p=x=>[1,2,3,4,5,6,0].indexOf(x.dow);return p(a)-p(b);});
+  savePlan();
+  closeModal('modal-cal-sheet');
+  renderPlanCalendar();
+  renderPlanView(currentViewWeek);
+  updatePlanHome();
+}
+
+async function deleteCalSession(){
+  const map=window._calSessionMap||{};
+  const entry=map[_calSheetKey];
+  if(!entry||!plan)return;
+  const ok=await appConfirm('Session löschen?',(entry.session.focus||'Diese Session')+' wird aus dem Plan entfernt.','Löschen','rgba(244,63,94,.9)');
+  if(!ok)return;
+  plan.weeks[entry.wi].sessions.splice(entry.si,1);
+  savePlan();
+  closeModal('modal-cal-sheet');
+  renderPlanCalendar();
+  renderPlanView(currentViewWeek);
+  updatePlanHome();
 }
 
 function renderPlanView(wi=0){
