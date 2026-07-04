@@ -858,6 +858,9 @@ function todayIso(){
   const d=new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+function dateKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 
 function streak(){
   if(!log.length)return 0;let s=0;
@@ -1794,7 +1797,7 @@ function renderPlanCalendar(){
   plan.weeks.forEach((w,wi)=>{
     w.sessions.forEach((s,si)=>{
       const d=getSessionDate(wi,s.dow);
-      if(d){const key=d.toISOString().slice(0,10);sessionMap[key]={wi,si,session:s};}
+      if(d){const key=dateKey(d);sessionMap[key]={wi,si,session:s};}
     });
   });
   window._calSessionMap=sessionMap;
@@ -1824,7 +1827,7 @@ function renderPlanCalendar(){
     for(let i=0;i<startWeekday;i++)html+='<div></div>';
     for(let day=1;day<=daysInMonth;day++){
       const date=new Date(year,month,day);
-      const key=date.toISOString().slice(0,10);
+      const key=dateKey(date);
       const sess=sessionMap[key];
       const isToday=key===todayKey;
       const isPast=key<todayKey;
@@ -1872,7 +1875,7 @@ function openCalSheet(dateKey){
   const cands=[];
   for(let off=-14;off<=21;off++){
     const d=new Date(base+off*86400000);
-    const k=d.toISOString().slice(0,10);
+    const k=dateKey(d);
     if(k===dateKey)continue;
     if(k<todayK)continue;                 // no moving into the past
     if(blocked.has(d.getDay()))continue;  // respect blocked weekdays
@@ -1883,8 +1886,8 @@ function openCalSheet(dateKey){
     const d=new Date(k+'T12:00:00');
     const lbl=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
     // Recovery check: is there a session on the adjacent day?
-    const prev=new Date(d.getTime()-86400000).toISOString().slice(0,10);
-    const next=new Date(d.getTime()+86400000).toISOString().slice(0,10);
+    const prev=dateKey(new Date(d.getTime()-86400000));
+    const next=dateKey(new Date(d.getTime()+86400000));
     const adjacent=(map[prev]&&prev!==dateKey)||(map[next]&&next!==dateKey);
     const isFullbody=plan.style==='fullbody';
     const risky=adjacent&&isFullbody;
