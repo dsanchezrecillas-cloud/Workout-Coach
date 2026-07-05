@@ -107,8 +107,7 @@ button:active:not(:disabled){transform:scale(.96)}
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="10.5" y="3" width="3" height="18" rx="1" fill="#a78bfa"/><rect x="4" y="7" width="6.5" height="10" rx="2" fill="#a78bfa"/><rect x="13.5" y="7" width="6.5" height="10" rx="2" fill="#a78bfa"/><rect x="1.5" y="9" width="3" height="6" rx="1" fill="#fb923c"/><rect x="19.5" y="9" width="3" height="6" rx="1" fill="#fb923c"/></svg>
       <span style="font-size:10px;letter-spacing:.1em;color:var(--ac);text-transform:uppercase;font-weight:600">Coach</span>
       <div id="c-spinner" style="display:none;margin-left:auto;width:14px;height:14px;border:2px solid var(--br);border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite"></div>
-      <button onclick="openDiary()" style="margin-left:auto;width:26px;height:26px;border-radius:7px;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);color:var(--ac);font-size:13px;display:flex;align-items:center;justify-content:center">📓</button>
-      <button id="c-refresh" onclick="fetchCoach(true)" style="width:26px;height:26px;border-radius:7px;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);color:var(--ac);font-size:13px;display:flex;align-items:center;justify-content:center">↻</button>
+      <button id="c-refresh" onclick="fetchCoach(true)" style="margin-left:auto;width:26px;height:26px;border-radius:7px;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);color:var(--ac);font-size:13px;display:flex;align-items:center;justify-content:center">↻</button>
     </div>
     <div id="c-text" style="font-size:13px;color:var(--su);line-height:1.65">Starte dein erstes Workout — dann analysiere ich dein Training.</div>
     <div id="c-tip" style="display:none;font-size:12px;color:var(--mu);line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px solid var(--br)"></div>
@@ -694,21 +693,6 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
 </div>
 
-<!-- MODAL: Diary -->
-<div class="modal-ov" id="modal-diary">
-  <div class="modal-box">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <div style="font-size:16px;font-weight:700">📓 Tagebuch</div>
-      <button onclick="closeModal('modal-diary')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
-    </div>
-    <div style="font-size:12px;color:var(--mu);margin-bottom:12px;line-height:1.5">Schlaf, Stress, Schmerzen, Motivation — der Coach liest mit und passt Empfehlungen und Workouts an.</div>
-    <textarea id="diary-inp" class="inp" placeholder="Wie geht's dir heute?" style="resize:none;height:76px;margin-bottom:9px"></textarea>
-    <button onclick="saveDiaryEntry()" class="btn btn-ac" id="diary-save-btn" style="padding:12px;margin-bottom:6px">Speichern</button>
-    <div id="diary-ai" style="display:none;font-size:12px;color:var(--su);line-height:1.6;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);border-radius:10px;padding:10px 12px;margin-bottom:10px"></div>
-    <div id="diary-list" style="max-height:220px;overflow-y:auto"></div>
-  </div>
-</div>
-
 <!-- MODAL: Custom confirm (replaces confirm() which fails in iOS PWA) -->
 <div class="modal-ov" id="modal-confirm">
   <div class="modal-box" style="padding:22px 20px">
@@ -1164,50 +1148,43 @@ function updateHome(){
   updatePlanHome();
 }
 
-function openDiary(){
-  document.getElementById('diary-inp').value='';
-  document.getElementById('diary-ai').style.display='none';
-  renderDiaryList();
-  document.getElementById('modal-diary').classList.add('open');
-}
-function renderDiaryList(){
-  const list=loadJournal().slice(-15).reverse();
-  document.getElementById('diary-list').innerHTML=list.map(e=>`
-    <div style="padding:9px 0;border-top:1px solid var(--br)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+function renderJournal(){
+  const el=document.getElementById('journal-list');if(!el)return;
+  const j=loadJournal().slice(-20).reverse();
+  el.innerHTML=j.map(e=>`
+    <div class="card" style="margin-bottom:9px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <span style="font-size:10px;color:var(--mu);font-weight:600">${e.date}</span>
-        <button onclick="deleteJournalEntry(${e.ts})" style="font-size:11px;color:var(--mu);background:none;border:none">✕</button>
+        <button onclick="deleteJournalEntry(${e.ts})" style="font-size:12px;color:var(--mu);background:none;border:none">✕</button>
       </div>
-      <div style="font-size:12px;color:var(--tx);line-height:1.5">${(e.text||'').replace(/</g,'&lt;')}</div>
-      ${e.ai?`<div style="font-size:11px;color:var(--ac);margin-top:5px;line-height:1.5">↳ ${e.ai.replace(/</g,'&lt;')}</div>`:''}
-    </div>`).join('')||'<div style="font-size:12px;color:var(--mu);padding:8px 0">Noch keine Einträge.</div>';
+      <div style="font-size:13px;color:var(--tx);line-height:1.55">${(e.text||'').replace(/</g,'&lt;')}</div>
+      ${e.ai?`<div style="font-size:12px;color:var(--ac);margin-top:7px;padding-top:7px;border-top:1px solid var(--br);line-height:1.55">🧠 ${e.ai.replace(/</g,'&lt;')}</div>`:''}
+    </div>`).join('')||'<div style="text-align:center;padding:26px 0;color:var(--mu);font-size:13px">Noch keine Einträge.</div>';
 }
-async function saveDiaryEntry(){
-  const txt=document.getElementById('diary-inp').value.trim();
-  if(!txt)return;
-  const btn=document.getElementById('diary-save-btn');btn.disabled=true;btn.textContent='Speichern...';
+async function saveJournalEntry(){
+  const inp=document.getElementById('journal-input');
+  const txt=(inp?.value||'').trim();
+  if(!txt){showErr('Eintrag ist leer.');return;}
   const j=loadJournal();
   const entry={date:todayIso(),ts:Date.now(),text:txt,ai:''};
   j.push(entry);
   safeSet('coach_journal',JSON.stringify(j.slice(-100)));
-  document.getElementById('diary-inp').value='';
-  renderDiaryList();
+  inp.value='';
+  renderJournal();
   try{localStorage.removeItem('coach_cache');}catch{}
+  // AI reaction on the entry
   if(loadKey()){
     try{
       const prof=profileTxt();
-      const raw=await callAPI([{role:'user',content:`Du bist Trainingswissenschaftler und persönlicher Coach.${prof?' Nutzer-Profil: '+prof+'.':''} Letztes Training: ${histTxt().split('\n')[0]||'keines'}. Tagebucheintrag von heute: "${txt}". Reagiere in 1-2 Sätzen auf Deutsch: empathisch aber konkret. Wenn der Eintrag trainingsrelevant ist (Schlaf, Schmerz, Stress, Energie), gib eine konkrete Konsequenz für heute/morgen. NUR JSON: {"message":"..."}`}],300);
+      const raw=await callAPI([{role:'user',content:`Du bist Trainingswissenschaftler und persönlicher Coach.${prof?' Nutzer-Profil: '+prof+'.':''} Letztes Training: ${histTxt().split('\n')[0]||'keines'}. Tagebucheintrag von heute: "${txt}". Reagiere in 1-2 Sätzen auf Deutsch: empathisch aber konkret. Wenn der Eintrag trainingsrelevant ist (Krankheit, Schlaf, Schmerz, Stress, Energie), gib eine konkrete Konsequenz für heute/morgen. NUR JSON: {"message":"..."}`}],300);
       const p=extractJSON(raw);const msg=(Array.isArray(p)?p[0]:p)?.message;
       if(msg){
         entry.ai=msg;
         safeSet('coach_journal',JSON.stringify(j.slice(-100)));
-        const ai=document.getElementById('diary-ai');ai.textContent=msg;ai.style.display='block';
-        renderDiaryList();
+        renderJournal();
       }
     }catch{}
   }
-  btn.disabled=false;btn.textContent='Speichern';
-  if(typeof fetchCoach==='function')setTimeout(()=>fetchCoach(true),400);
 }
 
 async function fetchCoach(force){
@@ -2734,7 +2711,7 @@ async function deleteJournalEntry(ts){
   if(!ok)return;
   const j=loadJournal().filter(e=>e.ts!==ts);
   safeSet('coach_journal',JSON.stringify(j));
-  renderDiaryList();
+  renderJournal();
 }
 function journalCtx(){
   const j=loadJournal().slice(-5);
