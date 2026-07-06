@@ -1159,8 +1159,54 @@ function renderJournal(){
       </div>
       <div style="font-size:13px;color:var(--tx);line-height:1.55">${(e.text||'').replace(/</g,'&lt;')}</div>
       ${e.ai?`<div style="font-size:12px;color:var(--ac);margin-top:7px;padding-top:7px;border-top:1px solid var(--br);line-height:1.55">🧠 ${e.ai.replace(/</g,'&lt;')}</div>`:''}
+      ${e.planPause&&!e.planApplied&&e.date===todayIso()&&plan?`<button onclick="applyJournalPause(${e.ts},${e.planPause})" class="btn" style="margin-top:9px;padding:11px;border:1.5px solid rgba(217,119,6,.35);color:var(--am);font-size:12px;text-transform:none">📅 Plan anpassen: ${e.planPause} Tag${e.planPause>1?'e':''} pausieren, Sessions verschieben</button>`:''}
+      ${e.planApplied?`<div style="font-size:11px;color:var(--co);margin-top:7px">✓ Plan angepasst (${e.planPause} Tag${e.planPause>1?'e':''} Pause)</div>`:''}
     </div>`).join('')||'<div style="text-align:center;padding:26px 0;color:var(--mu);font-size:13px">Noch keine Einträge.</div>';
 }
+async function applyJournalPause(ts,days){
+  if(!plan?.weeks?.length)return;
+  const ok=await appConfirm('Plan anpassen?',days+' Tag'+(days>1?'e':'')+' Trainingspause. Betroffene Sessions werden mit Erholungsabstand auf die Resttage verteilt; was nicht mehr passt, entfällt (nach Krankheit nicht nachholen).','Anpassen','rgba(217,119,6,.9)');
+  if(!ok)return;
+  const weekOrder=[1,2,3,4,5,6,0];
+  const blocked=new Set(plan.blockedDays||[]);
+  const today=new Date(todayIso()+'T12:00:00');
+  const pauseEnd=new Date(today.getTime()+days*86400000);
+  let moved=0,dropped=0;
+  plan.weeks.forEach((wk,wi)=>{
+    if(!wk.sessions?.length)return;
+    // Does this week overlap [today, pauseEnd)?
+    const weekMon=getSessionDate(wi,1);if(!weekMon)return;
+    const weekEnd=new Date(weekMon.getTime()+7*86400000);
+    if(weekEnd<=today||weekMon>=pauseEnd)return; // untouched week
+    const done=wk.sessions.filter(s=>s.done);
+    const todo=wk.sessions.filter(s=>!s.done);
+    if(!todo.length)return;
+    // Allowed days in this week: date >= pauseEnd, not blocked, not taken by a done session
+    const takenDone=new Set(done.map(s=>s.dow));
+    const avail=weekOrder.filter(dw=>{
+      if(blocked.has(dw)||takenDone.has(dw))return false;
+      const d=getSessionDate(wi,dw);
+      return d&&d>=pauseEnd;
+    });
+    const keep=todo.slice(0,avail.length);
+    dropped+=todo.length-keep.length;
+    moved+=keep.length;
+    const red=keep.length?redistributeWeek(keep,avail):[];
+    wk.sessions=[...done,...red].sort((a,b)=>weekOrder.indexOf(a.dow)-weekOrder.indexOf(b.dow));
+  });
+  savePlan();
+  markJournalApplied(ts);
+  renderPlanView(currentViewWeek);_refreshPlanCalendarIfActive();updatePlanHome();
+  try{localStorage.removeItem('coach_cache');}catch{}
+  showErr('✓ Plan angepasst: '+moved+' Session'+(moved!==1?'s':'')+' neu verteilt'+(dropped?', '+dropped+' entfällt':'')+'.');
+}
+function markJournalApplied(ts){
+  const j=loadJournal();
+  const e=j.find(x=>x.ts===ts);
+  if(e){e.planApplied=true;safeSet('coach_journal',JSON.stringify(j));}
+  renderJournal();
+}
+
 async function saveJournalEntry(){
   const inp=document.getElementById('journal-input');
   const txt=(inp?.value||'').trim();
@@ -1176,10 +1222,12 @@ async function saveJournalEntry(){
   if(loadKey()){
     try{
       const prof=profileTxt();
-      const raw=await callAPI([{role:'user',content:`Du bist Trainingswissenschaftler und persönlicher Coach.${prof?' Nutzer-Profil: '+prof+'.':''} Letztes Training: ${histTxt().split('\n')[0]||'keines'}. Tagebucheintrag von heute: "${txt}". Reagiere in 1-2 Sätzen auf Deutsch: empathisch aber konkret. Wenn der Eintrag trainingsrelevant ist (Krankheit, Schlaf, Schmerz, Stress, Energie), gib eine konkrete Konsequenz für heute/morgen. NUR JSON: {"message":"..."}`}],300);
-      const p=extractJSON(raw);const msg=(Array.isArray(p)?p[0]:p)?.message;
+      const raw=await callAPI([{role:'user',content:`Du bist Trainingswissenschaftler und persönlicher Coach.${prof?' Nutzer-Profil: '+prof+'.':''} Letztes Training: ${histTxt().split('\n')[0]||'keines'}. Tagebucheintrag von heute: "${txt}". Reagiere in 1-2 Sätzen auf Deutsch: empathisch aber konkret. Wenn der Eintrag trainingsrelevant ist (Krankheit, Schlaf, Schmerz, Stress, Energie), gib eine konkrete Konsequenz für heute/morgen.${plan?' Der Nutzer hat einen aktiven Trainingsplan. Wenn der Eintrag eine Trainingspause rechtfertigt (Krankheit, akuter Schmerz), gib zusätzlich planPause an: Anzahl der Pausentage (1-7). Sonst planPause:null.':''} NUR JSON: {"message":"...","planPause":null}`}],350);
+      const p=extractJSON(raw);const obj=Array.isArray(p)?p[0]:p;const msg=obj?.message;
       if(msg){
         entry.ai=msg;
+        const pd=parseInt(obj?.planPause);
+        if(plan&&pd>=1&&pd<=14)entry.planPause=pd;
         safeSet('coach_journal',JSON.stringify(j.slice(-100)));
         renderJournal();
       }
