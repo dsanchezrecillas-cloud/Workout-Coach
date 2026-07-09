@@ -101,6 +101,19 @@ button:active:not(:disabled){transform:scale(.96)}
     <div style="flex:1;background:var(--up);border:1px solid var(--br);border-radius:11px;padding:12px"><div style="font-size:9px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:5px">Zuletzt</div><div style="font-size:16px;font-weight:700;color:var(--co)" id="h-last">—</div></div>
   </div>
 
+  <!-- Daily check-in -->
+  <div id="checkin-card" class="card" style="display:none;margin-bottom:12px;border-color:rgba(217,119,6,.2);background:linear-gradient(135deg,rgba(217,119,6,.05),#fff)">
+    <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:10px">Wie fühlst du dich heute?</div>
+    <div style="display:flex;gap:7px">
+      <button onclick="quickCheckin('Top drauf, viel Energie')" style="flex:1;padding:11px 4px;border-radius:10px;border:1px solid var(--br);background:var(--up);font-size:19px">💪</button>
+      <button onclick="quickCheckin('Ganz okay, normal')" style="flex:1;padding:11px 4px;border-radius:10px;border:1px solid var(--br);background:var(--up);font-size:19px">🙂</button>
+      <button onclick="quickCheckin('Etwas müde/schlapp')" style="flex:1;padding:11px 4px;border-radius:10px;border:1px solid var(--br);background:var(--up);font-size:19px">😐</button>
+      <button onclick="quickCheckin('Erschöpft, kaum Kraft')" style="flex:1;padding:11px 4px;border-radius:10px;border:1px solid var(--br);background:var(--up);font-size:19px">😮‍💨</button>
+      <button onclick="quickCheckin('Schmerzen/angeschlagen')" style="flex:1;padding:11px 4px;border-radius:10px;border:1px solid var(--br);background:var(--up);font-size:19px">🤕</button>
+    </div>
+    <button onclick="openDiaryFromCheckin()" style="width:100%;margin-top:9px;font-size:11px;color:var(--mu);background:none;border:none;text-decoration:underline">oder frei schreiben</button>
+  </div>
+
   <!-- Coach card -->
   <div class="card" id="coach-card" style="margin-bottom:12px;background:linear-gradient(135deg,#f5f0ff,#fff);border-color:#ddd5f7">
     <div style="display:flex;align-items:center;gap:7px;margin-bottom:9px">
@@ -335,6 +348,7 @@ button:active:not(:disabled){transform:scale(.96)}
     </div>
   </div>
   <div id="plan-subtitle" style="font-size:13px;color:var(--mu);margin-bottom:16px"></div>
+  <div id="plan-intro" style="display:none;font-size:13px;color:var(--su);line-height:1.6;background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(124,58,237,.02));border:1px solid rgba(124,58,237,.15);border-radius:12px;padding:13px 15px;margin-bottom:16px"></div>
 
   <!-- Progress -->
   <div class="card" style="margin-bottom:12px">
@@ -359,7 +373,8 @@ button:active:not(:disabled){transform:scale(.96)}
   <div id="week-tabs" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
 
   <!-- Current week sessions -->
-  <div id="plan-week-title" style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px"></div>
+  <div id="plan-week-title" style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px"></div>
+  <div id="plan-week-note" style="display:none;font-size:12px;color:var(--ac);line-height:1.5;margin-bottom:10px"></div>
   <div id="plan-sessions" style="display:flex;flex-direction:column;gap:8px"></div>
   </div>
 </div>
@@ -425,6 +440,9 @@ button:active:not(:disabled){transform:scale(.96)}
 
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Trainings-Stil</div>
   <div id="style-cards" style="display:flex;flex-direction:column;gap:7px;margin-bottom:20px"></div>
+
+  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Warum dieses Ziel? (optional)</div>
+  <input id="goal-reason-inp" class="inp" placeholder="z.B. Sommerurlaub, Hochzeit, wieder fit werden" style="margin-bottom:20px"/>
 
   <button onclick="generatePlan()" class="btn btn-ac" id="plan-gen-btn">Plan generieren →</button>
 </div>
@@ -1222,6 +1240,7 @@ function renderWeekReport(){
 
 function updateHome(){
   try{renderWeekReport();}catch(e){}
+  try{updateCheckinCard();}catch(e){}
   try{renderWeekReport();}catch(e){}
   const hasKey=!!loadKey(),last=log[log.length-1];
   document.getElementById('no-key').style.display=hasKey?'none':'flex';
@@ -1245,6 +1264,24 @@ function updateHome(){
   }
   updatePlanHome();
 }
+
+function hasCheckinToday(){return loadJournal().some(e=>e.date===todayIso());}
+function updateCheckinCard(){const el=document.getElementById('checkin-card');if(!el)return;el.style.display=hasCheckinToday()?'none':'block';}
+async function quickCheckin(text){
+  const el=document.getElementById('checkin-card');if(el)el.style.display='none';
+  const j=loadJournal();const entry={date:todayIso(),ts:Date.now(),text,ai:''};
+  j.push(entry);safeSet('coach_journal',JSON.stringify(j.slice(-100)));
+  try{localStorage.removeItem('coach_cache');}catch{}
+  if(typeof fetchCoach==='function')fetchCoach(true);
+  if(loadKey()&&/(müde|schlapp|erschöpft|schmerz|angeschlagen)/i.test(text)){
+    try{
+      const raw=await callAPI([{role:'user',content:`Du bist Trainingswissenschaftler und Coach. Der Nutzer meldet heute: "${text}". Aktiver Plan: ${plan?'ja':'nein'}. Reagiere in 1 kurzem Satz auf Deutsch mit konkreter Konsequenz für heute. NUR JSON: {"message":"..."}`}],200);
+      const p=extractJSON(raw);const msg=(Array.isArray(p)?p[0]:p)?.message;
+      if(msg){entry.ai=msg;safeSet('coach_journal',JSON.stringify(j.slice(-100)));fetchCoach(true);}
+    }catch{}
+  }
+}
+function openDiaryFromCheckin(){show('s-journal');}
 
 function renderJournal(){
   const el=document.getElementById('journal-list');if(!el)return;
@@ -2031,7 +2068,7 @@ function onDurSlider(which){
   document.getElementById('dur-max-val').textContent=mx+' min';
 }
 
-function buildPlanCreate(){const gc=document.getElementById('goal-cards');if(!gc){console.error('goal-cards missing');return;}gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<span style="font-size:22px">${g.icon}</span><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');if(wc){wc.innerHTML='';[4,6,8,12].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});}const fc=document.getElementById('freq-chips');if(fc){fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' co':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';};fc.appendChild(b);});}const dmS=document.getElementById('dur-min-slider'),dxS=document.getElementById('dur-max-slider');if(dmS){dmS.value=planOpts.durMin;document.getElementById('dur-min-val').textContent=planOpts.durMin+' min';}if(dxS){dxS.value=planOpts.durMax;document.getElementById('dur-max-val').textContent=planOpts.durMax+' min';}const bdp=document.getElementById('blocked-days-picker');if(bdp){bdp.innerHTML='';const dayOrder=[1,2,3,4,5,6,0];const dayLbl={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};dayOrder.forEach(d=>{const active=!planOpts.blockedDays.includes(d);const b=document.createElement('button');b.style.cssText=`flex:1;padding:11px 0;border-radius:9px;border:1.5px solid ${active?'var(--ac)':'var(--br)'};background:${active?'rgba(124,58,237,.1)':'var(--up)'};color:${active?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f);opacity:${active?1:.5}`;b.textContent=dayLbl[d];b.onclick=()=>{if(planOpts.blockedDays.includes(d))planOpts.blockedDays=planOpts.blockedDays.filter(x=>x!==d);else planOpts.blockedDays=[...planOpts.blockedDays,d];const on=!planOpts.blockedDays.includes(d);b.style.borderColor=on?'var(--ac)':'var(--br)';b.style.background=on?'rgba(124,58,237,.1)':'var(--up)';b.style.color=on?'var(--ac)':'var(--mu)';b.style.opacity=on?1:.5;};bdp.appendChild(b);});}const sc=document.getElementById('style-cards');if(sc){sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<span style="font-size:18px">${s.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}sc.appendChild(b);});}const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';const ah=document.getElementById('assessment-hint');if(ah){const pp=loadProfile();ah.style.display=pp?.assessment?'none':'block';}const oh=document.getElementById('onboarding-hint');if(oh){const pp2=loadProfile();oh.style.display=pp2?.trainingStatus?'none':'block';}if(typeof setDurMode==='function'){try{setDurMode('weeks');}catch(e){}}}
+function buildPlanCreate(){const gc=document.getElementById('goal-cards');if(!gc){console.error('goal-cards missing');return;}gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<span style="font-size:22px">${g.icon}</span><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');if(wc){wc.innerHTML='';[4,6,8,12].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});}const fc=document.getElementById('freq-chips');if(fc){fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' co':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';};fc.appendChild(b);});}const dmS=document.getElementById('dur-min-slider'),dxS=document.getElementById('dur-max-slider');if(dmS){dmS.value=planOpts.durMin;document.getElementById('dur-min-val').textContent=planOpts.durMin+' min';}if(dxS){dxS.value=planOpts.durMax;document.getElementById('dur-max-val').textContent=planOpts.durMax+' min';}const bdp=document.getElementById('blocked-days-picker');if(bdp){bdp.innerHTML='';const dayOrder=[1,2,3,4,5,6,0];const dayLbl={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};dayOrder.forEach(d=>{const active=!planOpts.blockedDays.includes(d);const b=document.createElement('button');b.style.cssText=`flex:1;padding:11px 0;border-radius:9px;border:1.5px solid ${active?'var(--ac)':'var(--br)'};background:${active?'rgba(124,58,237,.1)':'var(--up)'};color:${active?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f);opacity:${active?1:.5}`;b.textContent=dayLbl[d];b.onclick=()=>{if(planOpts.blockedDays.includes(d))planOpts.blockedDays=planOpts.blockedDays.filter(x=>x!==d);else planOpts.blockedDays=[...planOpts.blockedDays,d];const on=!planOpts.blockedDays.includes(d);b.style.borderColor=on?'var(--ac)':'var(--br)';b.style.background=on?'rgba(124,58,237,.1)':'var(--up)';b.style.color=on?'var(--ac)':'var(--mu)';b.style.opacity=on?1:.5;};bdp.appendChild(b);});}const sc=document.getElementById('style-cards');if(sc){sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<span style="font-size:18px">${s.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(124,58,237,.1)';}sc.appendChild(b);});}const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';const gri=document.getElementById('goal-reason-inp');if(gri)gri.value=planOpts.goalReason||'';const ah=document.getElementById('assessment-hint');if(ah){const pp=loadProfile();ah.style.display=pp?.assessment?'none':'block';}const oh=document.getElementById('onboarding-hint');if(oh){const pp2=loadProfile();oh.style.display=pp2?.trainingStatus?'none':'block';}if(typeof setDurMode==='function'){try{setDurMode('weeks');}catch(e){}}}
 
 let durMode='weeks';
 function setDurMode(mode){durMode=mode;document.getElementById('dur-weeks-wrap').style.display=mode==='weeks'?'block':'none';document.getElementById('dur-date-wrap').style.display=mode==='date'?'block':'none';document.getElementById('tog-weeks').style.borderColor=mode==='weeks'?'var(--ac)':'var(--br)';document.getElementById('tog-weeks').style.background=mode==='weeks'?'rgba(124,58,237,.12)':'var(--up)';document.getElementById('tog-weeks').style.color=mode==='weeks'?'var(--ac)':'var(--mu)';document.getElementById('tog-date').style.borderColor=mode==='date'?'var(--ac)':'var(--br)';document.getElementById('tog-date').style.background=mode==='date'?'rgba(124,58,237,.12)':'var(--up)';document.getElementById('tog-date').style.color=mode==='date'?'var(--ac)':'var(--mu)';}
@@ -2116,6 +2153,7 @@ async function generatePlan(){
   const styleObj=STYLES.find(s=>s.id===planOpts.style)||STYLES[0];
   const styleRule={'fullbody':'GANZKÖRPER: Jede Session Ober- & Unterkörper kombiniert.','ppl':'PUSH/PULL/BEINE rotieren: Push=Brust+Schultern+Trizeps, Pull=Rücken+Bizeps, Beine=Quad+Hamstring+Gesäß.','upper_lower':'OBER/UNTERKÖRPER abwechselnd. Beine mind. 50%.','hybrid':'Woche 1-2 Ganzkörper, dann Split. Beine mind. 1×/Woche.'}[planOpts.style]||'';
   const startDateVal=(document.getElementById('plan-start-date')?.value)||todayIso();
+  const goalReason=(document.getElementById('goal-reason-inp')?.value||'').trim();planOpts.goalReason=goalReason;
   // Which weekdays are still available in the FIRST (partial) week — those on/after the start day
   const startDow=new Date(startDateVal+'T12:00:00').getDay(); // 0=So..6=Sa
   const dayNamesDe={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};
@@ -2143,7 +2181,8 @@ TRAININGSTAGE: Nutze NUR diese Wochentage: ${allowedDaysStr}. An anderen Tagen K
 ${regenRule}
 DAUER: Jede Session zwischen ${planOpts.durMin} und ${planOpts.durMax} Minuten, NIE darüber oder darunter. Koppel die Dauer an die Intensität: easy≈${planOpts.durMin} min, medium≈${durMid} min, hard≈${planOpts.durMax} min.
 WICHTIG Woche 1: Plan startet am ${dayNamesDe[startDow]} (${startDateVal}). Verwende in Woche 1 NUR: ${week1DaysStr||allowedDaysStr}. Woche 1 hat nur ${week1Count} Session(s). Ab Woche 2 volle ${planOpts.freq} Sessions, verteilt mit Erholung.
-NUR minifiziertes JSON ohne Leerzeichen: {"title":"Kurzname","goal":"${planOpts.goal}","weeks":[{"week":1,"theme":"Start","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.durMin},"done":false}]}]}
+intro: 2-3 motivierende, persönliche Sätze zum Plan.${goalReason?" Nutzer trainiert für: "+goalReason+" — beziehe dich konkret darauf.":""} note je Woche: 1 kurzer Satz zum Wochenziel.
+NUR minifiziertes JSON ohne Leerzeichen: {"title":"Kurzname","goal":"${planOpts.goal}","intro":"...","weeks":[{"week":1,"theme":"Start","note":"...","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.durMin},"done":false}]}]}
 dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
 
   try{
@@ -2183,7 +2222,7 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
     }
     // Extend locally if more weeks requested than AI generated
     if(weeks>planData.weeks.length)extendPlanWeeks(planData,weeks,allowedTrainingDays,isFullbody);
-    planData.blockedDays=planOpts.blockedDays||[];
+    planData.blockedDays=planOpts.blockedDays||[];planData.goalReason=goalReason;
     // Frequency ramp: low fitness level + ambitious frequency -> build up over weeks
     let rampMsg='';
     if(fitnessLevelLow()&&planOpts.freq>=3&&planData.weeks.length>=3){
@@ -2408,6 +2447,7 @@ function renderPlanView(wi=0){
   currentViewWeek=wi;
   const total=plan.weeks.flatMap(w=>w.sessions).length;const done=plan.weeks.flatMap(w=>w.sessions).filter(s=>s.done).length;const pct=total?Math.round(done/total*100):0;
   document.getElementById('plan-title').textContent=plan.title||'Trainingsplan';
+  const introEl=document.getElementById('plan-intro');if(introEl){if(plan.intro){introEl.textContent=plan.intro;introEl.style.display='block';}else introEl.style.display='none';}
   const durRange=plan.durMin&&plan.durMax?` · ${plan.durMin}-${plan.durMax} min`:(plan.sessionMin?` · ${plan.sessionMin} min`:'');
   const styleLabel=(STYLES.find(s=>s.id===plan.style)||{label:''}).label;
   const startFmt=plan.startDate?new Date(plan.startDate+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
@@ -2415,11 +2455,14 @@ function renderPlanView(wi=0){
   document.getElementById('plan-prog-lbl').textContent=done+' / '+total+' Sessions';document.getElementById('plan-prog-pct').textContent=pct+'%';document.getElementById('plan-prog-bar').style.width=pct+'%';
   const tabs=document.getElementById('week-tabs');tabs.innerHTML='';plan.weeks.forEach((w,i)=>{const isDone=w.sessions.every(s=>s.done),isCur=i===wi;const b=document.createElement('button');b.className='chip'+(isCur?' ac':isDone?' co':'');b.style.whiteSpace='nowrap';b.style.flexShrink='0';b.textContent='Wo '+(i+1)+(isDone?' ✓':'');b.onclick=()=>renderPlanView(i);tabs.appendChild(b);});
   const week=plan.weeks[wi];document.getElementById('plan-week-title').textContent='WOCHE '+(wi+1)+' — '+(week.theme||'');
+  // Next upcoming (undone) session across the whole plan
+  window._nextSess=null;{const nowD=new Date(todayIso()+'T12:00:00');let best=null;plan.weeks.forEach((pw,pwi)=>pw.sessions.forEach(s=>{if(s.done)return;const d=getSessionDate(pwi,s.dow);if(d&&d>=nowD&&(!best||d<best.d))best={d,pwi,dow:s.dow};}));window._nextSess=best;}
+  const wn=document.getElementById('plan-week-note');if(wn){if(week.note){wn.textContent=week.note;wn.style.display='block';}else wn.style.display='none';}
   const todayDow=new Date().getDay();
-  document.getElementById('plan-sessions').innerHTML=week.sessions.map((s,si)=>{const isToday=s.dow===todayDow,ic=INT_COLORS[s.intensity||'medium'];const c=isToday?'rgba(124,58,237,.08)':'var(--card)',bc=isToday?'rgba(124,58,237,.25)':'var(--br)';
+  document.getElementById('plan-sessions').innerHTML=week.sessions.map((s,si)=>{const isToday=s.dow===todayDow,isNext=window._nextSess&&window._nextSess.pwi===wi&&window._nextSess.dow===s.dow&&!s.done,ic=INT_COLORS[s.intensity||'medium'];const c=isToday?'rgba(124,58,237,.08)':'var(--card)',bc=isToday?'rgba(124,58,237,.25)':'var(--br)';
     return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:44px;height:44px;border-radius:9px;background:${s.done?'rgba(5,150,105,.1)':isToday?'rgba(124,58,237,.12)':'var(--up)'};border:1px solid ${s.done?'rgba(5,150,105,.3)':isToday?'rgba(124,58,237,.2)':'var(--br)'};display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
       ${s.done?`<span style="font-size:18px;color:var(--co)">✓</span>`:`<span style="font-size:12px;font-weight:700;color:${isToday?'var(--ac)':'var(--mu)'};line-height:1.1">${DAYS[s.dow]}</span><span style="font-size:10px;color:${isToday?'var(--ac)':'var(--mu)'};line-height:1.2">${_sessDateShort(wi,s.dow)}</span>`}
-    </div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}${isToday&&!s.done?' 📍':''}${s.savedWorkout?' 💾':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${s.exerciseCount?' · '+s.exerciseCount+' Üb.':''}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">⚡</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">💬</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
+    </div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}${isNext?' 📍':''}${s.savedWorkout?' 💾':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${s.exerciseCount?' · '+s.exerciseCount+' Üb.':''}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">⚡</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">💬</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
   }).join('');
 }
 
