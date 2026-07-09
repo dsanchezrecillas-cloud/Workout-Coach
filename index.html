@@ -1074,12 +1074,28 @@ async function reqWL(){try{if('wakeLock' in navigator)wakeLock=await navigator.w
 function relWL(){try{wakeLock?.release();wakeLock=null;}catch{}}
 
 // ─── API ──────────────────────────────────────────────────────────────────────
-async function callAPI(messages,maxT=800,system=''){
+async function callAPI(messages,maxT=800,system='',_retry=0){
   const key=loadKey();
   const body={model:MODEL,max_tokens:maxT,messages};
   if(system)body.system=system;
-  const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key},body:JSON.stringify(body)});
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'HTTP '+res.status);}
+  let res;
+  try{
+    res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key},body:JSON.stringify(body)});
+  }catch(netErr){
+    // Network hiccup — retry once
+    if(_retry<1){await new Promise(r=>setTimeout(r,800));return callAPI(messages,maxT,system,_retry+1);}
+    throw new Error('Keine Verbindung');
+  }
+  if(!res.ok){
+    // 504 Gateway Timeout / 502 / 529 overloaded — retry up to 2x with backoff
+    if((res.status===504||res.status===502||res.status===529||res.status===500)&&_retry<2){
+      await new Promise(r=>setTimeout(r,1000*(_retry+1)));
+      return callAPI(messages,maxT,system,_retry+1);
+    }
+    const e=await res.json().catch(()=>({}));
+    if(res.status===504)throw new Error('Zeitüberschreitung — bitte nochmal versuchen');
+    throw new Error(e?.error?.message||'HTTP '+res.status);
+  }
   const d=await res.json();
   return(d.content||[]).find(b=>b.type==='text')?.text||'';
 }
@@ -2138,7 +2154,8 @@ function extendPlanWeeks(planData, targetWeeks, allowedDays, isFullbody){
       durationMin:durFor(intensity)
     }));
     if(allowedDays)newSessions=redistributeWeek(newSessions, allowedDays);
-    planData.weeks.push({week:w,theme,sessions:newSessions});
+    const NOTE_MAP={Deload:'Erholungswoche — bewusst leichter, Bewegungsqualität im Fokus.',Aufbau:'Grundlagen festigen, Technik sauber halten.',Steigerung:'Volumen und Intensität steigern.',Maximierung:'Ans Limit gehen, Fortschritt maximieren.'};
+    planData.weeks.push({week:w,theme,note:NOTE_MAP[theme]||'',sessions:newSessions});
   }
 }
 async function generatePlan(){
@@ -2170,7 +2187,7 @@ async function generatePlan(){
   const week1DaysStr=week1DaysFiltered.map(d=>dayNamesDe[d]).join(',');
   const allowedDaysStr=allowedTrainingDays.map(d=>dayNamesDe[d]).join(',');
   // Generate only first 4 weeks via AI — rest extended locally (avoids timeout)
-  const aiWeeks=Math.min(4, weeks);
+  const aiWeeks=Math.min(3, weeks);
   const durMid=Math.round((planOpts.durMin+planOpts.durMax)/2);
   const styleObj2=STYLES.find(s=>s.id===planOpts.style)||{};
   const isFullbody=planOpts.style==='fullbody';
@@ -2184,12 +2201,12 @@ TRAININGSTAGE: Nutze NUR diese Wochentage: ${allowedDaysStr}. An anderen Tagen K
 ${regenRule}
 DAUER: Jede Session zwischen ${planOpts.durMin} und ${planOpts.durMax} Minuten, NIE darüber oder darunter. Koppel die Dauer an die Intensität: easy≈${planOpts.durMin} min, medium≈${durMid} min, hard≈${planOpts.durMax} min.
 WICHTIG Woche 1: Plan startet am ${dayNamesDe[startDow]} (${startDateVal}). Verwende in Woche 1 NUR: ${week1DaysStr||allowedDaysStr}. Woche 1 hat nur ${week1Count} Session(s). Ab Woche 2 volle ${planOpts.freq} Sessions, verteilt mit Erholung.
-${jrecent?"\nAKTUELLES BEFINDEN (Tagebuch): "+jrecent+(acuteFlag?"\nWICHTIG: Nutzer ist aktuell krank/angeschlagen. Starte Woche 1 SEHR moderat (nur leichte Sessions, weniger Umfang, Mobilität/Technik). Intensität erst ab Woche 2 aufbauen. Erwähne das kurz im intro.":"\nBeim Einstieg berücksichtigen."):""}intro: 2-3 motivierende, persönliche Sätze zum Plan.${goalReason?" Nutzer trainiert für: "+goalReason+" — beziehe dich konkret darauf.":""} note je Woche: 1 kurzer Satz zum Wochenziel.
+${jrecent?"\nAKTUELLES BEFINDEN (Tagebuch): "+jrecent+(acuteFlag?"\nWICHTIG: Nutzer ist aktuell krank/angeschlagen. Starte Woche 1 SEHR moderat (nur leichte Sessions, weniger Umfang, Mobilität/Technik). Intensität erst ab Woche 2 aufbauen. Erwähne das kurz im intro.":"\nBeim Einstieg berücksichtigen."):""}intro: 2 kurze motivierende Sätze.${goalReason?" Nutzer trainiert für: "+goalReason+" — beziehe dich konkret darauf.":""} note je Woche: 1 kurzer Satz zum Wochenziel.
 NUR minifiziertes JSON ohne Leerzeichen: {"title":"Kurzname","goal":"${planOpts.goal}","intro":"...","weeks":[{"week":1,"theme":"Start","note":"...","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.durMin},"done":false}]}]}
 dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
 
   try{
-    const raw=await callAPI([{role:'user',content:'Erstelle den Plan jetzt. Antworte NUR mit JSON.'}],1800,sys);
+    const raw=await callAPI([{role:'user',content:'Erstelle den Plan jetzt. Antworte NUR mit JSON.'}],1500,sys);
     const parsed=extractJSON(raw);
     let planData=null;
     if(Array.isArray(parsed)&&parsed[0]?.sessions){
