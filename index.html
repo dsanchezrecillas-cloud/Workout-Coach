@@ -2154,6 +2154,8 @@ async function generatePlan(){
   const styleRule={'fullbody':'GANZKÖRPER: Jede Session Ober- & Unterkörper kombiniert.','ppl':'PUSH/PULL/BEINE rotieren: Push=Brust+Schultern+Trizeps, Pull=Rücken+Bizeps, Beine=Quad+Hamstring+Gesäß.','upper_lower':'OBER/UNTERKÖRPER abwechselnd. Beine mind. 50%.','hybrid':'Woche 1-2 Ganzkörper, dann Split. Beine mind. 1×/Woche.'}[planOpts.style]||'';
   const startDateVal=(document.getElementById('plan-start-date')?.value)||todayIso();
   const goalReason=(document.getElementById('goal-reason-inp')?.value||'').trim();planOpts.goalReason=goalReason;
+  const jrecent=(typeof journalCtx==='function')?journalCtx():'';
+  const acuteFlag=/(krank|erkält|fieber|grippe|verletz|schmerz|angeschlagen)/i.test(jrecent);
   // Which weekdays are still available in the FIRST (partial) week — those on/after the start day
   const startDow=new Date(startDateVal+'T12:00:00').getDay(); // 0=So..6=Sa
   const dayNamesDe={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};
@@ -2181,7 +2183,7 @@ TRAININGSTAGE: Nutze NUR diese Wochentage: ${allowedDaysStr}. An anderen Tagen K
 ${regenRule}
 DAUER: Jede Session zwischen ${planOpts.durMin} und ${planOpts.durMax} Minuten, NIE darüber oder darunter. Koppel die Dauer an die Intensität: easy≈${planOpts.durMin} min, medium≈${durMid} min, hard≈${planOpts.durMax} min.
 WICHTIG Woche 1: Plan startet am ${dayNamesDe[startDow]} (${startDateVal}). Verwende in Woche 1 NUR: ${week1DaysStr||allowedDaysStr}. Woche 1 hat nur ${week1Count} Session(s). Ab Woche 2 volle ${planOpts.freq} Sessions, verteilt mit Erholung.
-intro: 2-3 motivierende, persönliche Sätze zum Plan.${goalReason?" Nutzer trainiert für: "+goalReason+" — beziehe dich konkret darauf.":""} note je Woche: 1 kurzer Satz zum Wochenziel.
+${jrecent?"\nAKTUELLES BEFINDEN (Tagebuch): "+jrecent+(acuteFlag?"\nWICHTIG: Nutzer ist aktuell krank/angeschlagen. Starte Woche 1 SEHR moderat (nur leichte Sessions, weniger Umfang, Mobilität/Technik). Intensität erst ab Woche 2 aufbauen. Erwähne das kurz im intro.":"\nBeim Einstieg berücksichtigen."):""}intro: 2-3 motivierende, persönliche Sätze zum Plan.${goalReason?" Nutzer trainiert für: "+goalReason+" — beziehe dich konkret darauf.":""} note je Woche: 1 kurzer Satz zum Wochenziel.
 NUR minifiziertes JSON ohne Leerzeichen: {"title":"Kurzname","goal":"${planOpts.goal}","intro":"...","weeks":[{"week":1,"theme":"Start","note":"...","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.durMin},"done":false}]}]}
 dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
 
