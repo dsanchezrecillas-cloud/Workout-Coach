@@ -2107,21 +2107,25 @@ function weekNeedsRecoveryGaps(sessions){
   // i.e. fullbody sessions or duplicated focus. Distinct splits can run consecutively.
   if(sessions.length<2)return false;
   const focuses=sessions.map(s=>(s.focus||'').toLowerCase());
-  const anyFullbody=focuses.some(f=>f.includes('ganzkörper')||f.includes('ganzkorper')||f.includes('fullbody'));
+  const anyFullbody=focuses.some(f=>f.includes('ganzkörper')||f.includes('ganzkorper')||f.includes('fullbody')||/^gk\b/.test(f)||f.includes('ganzkörper'));
   if(anyFullbody)return true;
   // If two sessions share the same focus, treat as needing a gap
   const unique=new Set(focuses);
   return unique.size<focuses.length;
 }
 
-function redistributeWeek(sessions, allowedDays, forceGaps){
+function redistributeWeek(sessions, allowedDays, forceGaps, prevLastPos){
   if(!sessions.length)return sessions;
-  // Decide per-week whether gaps are needed, unless caller forces it
   const needGaps=forceGaps!==undefined?forceGaps:weekNeedsRecoveryGaps(sessions);
   const n=sessions.length;
-  const avail=allowedDays.slice();
-  if(avail.length<n)return sessions.map((s,i)=>({...s,dow:avail[i%avail.length]}));
   const posOf=d=>[1,2,3,4,5,6,0].indexOf(d);
+  // If the previous week ended on Sunday (pos 6) and gaps needed, avoid Monday (pos 0) this week
+  let avail=allowedDays.slice();
+  if(needGaps&&typeof prevLastPos==='number'&&prevLastPos>=0){
+    const filtered=avail.filter(d=>posOf(d)-(prevLastPos-7)>=2); // prevLastPos-7 maps last week's day into this week's negative axis
+    if(filtered.length>=n)avail=filtered;
+  }
+  if(avail.length<n)return sessions.map((s,i)=>({...s,dow:allowedDays[i%allowedDays.length]}));
   const picks=[];const step=(avail.length-1)/(n-1||1);
   for(let i=0;i<n;i++){let idx=Math.round(i*step);while(picks.includes(idx))idx=(idx+1)%avail.length;picks.push(idx);}
   picks.sort((a,b)=>a-b);
@@ -2129,10 +2133,15 @@ function redistributeWeek(sessions, allowedDays, forceGaps){
   if(needGaps){
     const sorted=[...chosen].sort((a,b)=>posOf(a)-posOf(b));let backToBack=false;
     for(let i=1;i<sorted.length;i++){if(posOf(sorted[i])-posOf(sorted[i-1])<2)backToBack=true;}
-    if(backToBack&&avail.length>=n){const strict=[];let lastPos=-99;for(const d of avail){if(posOf(d)-lastPos>=2){strict.push(d);lastPos=posOf(d);}if(strict.length===n)break;}if(strict.length===n)chosen=strict;}
+    if(backToBack&&avail.length>=n){const strict=[];let lastPos=(typeof prevLastPos==='number'?prevLastPos-7:-99);for(const d of avail){if(posOf(d)-lastPos>=2){strict.push(d);lastPos=posOf(d);}if(strict.length===n)break;}if(strict.length===n)chosen=strict;}
   }
   const chosenSorted=[...chosen].sort((a,b)=>posOf(a)-posOf(b));
   return sessions.map((s,i)=>({...s,dow:chosenSorted[i]}));
+}
+function _lastTrainingPos(sessions){
+  if(!sessions||!sessions.length)return -99;
+  const posOf=d=>[1,2,3,4,5,6,0].indexOf(d);
+  return Math.max(...sessions.map(s=>posOf(s.dow)));
 }
 
 function extendPlanWeeks(planData, targetWeeks, allowedDays, isFullbody){
@@ -2153,7 +2162,7 @@ function extendPlanWeeks(planData, targetWeeks, allowedDays, isFullbody){
       intensity,
       durationMin:durFor(intensity)
     }));
-    if(allowedDays)newSessions=redistributeWeek(newSessions, allowedDays);
+    if(allowedDays)newSessions=redistributeWeek(newSessions, allowedDays, undefined, _lastTrainingPos(planData.weeks[planData.weeks.length-1]?.sessions));
     const NOTE_MAP={Deload:'Erholungswoche — bewusst leichter, Bewegungsqualität im Fokus.',Aufbau:'Grundlagen festigen, Technik sauber halten.',Steigerung:'Volumen und Intensität steigern.',Maximierung:'Ans Limit gehen, Fortschritt maximieren.'};
     planData.weeks.push({week:w,theme,note:NOTE_MAP[theme]||'',sessions:newSessions});
   }
@@ -2237,7 +2246,9 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
     for(let wi=1;wi<planData.weeks.length;wi++){
       const wk=planData.weeks[wi];
       if(wk?.sessions?.length){
-        wk.sessions=redistributeWeek(wk.sessions, allowedTrainingDays);
+        const prevLast=_lastTrainingPos(planData.weeks[wi-1]?.sessions);
+        const force=(planOpts.style==='fullbody')?true:undefined;
+        wk.sessions=redistributeWeek(wk.sessions, allowedTrainingDays, force, prevLast);
       }
     }
     // Extend locally if more weeks requested than AI generated
@@ -2580,7 +2591,8 @@ async function redistributePlanDays(){
       if(future.length>=todo.length)availForWeek=future;
     }
     if(availForWeek.length<todo.length)availForWeek=allowed.filter(d=>!takenByCurrent.includes(d));
-    const redistributed=redistributeWeek(todo, availForWeek);
+    const prevLast=wi>0?_lastTrainingPos(plan.weeks[wi-1]?.sessions):-99;
+    const redistributed=redistributeWeek(todo, availForWeek, undefined, prevLast);
     wk.sessions=[...done,...redistributed].sort((a,b)=>weekOrder.indexOf(a.dow)-weekOrder.indexOf(b.dow));
   });
   savePlan();
@@ -2625,7 +2637,8 @@ function _applyPlanDayRules(){
     const taken=done.map(s=>s.dow);
     let use=avail.filter(d=>!taken.includes(d));
     if(use.length<todo.length)use=avail.slice();
-    const red=redistributeWeek(todo, use);
+    const prevLast=wi>0?_lastTrainingPos(plan.weeks[wi-1]?.sessions):-99;
+    const red=redistributeWeek(todo, use, undefined, prevLast);
     wk.sessions=[...done,...red].sort((a,b)=>weekOrder.indexOf(a.dow)-weekOrder.indexOf(b.dow));
   });
 }
@@ -2708,7 +2721,7 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
     }
     for(let wi=1;wi<planData.weeks.length;wi++){
       const wk=planData.weeks[wi];
-      if(wk?.sessions?.length)wk.sessions=redistributeWeek(wk.sessions, allowedTrainingDays);
+      if(wk?.sessions?.length)wk.sessions=redistributeWeek(wk.sessions, allowedTrainingDays, undefined, _lastTrainingPos(planData.weeks[wi-1]?.sessions));
     }
     // Persist blocked days on the plan for future rebuilds
     planData.blockedDays=rbBlocked;
