@@ -506,6 +506,7 @@ button:active:not(:disabled){transform:scale(.96)}
     <textarea id="prof-limits" class="inp" placeholder="Einschränkungen (z.B. Knieschmerzen, IT-Band, Rückenproblem...)" style="resize:none;height:60px;margin-bottom:9px"></textarea>
     <textarea id="prof-notes" class="inp" placeholder="Sonstiges (z.B. Vegetarier, trainiere morgens, Heimtraining...)" style="resize:none;height:55px;margin-bottom:11px"></textarea>
     <button onclick="saveCoachProfile()" class="btn btn-ac" id="prof-btn" style="padding:12px">Profil speichern</button>
+    <button onclick="openOnboarding()" class="btn" style="padding:11px;margin-top:8px;border:1.5px solid var(--br);color:var(--tx)">🧬 Über dich (Alter, Größe, Status, Sportarten)</button>
   </div>
   <div class="card"><div style="font-size:12px;color:var(--mu)">Schema v5 · claude-sonnet-4-6</div></div>
 </div>
@@ -2954,7 +2955,11 @@ async function aiLoadExercises(){
 
 
 function saveCoachProfile(){
-  const p={name:document.getElementById('prof-name').value.trim(),goals:document.getElementById('prof-goals').value.trim(),limits:document.getElementById('prof-limits').value.trim(),notes:document.getElementById('prof-notes').value.trim()};
+  const p=loadProfile()||{};
+  p.name=document.getElementById('prof-name').value.trim();
+  p.goals=document.getElementById('prof-goals').value.trim();
+  p.limits=document.getElementById('prof-limits').value.trim();
+  p.notes=document.getElementById('prof-notes').value.trim();
   saveProfile(p);const btn=document.getElementById('prof-btn');btn.textContent='✓ Gespeichert';setTimeout(()=>btn.textContent='Profil speichern',2000);
 }
 
