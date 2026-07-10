@@ -2321,7 +2321,7 @@ function renderPlanCalendar(){
   plan.weeks.forEach((w,wi)=>{
     w.sessions.forEach((s,si)=>{
       const d=getSessionDate(wi,s.dow);
-      if(d){const key=dateKey(d);sessionMap[key]={wi,si,session:s};}
+      if(d){const sStart=new Date(plan.startDate+'T00:00:00');if(d>=sStart){const key=dateKey(d);sessionMap[key]={wi,si,session:s};}}
     });
   });
   window._calSessionMap=sessionMap;
