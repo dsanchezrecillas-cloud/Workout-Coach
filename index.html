@@ -1605,10 +1605,12 @@ TRAININGSWISSENSCHAFTLICHE REGELN:
 - Warmup nach RAMP-Prinzip: 1 Übung Puls anheben (z.B. Hampelmann leicht), 1-2 Übungen Zielmuskulatur aktivieren/mobilisieren (dynamisch, keine statischen Dehnungen).
 
 Typen: type:"time" zeitbasiert, type:"reps" zählbar (dann reps:N), type:"hold" Halten, type:"amrap" max Wdh in Zeit. 5-7 Hauptübungen + 2-3 Warmup.
-Antworte NUR mit JSON-Array: [{"name":"...","type":"time","duration":40,"reps":null,"rest":20,"icon":"◈","tip":"DE","muscles":["chest"],"bilateral":false,"details":"3 Sätze","mistakes":"Fehler","warmup":false}]${perfCtx}${journalPromptTxt}${recoveryPromptTxt}`;
+Antworte NUR mit JSON-Array: [{"name":"...","type":"time","duration":40,"reps":null,"rest":20,"sets":3,"group":null,"icon":"◈","tip":"DE","muscles":["chest"],"bilateral":false,"details":"kurze Ausführungsbeschreibung","mistakes":"Fehler","warmup":false}]
+sets: Zahl 2-4 für Hauptübungen (je nach Ziel/Intensität), 1 für Warmup.
+group (optional): Übungen, die als SUPERSATZ direkt im Wechsel laufen sollen, bekommen denselben group-String (z.B. "A"). Sinnvoll für antagonistische Paare (Drücken+Ziehen) oder bei Zeitdruck/Konditionsziel. Gruppierte Übungen haben dieselbe sets-Zahl und kurze rest (10-30s). Übungen ohne Supersatz: group weglassen. Höchstens 2 Gruppen pro Workout.${perfCtx}${journalPromptTxt}${recoveryPromptTxt}`;
   try{
     const raw=await callAPI([{role:'user',content:'Erstelle das Workout.'}],2000,sys);
-    const arr=extractJSON(raw);const exArr=Array.isArray(arr)?arr:[arr].filter(Boolean);
+    const arr=extractJSON(raw);let exArr=Array.isArray(arr)?arr:[arr].filter(Boolean);
     if(!exArr.length)throw new Error('Leeres Workout');
     // Post-process: fix hold/reps types based on name if AI got it wrong
     exArr.forEach(ex=>{
@@ -1618,6 +1620,34 @@ Antworte NUR mit JSON-Array: [{"name":"...","type":"time","duration":40,"reps":n
         else if(n.match(/push|liegest|klimmzug|pull.up|dip|curl|lunge|ausfallschritt|squat|kniebeug|row|raise/))ex.type='reps';
       }
     });
+    exArr.forEach(ex=>{
+      let s=parseInt(ex.sets);
+      if(!s||s<1)s=ex.warmup?1:3;      // sensible default: 3 working sets
+      ex.sets=ex.warmup?1:Math.min(5,Math.max(1,s));
+      if(ex.warmup)ex.group=null;
+      if(ex.group!=null&&typeof ex.group!=='string')ex.group=String(ex.group);
+    });
+    // Keep only groups with 2+ members; align their sets; ensure members are adjacent
+    {
+      const main=exArr.filter(e=>!e.warmup);
+      const counts={};
+      main.forEach(e=>{if(e.group)counts[e.group]=(counts[e.group]||0)+1;});
+      main.forEach(e=>{if(e.group&&counts[e.group]<2)e.group=null;});
+      Object.keys(counts).filter(g=>counts[g]>=2).forEach(g=>{
+        const members=main.filter(e=>e.group===g);
+        const s=members[0].sets||3;
+        members.forEach(e=>{e.sets=s;e.rest=Math.min(e.rest||20,30);});
+      });
+      // Reorder so grouped exercises are contiguous (stable: first occurrence wins)
+      const ordered=[];const seen=new Set();
+      main.forEach(e=>{
+        if(!e.group){if(!seen.has(e)){ordered.push(e);seen.add(e);}return;}
+        if(seen.has(e))return;
+        main.filter(x=>x.group===e.group).forEach(x=>{if(!seen.has(x)){ordered.push(x);seen.add(x);}});
+      });
+      const wu=exArr.filter(e=>e.warmup);
+      exArr=[...wu,...ordered];
+    }
     curExercises=exArr.filter(e=>!e.warmup);wuExercises=exArr.filter(e=>e.warmup);
     if(!curExercises.length)throw new Error('Keine Hauptübungen');
     curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:Math.round((wuExercises.length*35+curExercises.length*60)/60)};
@@ -1631,6 +1661,34 @@ Antworte NUR mit JSON-Array: [{"name":"...","type":"time","duration":40,"reps":n
 
 // ─── Review ───────────────────────────────────────────────────────────────────
 let wuVisible=true;
+function toggleSuperset(i){
+  const a=curExercises[i],b=curExercises[i+1];
+  if(!a||!b)return;
+  if(a.group&&a.group===b.group){
+    // Unlink: split the group at this boundary
+    const g=a.group;
+    // everything from i+1 onward that shares g gets a new group (or none if single)
+    const tail=[];
+    for(let k=i+1;k<curExercises.length&&curExercises[k].group===g;k++)tail.push(k);
+    if(tail.length===1){curExercises[tail[0]].group=null;}
+    else{const ng='g'+Date.now();tail.forEach(k=>curExercises[k].group=ng);}
+    // if the head is now a single member, drop its group too
+    const headCount=curExercises.filter(e=>e.group===g).length;
+    if(headCount===1)curExercises.forEach(e=>{if(e.group===g)e.group=null;});
+  }else{
+    // Link: merge b (and its group) into a's group
+    const g=a.group||('g'+Date.now());
+    a.group=g;
+    if(b.group){const old=b.group;curExercises.forEach(e=>{if(e.group===old)e.group=g;});}
+    else b.group=g;
+    // Sets are shared across a superset — align to the first exercise
+    const first=curExercises.find(e=>e.group===g);
+    const s=first.sets||3;
+    curExercises.forEach(e=>{if(e.group===g)e.sets=s;});
+  }
+  showReview();
+}
+
 function showReview(){
   if(wuVisible===undefined)wuVisible=true;
   document.getElementById('rev-meta').textContent=curExercises.length+' Übungen'+(wuExercises.length?' + '+wuExercises.length+' Warmup':'');
@@ -1641,7 +1699,18 @@ function showReview(){
     if(wuBtn){wuBtn.textContent=wuVisible?'✕ Überspringen':'✓ Einschließen';wuBtn.style.background=wuVisible?'rgba(217,119,6,.1)':'rgba(5,150,105,.1)';wuBtn.style.borderColor=wuVisible?'rgba(217,119,6,.2)':'rgba(5,150,105,.2)';wuBtn.style.color=wuVisible?'var(--am)':'var(--co)';}
     const wuList2=document.getElementById('wu-list');if(wuList2)wuList2.style.display=wuVisible?'flex':'none';
     document.getElementById('wu-list').innerHTML=wuExercises.map(ex=>`<div class="card" style="border-color:rgba(217,119,6,.15)"><div style="display:flex;align-items:center;gap:10px"><div style="width:33px;height:33px;border-radius:8px;background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.2);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--am)">${ex.icon||'○'}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}</div><div style="font-size:11px;color:var(--mu)">${ex.tip||''}</div></div><span style="font-size:11px;color:var(--mu)">${ex.duration||30}s</span></div></div>`).join('');}else ws.style.display='none';
-  document.getElementById('rev-list').innerHTML=curExercises.map((ex,i)=>`<div class="card" id="rev-${i}">
+  document.getElementById('rev-list').innerHTML=curExercises.map((ex,i)=>{
+    const g=ex.group||null;
+    const prevG=i>0?(curExercises[i-1].group||null):null;
+    const nextG=i<curExercises.length-1?(curExercises[i+1].group||null):null;
+    const inGroup=!!g;
+    const groupStart=inGroup&&g!==prevG;
+    const groupEnd=inGroup&&g!==nextG;
+    const border=inGroup?'border-color:rgba(217,119,6,.45);border-left:3px solid var(--am)':'';
+    const canLink=i<curExercises.length-1;
+    const linked=canLink&&g&&g===nextG;
+    return`${groupStart?`<div style="font-size:10px;color:var(--am);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:6px 0 4px 2px">🔗 Supersatz — Rotation</div>`:''}
+  <div class="card" id="rev-${i}" style="${border}">
     <div style="display:flex;align-items:center;gap:8px">
       <button onclick="openInfoModal(curExercises[${i}])" style="width:34px;height:34px;border-radius:8px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.15);font-size:13px;color:var(--ac);flex-shrink:0">${ex.icon||'ℹ'}</button>
       <div style="flex:1;min-width:0">
@@ -1678,7 +1747,8 @@ function showReview(){
       </div>
     </div>
     <div id="alt-info-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--br);font-size:12px;color:var(--mu)"></div>
-  </div>`).join('');
+  </div>
+  ${canLink?`<button onclick="toggleSuperset(${i})" style="width:100%;margin:-2px 0 6px;padding:6px;border-radius:8px;border:1px dashed ${linked?'rgba(217,119,6,.5)':'var(--br)'};background:${linked?'rgba(217,119,6,.07)':'transparent'};color:${linked?'var(--am)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">${linked?'🔗 Supersatz mit nächster — trennen':'⇵ Mit nächster Übung koppeln (Supersatz)'}</button>`:''}`;}).join('');
   // If already on review, don't jump to top
   const alreadyActive=document.getElementById('s-review').classList.contains('active');
   if(!alreadyActive){show('s-review');}
@@ -1766,7 +1836,12 @@ function setTrainingMode(mode){
   }
 }
 function setExType(idx,type){if(!curExercises[idx])return;curExercises[idx].type=type;if(type==='reps'&&!curExercises[idx].reps)curExercises[idx].reps=10;_updateRevCard(idx);}
-function setExSets(idx,n){if(!curExercises[idx])return;curExercises[idx].sets=n;_updateRevCard(idx);}
+function setExSets(idx,n){
+  if(!curExercises[idx])return;
+  const g=curExercises[idx].group;
+  if(g){curExercises.forEach(e=>{if(e.group===g)e.sets=n;});showReview();return;}
+  curExercises[idx].sets=n;_updateRevCard(idx);
+}
 function toggleExWeight(idx){if(!curExercises[idx])return;curExercises[idx].trackWeight=!curExercises[idx].trackWeight;_updateRevCard(idx);}
 function startWorkout(){initTimer();show('s-timer');}
 
@@ -1814,12 +1889,27 @@ function updateTimer(){
   let ctrTxt='';
   if(tStatus!=='idle'&&tStatus!=='done'){
     if(isWU)ctrTxt='Warmup '+(tIdx+1)+'/'+wuExercises.length;
-    else ctrTxt=(tIdx+1)+'/'+curExercises.length+(totalSetsC>1?' · Satz '+tSet+'/'+totalSetsC:'');
+    else{
+      const grc=_groupRange(tIdx);
+      if(grc){
+        const ts=curExercises[grc.start]?.sets||1;
+        ctrTxt='🔗 Supersatz '+(tIdx-grc.start+1)+'/'+(grc.end-grc.start+1)+' · Runde '+tSet+'/'+ts;
+      }else{
+        ctrTxt=(tIdx+1)+'/'+curExercises.length+(totalSetsC>1?' · Satz '+tSet+'/'+totalSetsC:'');
+      }
+    }
   }
-  // During rest: show what comes next
+  // During rest: show what comes next (superset aware)
   if(tStatus==='rest'||tStatus==='round_rest'){
     let nextTxt='';
+    const gr=!isWU?_groupRange(tIdx):null;
     if(tStatus==='round_rest'){nextTxt=curExercises[0]?.name||'';}
+    else if(gr){
+      const totalSets=curExercises[gr.start]?.sets||1;
+      if(tIdx<gr.end)nextTxt=curExercises[tIdx+1].name+' (Supersatz)';
+      else if(tSet<totalSets)nextTxt=curExercises[gr.start].name+' — Runde '+(tSet+1);
+      else nextTxt=curExercises[gr.end+1]?.name||'';
+    }
     else if(!isWU&&tSet<totalSetsC){nextTxt=ex.name+' — Satz '+(tSet+1);}
     else{
       const nx=exList[tIdx+1];
@@ -1904,10 +1994,41 @@ function startTimer(){if(tStatus==='idle'){tStatus='work';const f=isWU?wuExercis
 function pauseTimer(){tRun=false;clearInterval(tIv);updateTimer();}
 let _tickTs=0;
 function tick(){_tickTs=Date.now();if(tLeft<=4&&tLeft>1)beep(660,.08);if(tLeft<=1){clearInterval(tIv);tRun=false;advance();return;}tLeft--;document.getElementById('t-disp').textContent=fmtT(tLeft);const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};const mt=tStatus==='work'?(ex.duration||40):tStatus==='rest'?(ex.rest||20):RREST;document.getElementById('timer-arc').setAttribute('stroke-dashoffset',CIRC-((mt-tLeft)/mt)*CIRC);}
+// Superset helpers: exercises sharing the same non-empty `group` run as a rotation.
+function _groupOf(i){return (curExercises[i]||{}).group||null;}
+function _groupRange(i){
+  const g=_groupOf(i);
+  if(!g)return null;
+  let s=i,e=i;
+  while(s>0&&_groupOf(s-1)===g)s--;
+  while(e<curExercises.length-1&&_groupOf(e+1)===g)e++;
+  return{start:s,end:e,group:g};
+}
 function advance(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};if(tStatus==='work'){tStatus='rest';tLeft=ex.rest||20;beep(660,.15);}else if(tStatus==='rest'){
+      const gr=!isWU?_groupRange(tIdx):null;
+      if(gr){
+        // Inside a superset: rotate through the group, then repeat the rotation for each set
+        const totalSets=curExercises[gr.start]?.sets||1;
+        if(tIdx<gr.end){
+          // next exercise within the same rotation, same set number
+          tIdx++;tStatus='work';tLeft=curExercises[tIdx].duration||40;beep(880,.1);
+          tRun=true;updateTimer();tIv=setInterval(tick,1000);return;
+        }
+        if(tSet<totalSets){
+          // rotation finished -> next round of the superset, back to first exercise
+          tSet++;tIdx=gr.start;tStatus='work';tLeft=curExercises[tIdx].duration||40;beep(880,.15);
+          tRun=true;updateTimer();tIv=setInterval(tick,1000);return;
+        }
+        // superset done -> continue after the group
+        const nxg=gr.end+1;
+        if(nxg<curExercises.length){tIdx=nxg;tSet=1;tStatus='work';tLeft=curExercises[nxg].duration||40;beep(880,.1);tRun=true;updateTimer();tIv=setInterval(tick,1000);return;}
+        // nothing after the group -> fall through to round/done handling below
+        tIdx=curExercises.length-1;
+      }else{
       // Remaining sets of the same exercise first
       const totalSets=isWU?1:(ex.sets||1);
       if(!isWU&&tSet<totalSets){tSet++;tStatus='work';tLeft=ex.duration||40;beep(880,.1);tRun=true;updateTimer();tIv=setInterval(tick,1000);return;}
+      }
       const nx=tIdx+1;if(nx<exList.length){tIdx=nx;tSet=1;tStatus='work';tLeft=exList[nx].duration||40;beep(880,.1);}else if(isWU){isWU=false;tIdx=0;tStatus='work';tLeft=curExercises[0]?.duration||40;beep(1100,.3);renderExList();}else{
         const totalRounds=curSetup.trainingMode==='circuit'?(curSetup.rounds||1):1;
         if(tRound<totalRounds){tRound++;tIdx=0;tSet=1;tStatus='round_rest';tLeft=RREST;beep(880,.2);}
