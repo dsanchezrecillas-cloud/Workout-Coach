@@ -1605,11 +1605,13 @@ TRAININGSWISSENSCHAFTLICHE REGELN:
 - Warmup nach RAMP-Prinzip: 1 Übung Puls anheben (z.B. Hampelmann leicht), 1-2 Übungen Zielmuskulatur aktivieren/mobilisieren (dynamisch, keine statischen Dehnungen).
 
 Typen: type:"time" zeitbasiert, type:"reps" zählbar (dann reps:N), type:"hold" Halten, type:"amrap" max Wdh in Zeit. 5-7 Hauptübungen + 2-3 Warmup.
-Antworte NUR mit JSON-Array: [{"name":"...","type":"time","duration":40,"reps":null,"rest":20,"sets":3,"group":null,"icon":"◈","tip":"DE","muscles":["chest"],"bilateral":false,"details":"kurze Ausführungsbeschreibung","mistakes":"Fehler","warmup":false}]
+Antworte NUR mit JSON-Array: [{"name":"...","type":"time","duration":40,"reps":null,"rest":20,"sets":3,"group":null,"icon":"◈","tip":"max 8 Wörter","muscles":["chest"],"bilateral":false,"details":"max 12 Wörter","mistakes":"max 8 Wörter","warmup":false}]
+Halte tip/details/mistakes SEHR kurz (Stichworte, keine Sätze).
 sets: Zahl 2-4 für Hauptübungen (je nach Ziel/Intensität), 1 für Warmup.
-group (optional): Übungen, die als SUPERSATZ direkt im Wechsel laufen sollen, bekommen denselben group-String (z.B. "A"). Sinnvoll für antagonistische Paare (Drücken+Ziehen) oder bei Zeitdruck/Konditionsziel. Gruppierte Übungen haben dieselbe sets-Zahl und kurze rest (10-30s). Übungen ohne Supersatz: group weglassen. Höchstens 2 Gruppen pro Workout.${perfCtx}${journalPromptTxt}${recoveryPromptTxt}`;
+group (optional): Übungen, die als SUPERSATZ im direkten Wechsel laufen, bekommen denselben group-String ("A","B"). Gruppierte Übungen: gleiche sets-Zahl, kurze rest (10-30s), im Array direkt nebeneinander.
+WANN Supersatz: antagonistische Paare (Drücken+Ziehen, Quads+Hamstrings) — spart Zeit ohne Leistungsverlust. Bei kurzer Session (<25 min) oder Ziel Kondition/Fettabbau gern 1-2 Gruppen. Bei reinem Kraftziel mit schweren Grundübungen KEINE Supersätze (volle Erholung nötig) — dann group überall weglassen. Nie zwei Übungen derselben Muskelgruppe koppeln. Höchstens 2 Gruppen pro Workout.${perfCtx}${journalPromptTxt}${recoveryPromptTxt}`;
   try{
-    const raw=await callAPI([{role:'user',content:'Erstelle das Workout.'}],2000,sys);
+    const raw=await callAPI([{role:'user',content:'Erstelle das Workout.'}],1400,sys);
     const arr=extractJSON(raw);let exArr=Array.isArray(arr)?arr:[arr].filter(Boolean);
     if(!exArr.length)throw new Error('Leeres Workout');
     // Post-process: fix hold/reps types based on name if AI got it wrong
@@ -2195,7 +2197,27 @@ function renderWeekReport(){
 }
 
 function updatePlanHome(){if(!plan?.weeks?.length){document.getElementById('plan-home').style.display='none';return;}const wi=getCurrentWeekIdx();const week=plan.weeks[wi];if(!week){document.getElementById('plan-home').style.display='none';return;}const todayDow=new Date().getDay();const sess=week.sessions.find(s=>s.dow===todayDow&&!s.done);if(!sess){document.getElementById('plan-home').style.display='none';return;}document.getElementById('plan-home').style.display='block';document.getElementById('plan-home-focus').textContent=sess.focus;document.getElementById('plan-home-meta').textContent=(sess.durationMin||30)+' min · '+INT_LABELS[sess.intensity||'medium'];document.getElementById('plan-home-week').textContent='Woche '+(wi+1)+' / '+plan.weeks.length;pendingPlanSession={wi,si:week.sessions.indexOf(sess)};}
-function startPlanSession(){if(!pendingPlanSession||!plan)return;const week=plan.weeks[pendingPlanSession.wi];const sess=week?.sessions[pendingPlanSession.si];if(!sess)return;chatCtx={};chatHistory=[];const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);}
+function startPlanSession(){
+  if(!pendingPlanSession||!plan)return;
+  const wi=pendingPlanSession.wi;
+  const week=plan.weeks[wi];
+  const sess=week?.sessions[pendingPlanSession.si];
+  if(!sess)return;
+  chatCtx={};chatHistory=[];
+  const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';
+  const count=sess.exerciseCount||5;
+  const totalW=plan.weeks.length;
+  const isDeload=/deload/i.test(week.theme||'');
+  // Periodization context so the workout matches the phase, not just the day
+  const phase=isDeload
+    ? 'DELOAD-Woche: Volumen ~50-60% reduzieren (weniger Sätze), Intensität niedrig, Fokus auf saubere Technik und Mobilität. Keine Maximalbelastung.'
+    : `Woche ${wi+1} von ${totalW} (${week.theme||'Aufbau'}). ${wi===0?'Einstieg: Technik vor Last, konservative Wdh-Ziele.':'Progressive Überlastung: leicht mehr Volumen/Wdh als in der Vorwoche.'}`;
+  const weekNote=week.note?` Wochenziel: ${week.note}`:'';
+  const goalTxt=GOALS.find(g=>g.id===(plan.goal||'fitness'))?.label||'Fitness';
+  const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.
+PLANKONTEXT — Ziel des Plans: ${goalTxt}. ${phase}${weekNote} Die Satzzahl (sets) an die Phase anpassen: Deload 2, Einstieg 2-3, Aufbau/Steigerung 3-4.`;
+  generateWorkout(summary);
+}
 function onDurSlider(which){
   const minS=document.getElementById('dur-min-slider'),maxS=document.getElementById('dur-max-slider');
   let mn=parseInt(minS.value),mx=parseInt(maxS.value);
@@ -2321,12 +2343,16 @@ async function generatePlan(){
   const durMid=Math.round((planOpts.durMin+planOpts.durMax)/2);
   const styleObj2=STYLES.find(s=>s.id===planOpts.style)||{};
   const isFullbody=planOpts.style==='fullbody';
+  // Fullbody at high frequency is physiologically wrong — same muscles every session.
+  const freqStyleWarn=(isFullbody&&planOpts.freq>=5)
+    ? 'WICHTIG: Ganzkörper 5x/Woche ist nicht sinnvoll (gleiche Muskeln ohne 48h Erholung). Nutze stattdessen einen Split (z.B. Push/Pull/Beine oder Ober-/Unterkörper), damit aufeinanderfolgende Tage verschiedene Muskelgruppen treffen. Benenne die Sessions entsprechend unterschiedlich.'
+    : '';
   const regenRule=isFullbody
     ? `ERHOLUNG (Ganzkörper): Nach jeder Ganzkörper-Session mindestens 1 Pausentag. NIE zwei Trainingstage direkt hintereinander. Verteile die Sessions gleichmäßig über die Woche (z.B. Mo/Mi/Fr).`
     : `ERHOLUNG (Split): Trainiere dieselbe Muskelgruppe frühestens nach 48h wieder. Aufeinanderfolgende Tage sind nur erlaubt, wenn sie KOMPLETT verschiedene Muskelgruppen treffen (z.B. Mo Rücken+Bizeps, Di Beine, Mi Brust+Trizeps). Nach einer harten Session bevorzugt ein leichterer Tag oder Pause. Beine brauchen ~48h Erholung.`;
   const GOAL_SYSTEM={fitness:'SYSTEM: Ausgewogen — Kraftbasis (Compound) + kurzer Konditions-Finisher, moderate Pausen.',strength:'SYSTEM: Kraft/Hypertrophie — Grundübungen zuerst, 8-15 Wdh bei Körpergewicht, längere Pausen, Volumen wochenweise steigern.',fatLoss:'SYSTEM: Körperfett — Ganzkörper-Dichteformate/Zirkel, kurze Pausen, hoher Energieumsatz, knieschonend ohne Sprünge.',endurance:'SYSTEM: Ausdauer — Zirkel mit kurzen Pausen (30-45s), Umfang vor Intensität.'};
   const profP=profileTxt();const sys=`Erfahrener Trainingswissenschaftler. Erstelle kompakten ${aiWeeks}-Wochen-Trainingsplan. Ziel: ${goalObj.label}. ${planOpts.freq}×/Woche. ${styleRule} ${GOAL_SYSTEM[planOpts.goal]||''} Knieschonend.${profP?'\nNUTZER: '+profP+' — Einschränkungen strikt beachten, Fitness-Check zur Kalibrierung des Startniveaus nutzen.':''}
-PERIODISIERUNG: Lineare Progression — Volumen/Intensität wochenweise steigern, erst Umfang, dann Intensität. Woche 1 easy (Technik, RPE 5-6), Woche 2-3 medium bis hard (RPE 7-8,5), Woche 4 = Deload mit ~50-60% Volumen, alles easy (aktive Erholung, Bewegungsqualität). intensity easy=RPE 5-6, medium=RPE 7-8, hard=RPE 8-9.
+${freqStyleWarn?freqStyleWarn+"\n":""}PERIODISIERUNG: Lineare Progression — Volumen/Intensität wochenweise steigern, erst Umfang, dann Intensität. Woche 1 easy (Technik, RPE 5-6), Woche 2-3 medium bis hard (RPE 7-8,5), Woche 4 = Deload mit ~50-60% Volumen, alles easy (aktive Erholung, Bewegungsqualität). intensity easy=RPE 5-6, medium=RPE 7-8, hard=RPE 8-9.
 TRAININGSTAGE: Nutze NUR diese Wochentage: ${allowedDaysStr}. An anderen Tagen KEINE Session.
 ${regenRule}
 DAUER: Jede Session zwischen ${planOpts.durMin} und ${planOpts.durMax} Minuten, NIE darüber oder darunter. Koppel die Dauer an die Intensität: easy≈${planOpts.durMin} min, medium≈${durMid} min, hard≈${planOpts.durMax} min.
