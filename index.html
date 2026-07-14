@@ -2447,13 +2447,35 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
         if(typeof d!=='number'||d<dMin||d>dMax)s.durationMin=durFor(s.intensity||'medium');
       }));
     }
-    // Safety: week 1 only on allowed days that are also on/after the start day
-    if(planData.weeks[0]?.sessions){
-      const allowed=new Set(week1DaysFiltered);
-      planData.weeks[0].sessions=planData.weeks[0].sessions.filter(s=>allowed.has(s.dow));
-      if(!planData.weeks[0].sessions.length){
-        planData.weeks[0].sessions=[{dow:(week1DaysFiltered[0]??startDow),focus:'Ganzkörper Start',intensity:'easy',durationMin:planOpts.durMin,done:false}];
+    // Week 1: redistribute onto the days available from the start day onward,
+    // so training actually begins on the start date instead of days later.
+    if(planData.weeks[0]?.sessions?.length){
+      const w1=planData.weeks[0];
+      const avail=week1DaysFiltered.length?week1DaysFiltered:allowedTrainingDays;
+      const force=(planOpts.style==='fullbody')?true:weekNeedsRecoveryGaps(w1.sessions);
+      // Capacity = days that still respect recovery spacing, not just free days.
+      let capacity=avail.length;
+      if(force){
+        const order=[1,2,3,4,5,6,0];
+        let lastPos=-99,fit=0;
+        for(const d of avail){const p=order.indexOf(d);if(p-lastPos>=2){fit++;lastPos=p;}}
+        capacity=Math.max(1,fit);
       }
+      const keep=w1.sessions.slice(0,Math.max(1,Math.min(w1.sessions.length,capacity)));
+      w1.sessions=redistributeWeek(keep,avail,force||undefined);
+      // Guarantee the first session sits on the start day when the day is free
+      if(avail.length&&w1.sessions.length){
+        const order=[1,2,3,4,5,6,0];
+        const firstPos=Math.min(...w1.sessions.map(s=>order.indexOf(s.dow)));
+        const startPos=order.indexOf(avail[0]);
+        if(firstPos>startPos&&!w1.sessions.some(s=>s.dow===avail[0])){
+          const earliest=w1.sessions.reduce((a,b)=>order.indexOf(a.dow)<=order.indexOf(b.dow)?a:b);
+          earliest.dow=avail[0];
+          w1.sessions.sort((a,b)=>order.indexOf(a.dow)-order.indexOf(b.dow));
+        }
+      }
+    }else if(planData.weeks[0]){
+      planData.weeks[0].sessions=[{dow:(week1DaysFiltered[0]??startDow),focus:'Ganzkörper Start',intensity:'easy',durationMin:planOpts.durMin,done:false}];
     }
     // Redistribute weeks 2+ onto allowed days with recovery spacing (per-week detection)
     for(let wi=1;wi<planData.weeks.length;wi++){
@@ -2479,11 +2501,21 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
       planData.weeks.forEach((wk,wi)=>{
         const cap=rampFor(wi);
         if(wk.sessions.length>cap){
-          wk.sessions=redistributeWeek(wk.sessions.slice(0,cap),allowedTrainingDays);
+          // Week 1 may only use days on/after the start day
+          const days=(wi===0&&week1DaysFiltered.length)?week1DaysFiltered:allowedTrainingDays;
+          const prevLast=wi>0?_lastTrainingPos(planData.weeks[wi-1]?.sessions):undefined;
+          wk.sessions=redistributeWeek(wk.sessions.slice(0,cap),days,undefined,prevLast);
           trimmed=true;
         }
       });
       if(trimmed)rampMsg='Sanfter Einstieg: erste Wochen mit reduzierter Frequenz, Aufbau bis '+target+'×/Woche.';
+    }
+    // Final guard: no week-1 session may fall before the start date
+    if(planData.weeks[0]?.sessions?.length){
+      const ok=new Set(week1DaysFiltered);
+      const kept=planData.weeks[0].sessions.filter(s=>ok.has(s.dow));
+      if(kept.length)planData.weeks[0].sessions=kept;
+      else planData.weeks[0].sessions=[{dow:(week1DaysFiltered[0]??startDow),focus:'Ganzkörper Start',intensity:'easy',durationMin:planOpts.durMin,done:false}];
     }
     plan=planData;savePlan();renderPlanView(0);show('s-plan');
     if(rampMsg)showErr('✓ '+rampMsg);
@@ -2939,6 +2971,13 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
     // Persist blocked days on the plan for future rebuilds
     planData.blockedDays=rbBlocked;
     if(oldWeeks>planData.weeks.length)extendPlanWeeks(planData,oldWeeks,allowedTrainingDays,rbFullbody);
+    // Final guard: no week-1 session may fall before the start date
+    if(planData.weeks[0]?.sessions?.length){
+      const ok=new Set(week1DaysFiltered);
+      const kept=planData.weeks[0].sessions.filter(s=>ok.has(s.dow));
+      if(kept.length)planData.weeks[0].sessions=kept;
+      else planData.weeks[0].sessions=[{dow:(week1DaysFiltered[0]??startDow),focus:'Ganzkörper Start',intensity:'easy',durationMin:planOpts.durMin,done:false}];
+    }
     plan=planData;savePlan();renderPlanView(0);show('s-plan');
     showErr('✓ Plan mit '+newFreq+'×/Woche neu aufgebaut.');
   }catch(e){showErr('Fehler: '+e.message);show('s-plan');}
