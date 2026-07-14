@@ -1648,6 +1648,8 @@ async function generateWorkout(summaryOverride){
   const recoveryPromptTxt=rc?`\n\nZULETZT TRAINIERT: ${rc}\nERHOLUNG: Muskelgruppen, die vor <48h mit RPE>=7 belastet wurden, heute MEIDEN oder nur leicht/technisch einbinden. Wähle Übungen für erholte Muskelgruppen.`:'';
   const sys=`Erfahrener Trainingswissenschaftler und Coach. Erstelle Home-Workout auf Deutsch. Vorgaben: ${summary}. Knieschonend (keine tiefen Sprünge, keine hohen Knie-Scherkräfte).
 
+ZEITBUDGET — RECHNE NACH: Zeit pro Übung = Sätze × (Arbeitszeit + Pause). Die vorgegebene Übungszahl ist aus Dauer, Ziel und Pausenlänge berechnet — halte sie exakt ein. Die Summe aus Warmup (~5 min) und allen Hauptübungen muss in die Session-Dauer passen. Passt es nicht, kürze NICHT die Pausen (die sind zieldefiniert), sondern nutze Supersätze.
+
 EQUIPMENT — HARTE REGEL: Nutze AUSSCHLIESSLICH das in den Vorgaben genannte Equipment. Steht dort "Nur Körpergewicht", sind Hanteln, Kurzhanteln, Kettlebells, Bänder und Zusatzgewichte VERBOTEN — auch nicht "optional" oder ersatzweise mit Wasserflasche/Rucksack. Keine Übungsnamen, die Geräte implizieren (kein Goblet Squat, kein Kurzhantel-Rudern, kein Farmers Walk). Körpergewicht wird stattdessen schwerer gemacht durch: langsame Exzentrik, Pausen im Bewegungsablauf, ungünstigere Hebel, einbeinige/einarmige Varianten, mehr Wiederholungen.
 
 TRAININGSWISSENSCHAFTLICHE REGELN:
@@ -2263,6 +2265,58 @@ function renderWeekReport(){
 }
 
 function updatePlanHome(){if(!plan?.weeks?.length){document.getElementById('plan-home').style.display='none';return;}const wi=getCurrentWeekIdx();const week=plan.weeks[wi];if(!week){document.getElementById('plan-home').style.display='none';return;}const todayDow=new Date().getDay();const sess=week.sessions.find(s=>s.dow===todayDow&&!s.done);if(!sess){document.getElementById('plan-home').style.display='none';return;}document.getElementById('plan-home').style.display='block';document.getElementById('plan-home-focus').textContent=sess.focus;document.getElementById('plan-home-meta').textContent=(sess.durationMin||30)+' min · '+INT_LABELS[sess.intensity||'medium'];document.getElementById('plan-home-week').textContent='Woche '+(wi+1)+' / '+plan.weeks.length;pendingPlanSession={wi,si:week.sessions.indexOf(sess)};}
+// ─── Übungszahl: trainingswissenschaftliche Herleitung ────────────────────────
+// Kern: Die INTENSITÄT bestimmt Pause und Satzzahl. Beides zusammen bestimmt,
+// wie lange eine Übung dauert — und damit, wie viele in die Session passen.
+// Pause nach Ziel × Intensität (Sekunden). Schwere Sätze brauchen Erholung des
+// Nervensystems, leichte nicht.
+const REST_S={
+  strength: {easy:90, medium:120, hard:180},
+  fitness:  {easy:45, medium:75,  hard:90},
+  fatLoss:  {easy:30, medium:35,  hard:45},
+  endurance:{easy:30, medium:35,  hard:45}
+};
+// Arbeitszeit pro Satz: Kraft = wenige Wdh, kurz; Ausdauer = viele Wdh, lang.
+const WORK_S={strength:30, fitness:45, fatLoss:40, endurance:50};
+// Sätze nach Intensität: leicht = Technik/Deload, hart = hohe Reizdichte.
+const SETS_I={easy:2, medium:3, hard:4};
+// Obergrenze Gesamtvolumen (Arbeitssätze/Session) — darüber sinkt der Ertrag.
+const VOL_CAP={easy:12, medium:22, hard:28};
+// Bewegungsmuster, die ein Fokus abdecken muss (Kniebeuge, Hüfte, Drücken, Ziehen, Core).
+const FOCUS_MIN={fullbody:4,upper:3,lower:3,split:3};
+const FOCUS_MAX={fullbody:8,upper:6,lower:6,split:5};
+function focusKind(focus){
+  const f=(focus||'').toLowerCase();
+  if(/ganzkörper|ganzkorper|fullbody|^gk\b/.test(f))return 'fullbody';
+  if(/unter|lower|bein|leg|glute|gesäß|po\b|quad|waden/.test(f))return 'lower';
+  if(/ober|upper|push|pull|drück|zieh|brust|rücken|schulter|arm|bizeps|trizeps/.test(f))return 'upper';
+  return 'split';
+}
+function recommendExercises(durationMin,focus,goal,intensity){
+  const dur=Math.max(10,durationMin||30);
+  const g=REST_S[goal]?goal:'fitness';
+  const int=SETS_I[intensity]?intensity:'medium';
+  const warm=dur>=25?6:4;
+  const effSec=Math.max(6,dur-warm)*60;
+  const sets=SETS_I[int], rest=REST_S[g][int], work=WORK_S[g];
+  // Letzter Satz braucht keine Pause; +20s für Übungswechsel/Aufbau
+  const perEx=sets*work+(sets-1)*rest+20;
+  const byTime=Math.floor(effSec/perEx);
+  const byVolume=Math.floor(VOL_CAP[int]/sets);
+  let n=Math.min(byTime,byVolume);
+  const kind=focusKind(focus);
+  const min=FOCUS_MIN[kind]||3, max=FOCUS_MAX[kind]||5;
+  let superset=false;
+  if(n<min){
+    // Zeit reicht nicht für alle Muster bei voller Pause. Pausen kürzen wäre
+    // falsch (zieldefiniert) — stattdessen antagonistisch koppeln: der Partner
+    // arbeitet, während der andere Muskel erholt.
+    superset=true;
+    n=Math.min(min,byVolume);
+  }
+  return {count:Math.max(2,Math.min(max,n)),superset,sets,rest,perExMin:Math.round(perEx/60*10)/10};
+}
+
 function startPlanSession(){
   if(!pendingPlanSession||!plan)return;
   const wi=pendingPlanSession.wi;
@@ -2271,7 +2325,12 @@ function startPlanSession(){
   if(!sess)return;
   chatCtx={};chatHistory=[];
   const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';
-  const count=sess.exerciseCount||5;
+  const rec=recommendExercises(sess.durationMin||30,sess.focus,plan.goal,sess.intensity);
+  const count=sess.exerciseCount||rec.count;
+  const ssHint=(sess.wantSuperset||rec.superset)
+    ? ' Das Zeitbudget ist für volle Pausen zu knapp: nutze 1-2 antagonistische SUPERSÄTZE (group), damit alle Bewegungsmuster reinpassen, ohne die Erholung pro Muskel zu verkürzen.'
+    : '';
+  const doseTxt=` Aus Intensität abgeleitet: sets=${rec.sets}, rest≈${rec.rest}s pro Hauptübung — halte dich daran, davon hängt das Zeitbudget ab.`;
   const totalW=plan.weeks.length;
   const isDeload=/deload/i.test(week.theme||'');
   // Periodization context so the workout matches the phase, not just the day
@@ -2281,7 +2340,7 @@ function startPlanSession(){
   const weekNote=week.note?` Wochenziel: ${week.note}`:'';
   const goalTxt=GOALS.find(g=>g.id===(plan.goal||'fitness'))?.label||'Fitness';
   const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.
-PLANKONTEXT — Ziel des Plans: ${goalTxt}. ${phase}${weekNote} Die Satzzahl (sets) an die Phase anpassen: Deload 2, Einstieg 2-3, Aufbau/Steigerung 3-4.`;
+PLANKONTEXT — Ziel des Plans: ${goalTxt}. ${phase}${weekNote} ${doseTxt}${ssHint}`;
   generateWorkout(summary);
 }
 function onDurSlider(which){
@@ -2510,6 +2569,14 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
       });
       if(trimmed)rampMsg='Sanfter Einstieg: erste Wochen mit reduzierter Frequenz, Aufbau bis '+target+'×/Woche.';
     }
+    // Derive exercise count per session from duration, goal and focus
+    planData.weeks.forEach(wk=>{
+      (wk.sessions||[]).forEach(s=>{
+        const rec=recommendExercises(s.durationMin||planOpts.durMin,s.focus,planOpts.goal,s.intensity);
+        s.exerciseCount=rec.count;
+        if(rec.superset)s.wantSuperset=true;
+      });
+    });
     // Final guard: no week-1 session may fall before the start date
     if(planData.weeks[0]?.sessions?.length){
       const ok=new Set(week1DaysFiltered);
@@ -2767,7 +2834,7 @@ let sessEditTargetWi=-1; // -1 = no week change
 function openSessEdit(wi,si){
   sessEditWi=wi;sessEditSi=si;sessEditTargetWi=wi;
   const sess=plan.weeks[wi].sessions[si];
-  sessEditDow2=sess.dow;sessEditInt2=sess.intensity||'medium';sessEditEquip=sess.equipment?[...sess.equipment]:['bodyweight'];sessEditCount=sess.exerciseCount||5;
+  sessEditDow2=sess.dow;sessEditInt2=sess.intensity||'medium';sessEditEquip=sess.equipment?[...sess.equipment]:['bodyweight'];sessEditCount=sess.exerciseCount||recommendExercises(sess.durationMin||30,sess.focus,plan?.goal,sess.intensity).count;
   document.getElementById('sess-wi').value=wi;document.getElementById('sess-si').value=si;document.getElementById('sess-modal-title').textContent=sess.focus;
   const dp=document.getElementById('sess-day-picker');dp.innerHTML='';DAYS.forEach((d,dow)=>{const b=document.createElement('button');b.className='day-pill'+(dow===sessEditDow2?' active':'');b.textContent=d;b.onclick=()=>{sessEditDow2=dow;dp.querySelectorAll('.day-pill').forEach(x=>x.className='day-pill');b.className='day-pill active';};dp.appendChild(b);});
   const ip=document.getElementById('sess-int-picker');ip.innerHTML='';['easy','medium','hard'].forEach(int=>{const b=document.createElement('button');b.className='chip'+(int===sessEditInt2?' '+(int==='easy'?'co':int==='medium'?'am':'hot'):'');b.textContent=INT_LABELS[int];b.onclick=()=>{sessEditInt2=int;ip.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip '+(int==='easy'?'co':int==='medium'?'am':'hot');};ip.appendChild(b);});
@@ -3452,7 +3519,10 @@ function openQuickWorkout(){
 
 async function startQuickWorkout(){
   closeModal('modal-quick');
-  const summary=`${quickFocus.label}, ${quickDur} Minuten, knieschonend, Intensität: mittel, Körpergewicht, nur ${Math.round(quickDur/3)} Hauptübungen, kurze Pausen, hohe Intensität`;
+  const qGoal=(plan&&plan.goal)||'fitness';
+  const qRec=recommendExercises(quickDur,quickFocus.label,qGoal,'medium');
+  const qHint=qRec.superset?' Nutze 1-2 antagonistische Supersätze (group), damit die Bewegungsmuster ins Zeitbudget passen.':'';
+  const summary=`${quickFocus.label}, ${quickDur} Minuten, knieschonend, Intensität: mittel, Körpergewicht, genau ${qRec.count} Hauptübungen.${qHint}`;
   await generateWorkout(summary);
   // Mark as bonus after save (via pendingPlanSession flag not set, handled in showPlanLinkModal)
 }
