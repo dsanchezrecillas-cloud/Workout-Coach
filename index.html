@@ -718,10 +718,9 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
   <div id="goals-ach-pane"></div>
   <div id="goals-ch-pane" style="display:none">
-    <button onclick="openNewChallenge()" class="btn btn-ac" style="margin-bottom:14px;padding:12px;font-size:14px">+ Neue Challenge erstellen</button>
-    <div id="challenge-list"></div>
-    <div style="margin-top:14px">
-      <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Vorlagen</div>
+    <div id="challenge-active"></div>
+    <div style="margin-top:6px">
+      <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Vorschläge</div>
       <div id="challenge-templates"></div>
     </div>
   </div>
@@ -885,8 +884,9 @@ button:active:not(:disabled){transform:scale(.96)}
     <div style="display:flex;gap:8px;margin-bottom:18px" id="sess-int-picker"></div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Equipment</div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px" id="sess-equip-picker"></div>
-    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Anzahl Übungen</div>
-    <div style="display:flex;gap:7px;margin-bottom:20px" id="sess-count-picker"></div>
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px">Anzahl Übungen</div>
+    <div style="font-size:11px;color:var(--mu);margin-bottom:10px">Wird aus Dauer, Ziel und Intensität berechnet. Nur ändern, wenn du bewusst mehr oder weniger willst.</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px" id="sess-count-picker"></div>
     <!-- Move to week -->
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">In Woche verschieben</div>
     <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:16px;scrollbar-width:none" id="sess-week-picker"></div>
@@ -2161,7 +2161,14 @@ function initRating(){const tot=Object.values(tReps).reduce((s,v)=>s+v,0);docume
 
 function saveWorkout(){
   const entry={id:Date.now(),date:new Date().toISOString(),muscles:curSetup.muscles||[],durationMin:curSetup.durationMin||20,exercises:curExercises,repLog:{...tReps},rpe,note:document.getElementById('rat-note').value.trim()};
+  // Snapshot challenge completion before adding this workout
+  const _chBefore={};loadChallenges().forEach(ch=>{_chBefore[ch.id]=calcChallengeProgress(ch).pct>=100;});
   log.push(entry);persist();
+  // Celebrate any challenge that crossed 100% with this workout
+  try{
+    const done=loadChallenges().filter(ch=>!_chBefore[ch.id]&&calcChallengeProgress(ch).pct>=100);
+    if(done.length)setTimeout(()=>showErr('🎉 Challenge geschafft: '+done.map(ch=>ch.title).join(', ')),1000);
+  }catch{}
   if(pendingPlanSession){markSessDone(pendingPlanSession.wi,pendingPlanSession.si,true);pendingPlanSession=null;updateHome();setTimeout(fetchCoach,600);show('s-home');return;}
   // PR detection
   const newPRs=[];
@@ -2816,6 +2823,10 @@ function markSessDone(wi,si,done){if(!plan?.weeks[wi]?.sessions[si])return;plan.
 function startSessAt(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;pendingPlanSession={wi,si};
   if(sess.savedWorkout?.exercises?.length){curExercises=[...sess.savedWorkout.exercises];wuExercises=[...(sess.savedWorkout.warmup||[])];curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:sess.durationMin||30};showReview();return;}
+  startPlanSession();
+}
+function _startSessAt_legacy(wi,si){
+  const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;
   const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);
 }
 
@@ -2834,12 +2845,20 @@ let sessEditTargetWi=-1; // -1 = no week change
 function openSessEdit(wi,si){
   sessEditWi=wi;sessEditSi=si;sessEditTargetWi=wi;
   const sess=plan.weeks[wi].sessions[si];
-  sessEditDow2=sess.dow;sessEditInt2=sess.intensity||'medium';sessEditEquip=sess.equipment?[...sess.equipment]:['bodyweight'];sessEditCount=sess.exerciseCount||recommendExercises(sess.durationMin||30,sess.focus,plan?.goal,sess.intensity).count;
+  sessEditDow2=sess.dow;sessEditInt2=sess.intensity||'medium';sessEditEquip=sess.equipment?[...sess.equipment]:['bodyweight'];sessEditCount=sess.autoCount?null:(sess.exerciseCount||null);
   document.getElementById('sess-wi').value=wi;document.getElementById('sess-si').value=si;document.getElementById('sess-modal-title').textContent=sess.focus;
   const dp=document.getElementById('sess-day-picker');dp.innerHTML='';DAYS.forEach((d,dow)=>{const b=document.createElement('button');b.className='day-pill'+(dow===sessEditDow2?' active':'');b.textContent=d;b.onclick=()=>{sessEditDow2=dow;dp.querySelectorAll('.day-pill').forEach(x=>x.className='day-pill');b.className='day-pill active';};dp.appendChild(b);});
   const ip=document.getElementById('sess-int-picker');ip.innerHTML='';['easy','medium','hard'].forEach(int=>{const b=document.createElement('button');b.className='chip'+(int===sessEditInt2?' '+(int==='easy'?'co':int==='medium'?'am':'hot'):'');b.textContent=INT_LABELS[int];b.onclick=()=>{sessEditInt2=int;ip.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip '+(int==='easy'?'co':int==='medium'?'am':'hot');};ip.appendChild(b);});
   const ep=document.getElementById('sess-equip-picker');ep.innerHTML='';EQUIPMENT.forEach(eq=>{const b=document.createElement('button');const active=sessEditEquip.includes(eq.id);b.className='chip'+(active?' ac':'');b.innerHTML=`${eq.icon} ${eq.label}`;b.onclick=()=>{if(sessEditEquip.includes(eq.id)){if(sessEditEquip.length===1)return;sessEditEquip=sessEditEquip.filter(e=>e!==eq.id);b.className='chip';}else{sessEditEquip=[...sessEditEquip,eq.id];b.className='chip ac';};};ep.appendChild(b);});
-  const cp=document.getElementById('sess-count-picker');cp.innerHTML='';[3,4,5,6,7,8].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===sessEditCount?' ac':'');b.textContent=n+' Übungen';b.onclick=()=>{sessEditCount=n;cp.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};cp.appendChild(b);});
+  const cp=document.getElementById('sess-count-picker');cp.innerHTML='';
+  const _rec=recommendExercises(sess.durationMin||30,sess.focus,plan?.goal,sess.intensity);
+  // "Auto" = follow the computed recommendation (clears manual override)
+  const autoBtn=document.createElement('button');
+  autoBtn.className='chip'+(sess.exerciseCount?'':' ac');
+  autoBtn.textContent='⚙ Auto ('+_rec.count+')';
+  autoBtn.onclick=()=>{sessEditCount=null;cp.querySelectorAll('.chip').forEach(x=>x.className='chip');autoBtn.className='chip ac';};
+  cp.appendChild(autoBtn);
+  [3,4,5,6,7,8].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===sessEditCount?' ac':'');b.textContent=n+(n===_rec.count?' ✓':'');b.onclick=()=>{sessEditCount=n;cp.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};cp.appendChild(b);});
   // Week picker
   const wp=document.getElementById('sess-week-picker');wp.innerHTML='';
   if(plan?.weeks){
@@ -2863,7 +2882,7 @@ function openSessEdit(wi,si){
 function saveSessEdit(){
   if(!plan?.weeks[sessEditWi]?.sessions[sessEditSi])return;
   const s=plan.weeks[sessEditWi].sessions[sessEditSi];
-  s.dow=sessEditDow2;s.intensity=sessEditInt2;s.equipment=[...sessEditEquip];s.exerciseCount=sessEditCount;
+  s.dow=sessEditDow2;s.intensity=sessEditInt2;s.equipment=[...sessEditEquip];s.exerciseCount=sessEditCount||recommendExercises(s.durationMin||30,s.focus,plan?.goal,s.intensity).count;s.autoCount=!sessEditCount;
   if(sessEditTargetWi>=0&&sessEditTargetWi!==sessEditWi&&plan.weeks[sessEditTargetWi]){
     const moved={...s};
     plan.weeks[sessEditWi].sessions.splice(sessEditSi,1);
@@ -3528,6 +3547,55 @@ async function startQuickWorkout(){
 }
 
 // ─── Achievements ─────────────────────────────────────────────────────────────
+// ─── Challenge-Vorlagen (App-Vorschläge) ──────────────────────────────────────
+// span: 'month' = laufender Kalendermonat, 'week' = laufende Woche (Mo-So),
+// 'days:N' = ab Aktivierung N Tage. type: workouts|total_reps|streak|minutes|reps
+const CHALLENGE_TEMPLATES=[
+  {id:'m12',icon:'📅',title:'12 im Monat',desc:'12 Workouts in diesem Monat',type:'workouts',target:12,span:'month'},
+  {id:'m16',icon:'🏋️',title:'Fleißmonat',desc:'16 Workouts in diesem Monat',type:'workouts',target:16,span:'month'},
+  {id:'w4',icon:'✅',title:'Volle Woche',desc:'4 Workouts diese Woche',type:'workouts',target:4,span:'week'},
+  {id:'wstrk4',icon:'🔥',title:'4 Wochen dabei',desc:'4 Wochen in Folge mind. 1 Training',type:'week_streak',target:4,span:'days:35'},
+  {id:'wstrk8',icon:'🌊',title:'8 Wochen Konstanz',desc:'8 Wochen in Folge mind. 1 Training',type:'week_streak',target:8,span:'days:63'},
+  {id:'min300',icon:'⏱️',title:'300 Minuten',desc:'300 Trainingsminuten diesen Monat',type:'minutes',target:300,span:'month'},
+  {id:'rep3k',icon:'🎯',title:'3.000 Wdh',desc:'3.000 Wiederholungen diesen Monat',type:'total_reps',target:3000,span:'month'},
+  {id:'d30',icon:'💪',title:'30-Tage-Challenge',desc:'12 Workouts in 30 Tagen',type:'workouts',target:12,span:'days:30'}
+];
+function challengeWindow(span){
+  const today=new Date();
+  if(span==='month'){
+    const s=new Date(today.getFullYear(),today.getMonth(),1);
+    const e=new Date(today.getFullYear(),today.getMonth()+1,0);
+    return{start:dateKey(s),end:dateKey(e)};
+  }
+  if(span==='week'){
+    const dow=(today.getDay()+6)%7; // Mo=0
+    const s=new Date(today);s.setDate(today.getDate()-dow);
+    const e=new Date(s);e.setDate(s.getDate()+6);
+    return{start:dateKey(s),end:dateKey(e)};
+  }
+  const m=/^days:(\d+)$/.exec(span||'');
+  const n=m?parseInt(m[1]):30;
+  const e=new Date(today);e.setDate(today.getDate()+n-1);
+  return{start:dateKey(today),end:dateKey(e)};
+}
+function activateChallenge(tplId){
+  const t=CHALLENGE_TEMPLATES.find(x=>x.id===tplId);if(!t)return;
+  const list=loadChallenges();
+  if(list.some(ch=>ch.active&&ch.tplId===tplId)){showErr('Diese Challenge läuft bereits.');return;}
+  const win=challengeWindow(t.span);
+  list.push({id:'ch'+Date.now(),tplId:t.id,icon:t.icon,title:t.title,desc:t.desc,type:t.type,target:t.target,startDate:win.start,endDate:win.end,active:true,createdTs:Date.now()});
+  saveChallenges(list);
+  renderGoals();
+}
+function abandonChallenge(id){
+  const list=loadChallenges().filter(ch=>ch.id!==id);
+  saveChallenges(list);renderGoals();
+}
+function challengeDaysLeft(ch){
+  const e=new Date(ch.endDate+'T23:59:59'),now=new Date();
+  return Math.max(0,Math.ceil((e-now)/86400000));
+}
+
 const BUILT_IN_ACH=[
   {id:'w1',name:'Erstes Workout',desc:'Ein Training absolviert',icon:'🌱',type:'workouts',target:1},
   {id:'w10',name:'10 Workouts',desc:'Zehn Trainings abgeschlossen',icon:'🔥',type:'workouts',target:10},
@@ -3560,14 +3628,6 @@ function calcAchProgress(ach){
 }
 
 // ─── Challenges ───────────────────────────────────────────────────────────────
-const CHALLENGE_TEMPLATES=[
-  {name:'100 Liegestütz in 30 Tagen',icon:'💪',exercise:'Push-up',type:'reps',target:100,days:30},
-  {name:'50 Klimmzüge Challenge',icon:'🧗',exercise:'Klimmzug',type:'reps',target:50,days:21},
-  {name:'10 Workouts in 3 Wochen',icon:'🔥',exercise:'',type:'workouts',target:10,days:21},
-  {name:'30 Tage Streak',icon:'⚡',exercise:'',type:'streak_days',target:30,days:30},
-  {name:'500 Gesamtwdh in 2 Wochen',icon:'🎯',exercise:'',type:'total_reps',target:500,days:14},
-];
-
 function loadChallenges(){try{return JSON.parse(localStorage.getItem('coach_challenges'))||[];}catch{return[];}}
 function saveChallenges(c){safeSet('coach_challenges',JSON.stringify(c));}
 
@@ -3578,6 +3638,29 @@ function calcChallengeProgress(ch){
     case 'reps':{let r=0;filtered.forEach(w=>{const exArr=w.exercises||[];exArr.forEach((ex,ei)=>{if(!ch.exercise||(ex.name||'').toLowerCase().includes(ch.exercise.toLowerCase())){const rk='1_'+ei;r+=(w.repLog?.[rk]||0)+(w.repLog?.[rk+'_L']||0)+(w.repLog?.[rk+'_R']||0);}});});return{cur:r,pct:Math.min(100,Math.round(r/ch.target*100))};}
     case 'workouts':return{cur:filtered.length,pct:Math.min(100,Math.round(filtered.length/ch.target*100))};
     case 'total_reps':{const r=filtered.flatMap(w=>Object.values(w.repLog||{})).reduce((s,v)=>s+v,0);return{cur:r,pct:Math.min(100,Math.round(r/ch.target*100))};}
+    case 'streak':{
+      // Longest run of consecutive calendar days with a workout inside the window
+      const dayset=new Set(filtered.map(w=>w.date.slice(0,10)));
+      let best=0,run=0;
+      const s=new Date(start+'T12:00:00'),e=new Date(end+'T12:00:00');
+      for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1)){
+        if(dayset.has(dateKey(d))){run++;best=Math.max(best,run);}else run=0;
+      }
+      return{cur:best,pct:Math.min(100,Math.round(best/ch.target*100))};
+    }
+    case 'minutes':{let m=0;filtered.forEach(w=>{m+=(w.durationMin||w.setup?.durationMin||0);});return{cur:m,pct:Math.min(100,Math.round(m/ch.target*100))};}
+    case 'week_streak':{
+      // Longest run of consecutive calendar weeks (Mon-Sun) with >=1 workout in the window.
+      const weeks=new Set(filtered.map(w=>weekKeyOf(w.date.slice(0,10))));
+      let best=0,run=0;
+      const s=new Date(start+'T12:00:00'),e=new Date(end+'T12:00:00');
+      // Step Monday by Monday across the window
+      let wk=new Date(s);const dw=wk.getDay();wk.setDate(wk.getDate()+(dw===0?-6:1-dw));
+      for(;wk<=e;wk.setDate(wk.getDate()+7)){
+        if(weeks.has(dateKey(wk))){run++;best=Math.max(best,run);}else run=0;
+      }
+      return{cur:best,pct:Math.min(100,Math.round(best/ch.target*100))};
+    }
     default:return{cur:0,pct:0};
   }
 }
@@ -3639,32 +3722,51 @@ function renderGoals(){
     </div>`;
   }).join('');
 
-  // Challenges
-  const challenges=loadChallenges();
-  const chEl=document.getElementById('challenge-list');
-  if(!challenges.length){chEl.innerHTML='<div style="text-align:center;padding:14px;color:var(--mu);font-size:13px">Noch keine Challenges. Erstell eine!</div>';}
-  else{chEl.innerHTML=challenges.map((ch,i)=>{
-    const{cur,pct}=calcChallengeProgress(ch);const done=pct>=100;
-    const endDate=new Date(ch.endDate+'T12:00:00');const daysLeft=Math.ceil((endDate-new Date())/86400000);
-    const expired=daysLeft<0&&!done;
-    return`<div class="card" style="margin-bottom:9px;${done?'border-color:rgba(var(--coRGB),.35);':expired?'opacity:.6':''}">
-      <div style="display:flex;align-items:flex-start;gap:11px;margin-bottom:8px">
-        <div style="font-size:22px">${ch.icon||'🎯'}</div>
-        <div style="flex:1">
-          <div style="font-size:14px;font-weight:700;color:var(--tx)">${ch.name}${done?' ✓':''}</div>
-          <div style="font-size:11px;color:var(--mu);margin-top:2px">${done?'Abgeschlossen!':expired?'Abgelaufen':daysLeft===0?'Endet heute!':'Noch '+daysLeft+' Tag(e)'}</div>
+  // Challenges — active
+  const challenges=loadChallenges().filter(ch=>ch.active!==false);
+  const actEl=document.getElementById('challenge-active');
+  if(!challenges.length){
+    actEl.innerHTML='<div style="text-align:center;padding:16px;color:var(--mu);font-size:13px">Keine aktive Challenge. Wähle unten einen Vorschlag.</div>';
+  }else{
+    actEl.innerHTML=challenges.map(ch=>{
+      const{cur,pct}=calcChallengeProgress(ch);const done=pct>=100;
+      const daysLeft=challengeDaysLeft(ch);const expired=daysLeft<=0&&!done;
+      const unit=ch.type==='workouts'?'Workouts':ch.type==='week_streak'?'Wochen in Folge':ch.type==='streak'?'Tage in Folge':ch.type==='minutes'?'Min':'Wdh';
+      return`<div class="card" style="margin-bottom:9px;${done?'border-color:rgba(var(--coRGB),.42);background:linear-gradient(135deg,rgba(var(--coRGB),.08),var(--card));':expired?'opacity:.6':''}">
+        <div style="display:flex;align-items:flex-start;gap:11px;margin-bottom:9px">
+          <div style="font-size:24px">${ch.icon||'🎯'}</div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:700;color:var(--tx)">${ch.title}${done?' ✓':''}</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:2px">${done?'Geschafft! 🎉':expired?'Abgelaufen':daysLeft===1?'Endet morgen':(ch.type==='week_streak'&&daysLeft>=14?'Noch ~'+Math.round(daysLeft/7)+' Wochen':'Noch '+daysLeft+' Tage')}</div>
+          </div>
+          <button onclick="abandonChallenge('${ch.id}')" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
         </div>
-        <button onclick="deleteChallenge(${i})" style="width:24px;height:24px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
-      </div>
-      <div style="height:5px;background:var(--br);border-radius:3px;overflow:hidden;margin-bottom:5px">
-        <div style="height:100%;width:${pct}%;background:${done?'linear-gradient(90deg,var(--co),#10b981)':'linear-gradient(90deg,var(--ac),#a855f7)'};border-radius:3px;transition:width .6s"></div>
-      </div>
-      <div style="font-size:11px;color:var(--mu)">${cur} / ${ch.target}${ch.exercise?' '+ch.exercise:''}</div>
-    </div>`;
-  }).join('');}
+        <div style="height:8px;background:var(--up);border-radius:4px;overflow:hidden;margin-bottom:6px">
+          <div style="height:100%;width:${pct}%;background:${done?'var(--co)':'var(--ac)'};border-radius:4px;transition:width .4s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span style="color:var(--su);font-weight:600">${cur} / ${ch.target} ${unit}</span>
+          <span style="color:${done?'var(--co)':'var(--ac)'};font-weight:700">${pct}%</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
 
-  // Templates
-  document.getElementById('challenge-templates').innerHTML=CHALLENGE_TEMPLATES.map(t=>`<button onclick="openNewChallenge(${JSON.stringify(t).replace(/"/g,'&quot;')})" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 13px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;font-family:var(--f);cursor:pointer"><span style="font-size:18px">${t.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${t.name}</div><div style="font-size:11px;color:var(--mu)">${t.target} ${t.type==='workouts'?'Workouts':'Wdh'} · ${t.days} Tage</div></div><span style="margin-left:auto;color:var(--ac);font-size:14px">+</span></button>`).join('');
+  // Challenges — suggestions (templates not already active)
+  const activeTpls=new Set(challenges.map(ch=>ch.tplId));
+  const tplEl=document.getElementById('challenge-templates');
+  tplEl.innerHTML=CHALLENGE_TEMPLATES.filter(t=>!activeTpls.has(t.id)).map(t=>{
+    const unit=t.type==='workouts'?'Workouts':t.type==='week_streak'?'Wochen in Folge':t.type==='streak'?'Tage in Folge':t.type==='minutes'?'Minuten':'Wdh';
+    const spanTxt=t.span==='month'?'diesen Monat':t.span==='week'?'diese Woche':(/^days:(\d+)$/.exec(t.span)?.[1]||'')+' Tage';
+    return`<button onclick="activateChallenge('${t.id}')" class="card" style="width:100%;display:flex;align-items:center;gap:11px;margin-bottom:8px;text-align:left;cursor:pointer;border:1px solid var(--br)">
+      <div style="font-size:22px">${t.icon}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">${t.title}</div>
+        <div style="font-size:11px;color:var(--mu);margin-top:1px">${t.target} ${unit} · ${spanTxt}</div>
+      </div>
+      <span style="color:var(--ac);font-size:18px;font-weight:700">+</span>
+    </button>`;
+  }).join('')||'<div style="text-align:center;padding:12px;color:var(--mu);font-size:12px">Alle Vorschläge aktiv 💪</div>';
 }
 
 async function deleteChallenge(idx){const ok=await appConfirm('Challenge löschen?');if(!ok)return;const challenges=loadChallenges();challenges.splice(idx,1);saveChallenges(challenges);renderGoals();}
