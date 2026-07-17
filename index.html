@@ -207,11 +207,15 @@ button:active:not(:disabled){transform:scale(.96)}
 
 <!-- REVIEW -->
 <div id="s-review" class="screen">
-  <button class="back" onclick="startChat()">← neu besprechen</button>
+  <button class="back" onclick="reviewBackToChat()">← neu besprechen</button>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
     <div style="font-size:21px;font-weight:700;letter-spacing:-.02em">Dein Workout</div>
   </div>
   <div id="rev-meta" style="font-size:13px;color:var(--mu);margin-bottom:12px"></div>
+  <div id="rev-regen-bar" style="display:none;margin-bottom:14px;padding:11px 13px;border-radius:11px;background:rgba(var(--acRGB),.08);border:1px solid rgba(var(--acRGB),.2);display:flex;align-items:center;gap:10px">
+    <div style="flex:1;font-size:12px;color:var(--su);line-height:1.4">💾 Gespeichertes Workout. Umentschieden?</div>
+    <button onclick="regenPlanSession()" style="flex-shrink:0;padding:8px 12px;border-radius:9px;background:rgba(var(--acRGB),.15);border:1px solid rgba(var(--acRGB),.35);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">🔄 Neu generieren</button>
+  </div>
   <!-- Training structure -->
   <div class="card" style="margin-bottom:16px;padding:12px 14px">
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Trainingsstruktur</div>
@@ -239,7 +243,7 @@ button:active:not(:disabled){transform:scale(.96)}
   </button>
   <div style="display:flex;gap:8px">
     <button onclick="startWorkout()" class="btn btn-ac" style="flex:2">Training starten →</button>
-    <button onclick="openSaveForLater()" style="flex:1;padding:15px;border-radius:13px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f);display:flex;align-items:center;justify-content:center;gap:5px">📅 Einplanen</button>
+    <button onclick="openSaveForLater()" style="flex:1;padding:15px;border-radius:13px;background:rgba(var(--acRGB),.1);border:1.5px solid rgba(var(--acRGB),.3);color:var(--ac);font-size:13px;font-weight:600;font-family:var(--f);display:flex;align-items:center;justify-content:center;gap:5px">💾 Für später speichern</button>
   </div>
   <div style="text-align:center;margin-top:9px">
     <button onclick="saveAsTemplate()" style="color:var(--mu);font-size:12px;background:none;border:none;cursor:pointer;font-family:var(--f)">💾 Als Vorlage speichern</button>
@@ -1762,6 +1766,12 @@ function toggleSuperset(i){
 function showReview(){
   if(wuVisible===undefined)wuVisible=true;
   document.getElementById('rev-meta').textContent=curExercises.length+' Übungen'+(wuExercises.length?' + '+wuExercises.length+' Warmup':'');
+  // Show "regenerate" only when viewing a plan session that has a saved workout
+  const _rb=document.getElementById('rev-regen-bar');
+  if(_rb){
+    const _s=pendingPlanSession&&plan?.weeks[pendingPlanSession.wi]?.sessions[pendingPlanSession.si];
+    _rb.style.display=(_s&&_s.savedWorkout)?'flex':'none';
+  }
   const ws=document.getElementById('wu-sec');
   if(wuExercises.length){ws.style.display='block';
     // Sync toggle button state
@@ -2825,18 +2835,51 @@ function startSessAt(wi,si){
   if(sess.savedWorkout?.exercises?.length){curExercises=[...sess.savedWorkout.exercises];wuExercises=[...(sess.savedWorkout.warmup||[])];curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:sess.durationMin||30};showReview();return;}
   startPlanSession();
 }
+async function regenPlanSession(){
+  if(!pendingPlanSession||!plan){startPlanSession&&startPlanSession();return;}
+  const{wi,si}=pendingPlanSession;
+  const sess=plan.weeks[wi]?.sessions[si];
+  if(sess?.savedWorkout){
+    const ok=await appConfirm('Gespeichertes Workout verwerfen und passend zum Plan neu generieren?');
+    if(!ok)return;
+    delete sess.savedWorkout;savePlan();
+  }
+  // Full plan-aware generation (phase, week, dose, supersets, equipment, profile, journal)
+  startPlanSession();
+}
 function _startSessAt_legacy(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;
   const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);
 }
 
+function reviewBackToChat(){
+  // If this review belongs to a plan session, keep the plan context instead of
+  // starting a blank chat that forgets phase, week, dose, equipment.
+  if(pendingPlanSession&&plan?.weeks[pendingPlanSession.wi]?.sessions[pendingPlanSession.si]){
+    chatFromPlan(pendingPlanSession.wi,pendingPlanSession.si);
+  }else{
+    startChat();
+  }
+}
 function chatFromPlan(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;pendingPlanSession={wi,si};chatHistory=[];chatCtx={};
+  const week=plan.weeks[wi];
   const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Körpergewicht';
   show('s-chat');document.getElementById('chat-msgs').innerHTML='';
   const focusClean=sess.focus.split('&').map(p=>p.trim()).map(p=>MUSCLE_DE[p]||MUSCLE_DE_SHORT[p]||p).join(' & ');
   addAIMsg(`Bereit für "${focusClean}"! ${sess.durationMin||30} Minuten, ${INT_LABELS[sess.intensity||'medium']}, ${equip}. Direkt starten oder noch Wünsche?`,['Direkt erstellen','Ich hab noch Wünsche']);
-  chatCtx.summary=`${focusClean}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}`;
+  // Same plan-aware dosing/periodization the ⚡ path uses, so a chat-built workout
+  // is just as adapted to the plan (phase, week, sets/rest, supersets).
+  const rec=recommendExercises(sess.durationMin||30,sess.focus,plan.goal,sess.intensity);
+  const count=sess.exerciseCount||rec.count;
+  const isDeload=/deload/i.test(week?.theme||'');
+  const phase=isDeload
+    ? 'DELOAD-Woche: Volumen ~50-60% reduzieren, Intensität niedrig, Technik/Mobilität, keine Maximalbelastung.'
+    : `Woche ${wi+1} von ${plan.weeks.length} (${week?.theme||'Aufbau'}). ${wi===0?'Einstieg: Technik vor Last.':'Progressive Überlastung ggü. Vorwoche.'}`;
+  const weekNote=week?.note?` Wochenziel: ${week.note}`:'';
+  const goalTxt=GOALS.find(g=>g.id===(plan.goal||'fitness'))?.label||'Fitness';
+  const ssHint=(sess.wantSuperset||rec.superset)?' Nutze 1-2 antagonistische Supersätze (group), damit alle Muster ins Zeitbudget passen.':'';
+  chatCtx.summary=`${focusClean}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.\nPLANKONTEXT — Ziel: ${goalTxt}. ${phase}${weekNote} Aus Intensität abgeleitet: sets=${rec.sets}, rest≈${rec.rest}s — halte dich daran.${ssHint}`;
   chatHistory.push({role:'assistant',content:`Bereit für "${sess.focus}"!`});
 }
 
@@ -3077,7 +3120,7 @@ function openTemplates(){const templates=loadTemplates();const el=document.getEl
 async function deleteTpl(idx){const ok=await appConfirm('Vorlage löschen?');if(!ok)return;const templates=loadTemplates();templates.splice(idx,1);saveTemplates(templates);openTemplates();}
 function startFromTemplate(idx){const templates=loadTemplates();const t=templates[idx];if(!t)return;curExercises=[...t.exercises];wuExercises=[...(t.warmup||[])];curSetup={muscles:t.muscles,durationMin:Math.round(((t.warmup||[]).length*35+t.exercises.length*60)/60)};closeModal('modal-templates');startWorkout();}
 function planFromTemplate(idx){closeModal('modal-templates');window._planningTemplate=idx;openSaveForLater(loadTemplates()[idx]);}
-function openSaveForLater(template){if(!plan?.weeks?.length){showErr('Kein aktiver Trainingsplan.');return;}const wi=getCurrentWeekIdx();let html=`<div style="font-size:12px;color:var(--mu);margin-bottom:14px">Wähle eine Session, zu der dieses Workout gespeichert wird.</div>`;html+=`<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none">`;plan.weeks.forEach((w,i)=>{html+=`<button onclick="renderSaveLaterWeek(${i},${!!template})" id="sl-tab-${i}" style="white-space:nowrap;padding:7px 13px;border-radius:9px;border:1.5px solid ${i===wi?'var(--ac)':'var(--br)'};background:${i===wi?'rgba(var(--acRGB),.13)':'var(--up)'};color:${i===wi?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f)">Wo ${i+1}</button>`;});html+=`</div><div id="sl-sessions"></div>`;html+=`<div style="margin-top:10px;border-top:1px solid var(--br);padding-top:12px"><button onclick="addNewSessionWithWorkout(${wi},${!!template})" class="btn" style="border:1.5px solid var(--br);color:var(--mu);padding:12px;font-size:13px;font-family:var(--f)">+ Neue Session erstellen</button></div>`;document.getElementById('save-later-body').innerHTML=html;renderSaveLaterWeek(wi,!!template);document.getElementById('modal-save-later').classList.add('open');}
+function openSaveForLater(template){if(!plan?.weeks?.length){showErr('Kein aktiver Trainingsplan.');return;}const wi=getCurrentWeekIdx();let html=`<div style="font-size:12px;color:var(--mu);margin-bottom:14px">Wähle den Trainingstag, an dem du dieses Workout machen willst. Es wird genau so gespeichert und startet später ohne neue Generierung.</div>`;html+=`<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none">`;plan.weeks.forEach((w,i)=>{html+=`<button onclick="renderSaveLaterWeek(${i},${!!template})" id="sl-tab-${i}" style="white-space:nowrap;padding:7px 13px;border-radius:9px;border:1.5px solid ${i===wi?'var(--ac)':'var(--br)'};background:${i===wi?'rgba(var(--acRGB),.13)':'var(--up)'};color:${i===wi?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f)">Wo ${i+1}</button>`;});html+=`</div><div id="sl-sessions"></div>`;html+=`<div style="margin-top:10px;border-top:1px solid var(--br);padding-top:12px"><button onclick="addNewSessionWithWorkout(${wi},${!!template})" class="btn" style="border:1.5px solid var(--br);color:var(--mu);padding:12px;font-size:13px;font-family:var(--f)">+ Neue Session erstellen</button></div>`;document.getElementById('save-later-body').innerHTML=html;renderSaveLaterWeek(wi,!!template);document.getElementById('modal-save-later').classList.add('open');}
 function renderSaveLaterWeek(wi,isTpl){const week=plan.weeks[wi];if(!week)return;plan.weeks.forEach((_,i)=>{const t=document.getElementById('sl-tab-'+i);if(t){t.style.borderColor=i===wi?'var(--ac)':'var(--br)';t.style.background=i===wi?'rgba(var(--acRGB),.13)':'var(--up)';t.style.color=i===wi?'var(--ac)':'var(--mu)';}});const el=document.getElementById('sl-sessions');if(!el)return;el.innerHTML=week.sessions.map((s,si)=>`<button onclick="attachWorkoutToSession(${wi},${si},${isTpl})" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:12px 14px;border-radius:11px;border:1.5px solid ${s.savedWorkout?'var(--co)':'var(--br)'};background:${s.savedWorkout?'rgba(var(--coRGB),.08)':'var(--card)'};margin-bottom:8px;cursor:pointer;font-family:var(--f)"><div style="width:36px;height:36px;border-radius:9px;background:var(--up);border:1px solid var(--br);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--mu);flex-shrink:0">${DAYS[s.dow]}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.focus}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.durationMin||30} min${s.savedWorkout?' · 💾 Gespeichert':''}</div></div><div style="font-size:11px;color:var(--ac);font-weight:600">→</div></button>`).join('');}
 function attachWorkoutToSession(wi,si,isTpl){if(!plan?.weeks[wi]?.sessions[si])return;const idx=window._planningTemplate;const exercises=isTpl&&idx!=null?loadTemplates()[idx]?.exercises:curExercises;const warmup=isTpl&&idx!=null?loadTemplates()[idx]?.warmup:wuExercises;plan.weeks[wi].sessions[si].savedWorkout={exercises:[...(exercises||[])],warmup:[...(warmup||[])],savedAt:todayIso()};savePlan();closeModal('modal-save-later');showErr('✓ Workout in Session gespeichert.');window._planningTemplate=null;}
 function addNewSessionWithWorkout(wi,isTpl){const idx=window._planningTemplate;const exercises=isTpl&&idx!=null?loadTemplates()[idx]?.exercises:curExercises;const warmup=isTpl&&idx!=null?loadTemplates()[idx]?.warmup:wuExercises;const muscles=(isTpl&&idx!=null?loadTemplates()[idx]?.muscles:curSetup.muscles)||[];const todayDow=new Date().getDay();plan.weeks[wi].sessions.push({dow:todayDow,focus:muscles.map(m=>MUSCLE_DE[m]||m).join(' & ')||'Workout',intensity:'medium',durationMin:Math.round(((warmup||[]).length*35+(exercises||[]).length*60)/60)||30,done:false,savedWorkout:{exercises:[...(exercises||[])],warmup:[...(warmup||[])],savedAt:todayIso()}});savePlan();closeModal('modal-save-later');showErr('✓ Neue Session erstellt.');window._planningTemplate=null;}
