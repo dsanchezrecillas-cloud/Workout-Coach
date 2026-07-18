@@ -1671,7 +1671,7 @@ async function generateWorkout(summaryOverride){
       if(!ex.name||seen.has(ex.name)||ex.warmup)return;
       seen.add(ex.name);
       const rl=w.repLog||{};let last=0;
-      Object.entries(rl).forEach(([k,v])=>{const m=k.match(/^\d+_(\d+)_s\d+(_L|_R)?$/);if(m&&parseInt(m[1])===ei&&v>last)last=v;});
+      Object.entries(rl).forEach(([k,v])=>{const p=parseRepKey(k);if(p&&p.ex===ei&&v>last)last=v;});
       const pr=getPR(ex.name);
       if(last>0||pr)perfLines.push(`${ex.name}: zuletzt ${last||'?'} Wdh${pr?', PR '+pr:''}`);
     });
@@ -2310,33 +2310,80 @@ function addAsExtraSession(wi,muscles){if(!plan?.weeks[wi])return;const todayDow
 function showHistory(){const rd=log.slice(-8).map(w=>({l:fmtD(w.date),v:w.rpe,c:rpc(w.rpe)}));const hw=document.getElementById('hist-chart');if(rd.length>1){hw.style.display='block';setTimeout(()=>drawBars('rpe-chart',rd,60),30);}else hw.style.display='none';document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.values(w.repLog||{}).reduce((s,v)=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${(w.muscles||[]).map(m=>MUSCLE_DE_SHORT[m]||m).join(', ')||'Workout'}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{const per=repsPerExercise(w).filter(p=>p.reps>0);if(!per.length)return'';return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${per.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''}</span><span style="color:var(--su);font-weight:600;margin-left:8px">${p.reps} Wdh</span></div>`).join('')}</div>`;})()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${w.note}</div>`:''}</div>`;}).join('');show('s-history');}
 async function delW(idx){const ok=await appConfirm('Training löschen?','Diese Aktion kann nicht rückgängig gemacht werden.');if(!ok)return;log.splice(idx,1);persist();updateHome();showHistory();}
 async function delLastWorkout(){if(!log.length)return;const last=log[log.length-1];const ok=await appConfirm('Letztes Training löschen?','RPE '+(last.rpe||'?')+'/10 · '+fmtD(last.date));if(!ok)return;log.pop();persist();updateHome();}
-// ─── Wiederholungen je Übung ──────────────────────────────────────────────────
-// repLog keys look like "<round>_<exIndex>" plus optional "_L"/"_R" for
-// two-sided exercises. Sum them per exercise across all rounds.
-function repsPerExercise(w){
-  const out=(w.exercises||[]).map(ex=>({name:ex.name||'Übung',bilateral:!!ex.bilateral,reps:0}));
+// ─── Wiederholungen je Übung / je Satz ────────────────────────────────────────
+// repLog keys: "<round>_<exIdx>_s<set>"  (+ "_L"/"_R" for two-sided,
+// "_w" for weight). Older entries may lack the "_s<set>" part.
+const REP_KEY_RX=/^(\d+)_(\d+)(?:_s(\d+))?(?:_([LR]))?$/;
+function parseRepKey(k){
+  if(/_w$/.test(k))return null;                 // weight, not reps
+  const m=REP_KEY_RX.exec(k);
+  if(!m)return null;
+  return{round:+m[1],ex:+m[2],set:m[3]?+m[3]:1,side:m[4]||null};
+}
+// Flat list of logged sets for one exercise, sorted by round/set
+function setsOfExercise(w,exIdx){
+  const map={};
   Object.entries(w.repLog||{}).forEach(([k,v])=>{
-    const m=/^\d+_(\d+)(?:_[LR])?$/.exec(k);
-    if(!m)return;
-    const i=parseInt(m[1]);
-    if(out[i])out[i].reps+=(v||0);
+    const p=parseRepKey(k);
+    if(!p||p.ex!==exIdx)return;
+    const id=p.round+'_'+p.set;
+    const e=map[id]||(map[id]={round:p.round,set:p.set,reps:0,L:null,R:null});
+    if(p.side==='L')e.L=v; else if(p.side==='R')e.R=v; else e.reps=v;
+  });
+  return Object.values(map).sort((a,b)=>a.round-b.round||a.set-b.set);
+}
+function repsPerExercise(w){
+  const out=(w.exercises||[]).map((ex,i)=>({
+    name:ex.name||'Übung',
+    bilateral:!!ex.bilateral,
+    plannedSets:ex.sets||1,
+    reps:0
+  }));
+  Object.entries(w.repLog||{}).forEach(([k,v])=>{
+    const p=parseRepKey(k);
+    if(!p||!out[p.ex])return;
+    out[p.ex].reps+=(v||0);
   });
   return out;
 }
 function renderEditReps(idx){
   const w=log[idx];const el=document.getElementById('edit-reps-list');
   if(!el)return;
-  const per=repsPerExercise(w);
-  if(!per.length){el.innerHTML='<div style="font-size:12px;color:var(--mu);padding:4px 0">Keine Übungen gespeichert.</div>';return;}
-  el.innerHTML=per.map((p,i)=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--br)">
-    <div style="flex:1;font-size:13px;color:var(--tx);min-width:0">${p.name}${p.bilateral?' ↔':''}</div>
-    <button onclick="adjEditRep(${i},-1)" style="width:28px;height:28px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:15px;flex-shrink:0">−</button>
-    <input id="edrep-${i}" type="number" inputmode="numeric" value="${p.reps}" style="width:52px;text-align:center;background:var(--up);border:1px solid var(--br);border-radius:8px;padding:6px 2px;color:var(--tx);font-size:14px;font-weight:600;font-family:var(--m)"/>
-    <button onclick="adjEditRep(${i},1)" style="width:28px;height:28px;border-radius:8px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:15px;flex-shrink:0">+</button>
-  </div>`).join('');
+  const exs=w.exercises||[];
+  if(!exs.length){el.innerHTML='<div style="font-size:12px;color:var(--mu);padding:4px 0">Keine Übungen gespeichert.</div>';return;}
+  el.innerHTML=exs.map((ex,i)=>{
+    let sets=setsOfExercise(w,i);
+    // Show at least the planned number of sets so missed entries can be added
+    const want=Math.max(sets.length,ex.sets||1);
+    for(let s=sets.length+1;s<=want;s++)sets.push({round:1,set:s,reps:0,L:null,R:null});
+    const bi=!!ex.bilateral;
+    const rows=sets.map(st=>{
+      const id=i+'_'+st.round+'_'+st.set;
+      if(bi){
+        return`<div style="display:flex;align-items:center;gap:6px;padding:4px 0">
+          <div style="font-size:11px;color:var(--mu);width:44px;flex-shrink:0">Satz ${st.set}</div>
+          <span style="font-size:10px;color:var(--mu)">L</span>
+          <input id="edset-${id}-L" type="number" inputmode="numeric" value="${st.L??0}" style="width:44px;text-align:center;background:var(--up);border:1px solid var(--br);border-radius:7px;padding:5px 2px;color:var(--tx);font-size:13px;font-family:var(--m)"/>
+          <span style="font-size:10px;color:var(--mu)">R</span>
+          <input id="edset-${id}-R" type="number" inputmode="numeric" value="${st.R??0}" style="width:44px;text-align:center;background:var(--up);border:1px solid var(--br);border-radius:7px;padding:5px 2px;color:var(--tx);font-size:13px;font-family:var(--m)"/>
+        </div>`;
+      }
+      return`<div style="display:flex;align-items:center;gap:7px;padding:4px 0">
+        <div style="font-size:11px;color:var(--mu);width:44px;flex-shrink:0">Satz ${st.set}</div>
+        <button onclick="adjEditSet('${id}',-1)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;flex-shrink:0">−</button>
+        <input id="edset-${id}" type="number" inputmode="numeric" value="${st.reps||0}" style="width:48px;text-align:center;background:var(--up);border:1px solid var(--br);border-radius:7px;padding:5px 2px;color:var(--tx);font-size:13px;font-weight:600;font-family:var(--m)"/>
+        <button onclick="adjEditSet('${id}',1)" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:14px;flex-shrink:0">+</button>
+        <span style="font-size:11px;color:var(--mu)">Wdh</span>
+      </div>`;
+    }).join('');
+    return`<div style="padding:8px 0;border-bottom:1px solid var(--br)">
+      <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:3px">${ex.name||'Übung'}${bi?' ↔':''}</div>
+      ${rows}
+    </div>`;
+  }).join('');
 }
-function adjEditRep(i,d){
-  const inp=document.getElementById('edrep-'+i);if(!inp)return;
+function adjEditSet(id,d){
+  const inp=document.getElementById('edset-'+id);if(!inp)return;
   inp.value=Math.max(0,(parseInt(inp.value)||0)+d);
 }
 
@@ -2346,21 +2393,32 @@ function saveEdit(){
   const w=log[idx];
   w.rpe=editRpe;
   w.note=document.getElementById('edit-note').value.trim();
-  // Write back per-exercise reps: replace all keys for an exercise whose total changed
-  const per=repsPerExercise(w);
-  per.forEach((p,i)=>{
-    const inp=document.getElementById('edrep-'+i);if(!inp)return;
-    const val=Math.max(0,parseInt(inp.value)||0);
-    if(val===p.reps)return;                       // unchanged -> keep original split
-    Object.keys(w.repLog||{}).forEach(k=>{
-      const m=/^\d+_(\d+)(?:_[LR])?$/.exec(k);
-      if(m&&parseInt(m[1])===i)delete w.repLog[k];
+  // Rewrite reps per set, keeping weight entries (_w) untouched
+  const exs=w.exercises||[];
+  w.repLog=w.repLog||{};
+  exs.forEach((ex,i)=>{
+    const bi=!!ex.bilateral;
+    let sets=setsOfExercise(w,i);
+    const want=Math.max(sets.length,ex.sets||1);
+    for(let s=sets.length+1;s<=want;s++)sets.push({round:1,set:s});
+    // drop existing rep keys for this exercise (weights stay)
+    Object.keys(w.repLog).forEach(k=>{
+      const p=parseRepKey(k);
+      if(p&&p.ex===i)delete w.repLog[k];
     });
-    if(val>0){
-      w.repLog=w.repLog||{};
-      if(p.bilateral){const h=Math.round(val/2);w.repLog['1_'+i+'_L']=h;w.repLog['1_'+i+'_R']=val-h;}
-      else w.repLog['1_'+i]=val;
-    }
+    sets.forEach(st=>{
+      const id=i+'_'+st.round+'_'+st.set;
+      const base=st.round+'_'+i+'_s'+st.set;
+      if(bi){
+        const l=Math.max(0,parseInt(document.getElementById('edset-'+id+'-L')?.value)||0);
+        const r=Math.max(0,parseInt(document.getElementById('edset-'+id+'-R')?.value)||0);
+        if(l)w.repLog[base+'_L']=l;
+        if(r)w.repLog[base+'_R']=r;
+      }else{
+        const v=Math.max(0,parseInt(document.getElementById('edset-'+id)?.value)||0);
+        if(v)w.repLog[base]=v;
+      }
+    });
   });
   persist();closeModal('modal-edit');showHistory();updateHome();
 }
