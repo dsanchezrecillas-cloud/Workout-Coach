@@ -131,6 +131,16 @@ button:active:not(:disabled){transform:scale(.96)}
     <button onclick="openDiaryFromCheckin()" style="width:100%;margin-top:9px;font-size:11px;color:var(--mu);background:none;border:none;text-decoration:underline">oder frei schreiben</button>
   </div>
 
+  <!-- Plan adjustment suggestion (soreness / recovery) -->
+  <div id="adjust-card" class="card" style="display:none;margin-bottom:12px;border-color:rgba(var(--amRGB),.3);background:linear-gradient(135deg,rgba(var(--amRGB),.09),var(--card))">
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
+      <span style="font-size:15px">🔄</span>
+      <span style="font-size:10px;letter-spacing:.1em;color:var(--am);text-transform:uppercase;font-weight:700">Plan anpassen?</span>
+    </div>
+    <div id="adjust-text" style="font-size:13px;color:var(--su);line-height:1.5;margin-bottom:11px"></div>
+    <div style="display:flex;gap:7px" id="adjust-actions"></div>
+  </div>
+
   <!-- Coach card -->
   <div class="card" id="coach-card" style="margin-bottom:12px;background:linear-gradient(135deg,var(--grad1),var(--card));border-color:var(--br)">
     <div style="display:flex;align-items:center;gap:7px;margin-bottom:9px">
@@ -906,7 +916,8 @@ button:active:not(:disabled){transform:scale(.96)}
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Equipment</div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px" id="sess-equip-picker"></div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px">Anzahl Übungen</div>
-    <div style="font-size:11px;color:var(--mu);margin-bottom:10px">Wird aus Dauer, Ziel und Intensität berechnet. Nur ändern, wenn du bewusst mehr oder weniger willst.</div>
+    <div style="font-size:11px;color:var(--mu);margin-bottom:4px">Wird aus Dauer, Ziel und Intensität berechnet. Nur ändern, wenn du bewusst mehr oder weniger willst.</div>
+    <div id="sess-count-why" style="font-size:11px;color:var(--ac);margin-bottom:10px"></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px" id="sess-count-picker"></div>
     <!-- Move to week -->
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">In Woche verschieben</div>
@@ -1448,6 +1459,7 @@ function renderWeekReport(){
 function updateHome(){
   try{renderWeekReport();}catch(e){}
   try{updateCheckinCard();}catch(e){}
+  try{renderAdjustCard();}catch(e){}
   try{renderWeekReport();}catch(e){}
   const hasKey=!!loadKey(),last=log[log.length-1];
   document.getElementById('no-key').style.display=hasKey?'none':'flex';
@@ -1735,6 +1747,137 @@ Wenn ready:true, fülle summary mit allem nötigen für das Workout.`;
       setTimeout(()=>{const w=document.getElementById('chat-msgs');const btn=document.createElement('button');btn.className='btn btn-ac fade';btn.style.cssText='margin:6px 0;width:100%';btn.textContent='💪 Workout erstellen';btn.onclick=()=>{btn.remove();generateWorkout();};w.appendChild(btn);w.scrollTop=9999;},400);
     }
   }catch(e){typing.remove();addAIMsg('Fehler: '+e.message,['Ganzkörper','Oberkörper','Core']);}
+}
+
+// ─── Plan-Autoregulation ──────────────────────────────────────────────────────
+// Welche Muskelregionen trifft eine geplante Session? Aus dem Fokus-Namen
+// abgeleitet, damit wir Sessions sinnvoll tauschen können.
+function renderAdjustCard(){
+  const el=document.getElementById('adjust-card');if(!el)return;
+  const sug=suggestPlanAdjustment();
+  if(!sug){el.style.display='none';return;}
+  const dayName=['So','Mo','Di','Mi','Do','Fr','Sa'][sug.next.s.dow];
+  const soreTxt=sug.hit.slice(0,3).map(m=>MUSCLE_DE_SHORT[m]||MUSCLE_DE[m]||m).join(', ');
+  const txt=document.getElementById('adjust-text');
+  const acts=document.getElementById('adjust-actions');
+  if(sug.alt){
+    txt.innerHTML=`Als Nächstes steht <b>${sug.next.s.focus}</b> (${dayName}) an — trifft aber ${soreTxt}, was gerade belastet ist. <b>${sug.alt.s.focus}</b> wäre erholt.`;
+    acts.innerHTML=`
+      <button onclick="applyPlanSwap()" style="flex:1;padding:10px;border-radius:10px;background:rgba(var(--amRGB),.18);border:1px solid rgba(var(--amRGB),.4);color:var(--am);font-size:12px;font-weight:600;font-family:var(--f)">🔄 Tauschen</button>
+      <button onclick="applyPlanDelay()" style="flex:1;padding:10px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">📅 Verschieben</button>
+      <button onclick="dismissAdjust()" style="padding:10px 12px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-family:var(--f)">✕</button>`;
+  }else{
+    txt.innerHTML=`Als Nächstes steht <b>${sug.next.s.focus}</b> (${dayName}) an — trifft aber ${soreTxt}, was gerade belastet ist. Kein passender Tausch im Plan.`;
+    acts.innerHTML=`
+      <button onclick="applyPlanDelay()" style="flex:1;padding:10px;border-radius:10px;background:rgba(var(--amRGB),.18);border:1px solid rgba(var(--amRGB),.4);color:var(--am);font-size:12px;font-weight:600;font-family:var(--f)">📅 Später trainieren</button>
+      <button onclick="dismissAdjust()" style="padding:10px 12px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-family:var(--f)">✕</button>`;
+  }
+  el.style.display='block';
+}
+function dismissAdjust(){
+  try{safeSet('coach_adjust_dismissed',todayIso());}catch{}
+  const el=document.getElementById('adjust-card');if(el)el.style.display='none';
+}
+
+function focusMuscleGroups(focus){
+  const f=(focus||'').toLowerCase();
+  const upper=['chest','back','shoulders','arms','lats','biceps','triceps','upper_back'];
+  const lower=['quads','hams','glutes','calves','legs'];
+  if(/ganzkörper|ganzkorper|fullbody|^gk\b/.test(f))return[...upper,...lower,'core'];
+  if(/unter|lower|bein|leg|glute|gesäß|quad|waden|hamstring/.test(f))return lower;
+  if(/ober|upper|push|drück|brust|chest|schulter|trizeps/.test(f))return['chest','shoulders','triceps','arms'];
+  if(/pull|zieh|rücken|ruecken|back|lat|bizeps/.test(f))return['back','lats','biceps','upper_back','arms'];
+  if(/core|bauch|rumpf/.test(f))return['core','abs','obliques'];
+  return[...upper,...lower];
+}
+// Soreness reported in today's journal, mapped to muscle regions
+function soreMusclesFromJournal(){
+  const out=new Set();
+  const today=loadJournal().filter(e=>e.date===todayIso());
+  if(!today.length)return out;
+  const txt=today.map(e=>e.text||'').join(' ').toLowerCase();
+  if(!/muskelkater|sore|zwiebel|kaputt|platt|erschöpft|übersäuert|schwer in den/.test(txt))return out;
+  const map={
+    'brust':['chest'],'chest':['chest'],
+    'rücken':['back','lats','upper_back'],'ruecken':['back','lats','upper_back'],'lat':['lats'],
+    'schulter':['shoulders'],'arm':['arms','biceps','triceps'],'bizeps':['biceps'],'trizeps':['triceps'],
+    'bein':['quads','hams','glutes','legs'],'quad':['quads'],'oberschenkel':['quads','hams'],
+    'gesäß':['glutes'],'po':['glutes'],'wade':['calves'],'hamstring':['hams'],
+    'bauch':['core'],'core':['core'],'rumpf':['core'],
+    'oberkörper':['chest','back','shoulders','arms','lats','biceps','triceps'],
+    'unterkörper':['quads','hams','glutes','calves']
+  };
+  let named=false;
+  Object.entries(map).forEach(([k,v])=>{if(txt.includes(k)){v.forEach(m=>out.add(m));named=true;}});
+  // Soreness mentioned but no body part named -> assume the last session's muscles
+  if(!named){
+    const last=[...log].reverse()[0];
+    (last?.muscles||[]).forEach(m=>out.add(m));
+    (last?.exercises||[]).forEach(ex=>(ex.muscles||[]).forEach(m=>out.add(m)));
+  }
+  return out;
+}
+// Suggest a plan adjustment when the next session hits sore/recently stressed muscles.
+// Preference: swap with a later session that trains something else > push it back.
+function suggestPlanAdjustment(){
+  if(!plan?.weeks?.length)return null;
+  try{if(localStorage.getItem('coach_adjust_dismissed')===todayIso())return null;}catch{}
+  const sore=new Set([...soreMusclesFromJournal(),...recentStressedMuscles()]);
+  if(!sore.size)return null;
+  // Find the next open session
+  const now=new Date(todayIso()+'T12:00:00');   // getSessionDate uses noon too
+  let next=null;
+  plan.weeks.forEach((wk,wi)=>(wk.sessions||[]).forEach((s,si)=>{
+    if(s.done)return;
+    const d=getSessionDate(wi,s.dow);
+    if(!d||d<now)return;                       // today or later
+    if(!next||d<next.date)next={wi,si,s,date:d};
+  }));
+  if(!next)return null;
+  // Does it hit sore muscles?
+  const hit=focusMuscleGroups(next.s.focus).filter(m=>sore.has(m));
+  if(hit.length<2)return null;                 // minor overlap -> no need to act
+  const daysAway=Math.round((next.date-now)/86400000);
+  if(daysAway>1)return null;                   // far enough out, recovery will handle it
+  // Look for a later session that avoids the sore muscles -> swap candidate
+  let alt=null;
+  plan.weeks.forEach((wk,wi)=>(wk.sessions||[]).forEach((s,si)=>{
+    if(s.done||(wi===next.wi&&si===next.si))return;
+    const d=getSessionDate(wi,s.dow);
+    if(!d||d<=next.date)return;
+    const overlap=focusMuscleGroups(s.focus).filter(m=>sore.has(m));
+    if(overlap.length>=2)return;               // also hits sore muscles
+    if(!alt||d<alt.date)alt={wi,si,s,date:d};
+  }));
+  return{next,alt,sore:[...sore],hit};
+}
+function applyPlanSwap(){
+  const sug=suggestPlanAdjustment();
+  if(!sug||!sug.alt)return;
+  const a=plan.weeks[sug.next.wi].sessions[sug.next.si];
+  const b=plan.weeks[sug.alt.wi].sessions[sug.alt.si];
+  // Swap the days (and weeks if they differ) so the fresh focus comes first
+  const tmpDow=a.dow;a.dow=b.dow;b.dow=tmpDow;
+  if(sug.next.wi!==sug.alt.wi){
+    plan.weeks[sug.next.wi].sessions[sug.next.si]=b;
+    plan.weeks[sug.alt.wi].sessions[sug.alt.si]=a;
+  }
+  savePlan();updateHome();
+  if(document.getElementById('s-plan')?.classList.contains('active'))renderPlanView(currentWeekIdx||0);
+  showErr('✓ Getauscht: '+b.focus+' kommt zuerst.');
+}
+function applyPlanDelay(){
+  const sug=suggestPlanAdjustment();
+  if(!sug)return;
+  const s=plan.weeks[sug.next.wi].sessions[sug.next.si];
+  const order=[1,2,3,4,5,6,0];
+  const pos=order.indexOf(s.dow);
+  // Push back by two days, staying inside the week where possible
+  const newPos=Math.min(6,pos+2);
+  s.dow=order[newPos];
+  savePlan();updateHome();
+  if(document.getElementById('s-plan')?.classList.contains('active'))renderPlanView(currentWeekIdx||0);
+  showErr('✓ Verschoben auf '+['Mo','Di','Mi','Do','Fr','Sa','So'][newPos]+' — mehr Erholung.');
 }
 
 function recentStressedMuscles(){
@@ -3291,9 +3434,14 @@ function openSessEdit(wi,si){
   // "Auto" = follow the computed recommendation (clears manual override)
   const autoBtn=document.createElement('button');
   autoBtn.className='chip'+(sess.exerciseCount?'':' ac');
-  autoBtn.textContent='⚙ Auto ('+_rec.count+')';
+  autoBtn.textContent='⚙ Auto — '+_rec.count+' Übungen';
   autoBtn.onclick=()=>{sessEditCount=null;cp.querySelectorAll('.chip').forEach(x=>x.className='chip');autoBtn.className='chip ac';};
   cp.appendChild(autoBtn);
+  const why=document.getElementById('sess-count-why');
+  if(why){
+    const mins=sess.durationMin||30;
+    why.textContent=`${mins} min · ${_rec.sets} Sätze · ${_rec.rest}s Pause ≈ ${_rec.perExMin} min je Übung`+(_rec.superset?' → Supersätze empfohlen, damit alles reinpasst':'');
+  }
   [3,4,5,6,7,8].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===sessEditCount?' ac':'');b.textContent=n+(n===_rec.count?' ✓':'');b.onclick=()=>{sessEditCount=n;cp.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};cp.appendChild(b);});
   // Week picker
   const wp=document.getElementById('sess-week-picker');wp.innerHTML='';
