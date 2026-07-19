@@ -113,7 +113,7 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
 
   <div style="display:flex;gap:8px;margin-bottom:14px">
-    <div style="flex:1;background:var(--up);border:1px solid var(--br);border-radius:11px;padding:12px"><div style="font-size:9px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:5px">Streak</div><div style="font-size:16px;font-weight:700;color:var(--am)" id="h-streak">—</div></div>
+    <div id="h-streak-tile" style="flex:1;background:var(--up);border:1px solid var(--br);border-radius:11px;padding:12px"><div style="font-size:9px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:5px">Streak</div><div style="font-size:16px;font-weight:700;color:var(--am)" id="h-streak">—</div></div>
     <div style="flex:1;background:var(--up);border:1px solid var(--br);border-radius:11px;padding:12px"><div style="font-size:9px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:5px">Workouts</div><div style="font-size:16px;font-weight:700;color:var(--ac)" id="h-total">0</div></div>
     <div style="flex:1;background:var(--up);border:1px solid var(--br);border-radius:11px;padding:12px"><div style="font-size:9px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:5px">Zuletzt</div><div style="font-size:16px;font-weight:700;color:var(--co)" id="h-last">—</div></div>
   </div>
@@ -1027,9 +1027,15 @@ function dateKey(d){
 }
 
 function streak(){
-  if(!log.length)return 0;let s=0;
-  const d=[...new Set(log.map(w=>new Date(w.date).toDateString()))].reverse();
-  for(let i=0;i<d.length;i++){if(d[i]===new Date(Date.now()-i*86400000).toDateString())s++;else break;}
+  if(!log.length)return 0;
+  const days=new Set(log.map(w=>dateKey(new Date(w.date))));
+  const today=new Date(todayIso()+'T12:00:00');
+  // If today has no workout yet, the streak still counts from yesterday —
+  // the day isn't over. It only breaks after a full day without training.
+  let cursor=new Date(today);
+  if(!days.has(dateKey(cursor)))cursor.setDate(cursor.getDate()-1);
+  let s=0;
+  while(days.has(dateKey(cursor))){s++;cursor.setDate(cursor.getDate()-1);}
   return s;
 }
 
@@ -1134,7 +1140,7 @@ function histTxt(){
     const d=new Date(w.date.split('T')[0]+'T12:00:00');
     const daysAgo=Math.round((now-d)/86400000);
     const when=daysAgo===0?'heute':daysAgo===1?'gestern':`vor ${daysAgo} Tagen`;
-    const muscles=(w.muscles||[]).map(m=>MUSCLE_DE_SHORT[m]||m).join(', ')||'?';
+    const muscles=mainMuscles(w.muscles,3).join(', ')||'?';
     return`${when} | ${muscles} | RPE ${w.rpe}/10`+(w.note?` | "${w.note}"`:'')+` | ${w.durationMin||'?'} min`;
   }).join('\n');
 }
@@ -1464,6 +1470,8 @@ function updateHome(){
   const hasKey=!!loadKey(),last=log[log.length-1];
   document.getElementById('no-key').style.display=hasKey?'none':'flex';
   document.getElementById('h-streak').textContent=streak()>0?streak()+'d 🔥':'—';
+  {const _st=streak(),_tile=document.getElementById('h-streak-tile');
+   if(_tile)_tile.style.display=_st>0?'block':'none';}
   document.getElementById('h-total').textContent=log.length;
   document.getElementById('h-last').textContent=last?(dSince(last.date)===0?'heute':'vor '+dSince(last.date)+'T'):'—';
   document.getElementById('hist-btn').style.display=log.length>0?'block':'none';
@@ -1475,7 +1483,7 @@ function updateHome(){
   document.getElementById('greeting').textContent=(h<12?'Guten Morgen':h<18?'Guten Tag':'Guten Abend')+', Dario.';
   if(last){
     document.getElementById('last-card').style.display='block';
-    document.getElementById('l-name').textContent=(last.muscles||[]).map(m=>MUSCLE_DE_SHORT[m]||m).join(', ')||'Workout';
+    document.getElementById('l-name').textContent=mainMuscles(last.muscles,3).join(', ')||'Workout';
     const rc=rpc(last.rpe);
     document.getElementById('l-tags').innerHTML=mkT(fmtD(last.date),'#64748b')+' '+mkT((last.durationMin||'?')+' min','#64748b')+' '+mkT('RPE '+last.rpe+'/10',rc)+(last.note?' '+mkT('📝','var(--mu)'):'');
     document.getElementById('l-rpe').textContent=last.rpe+'/10';
@@ -1629,7 +1637,7 @@ async function fetchCoach(force){
     const h=new Date().getHours(),timeOfDay=h<12?'Morgen':h<18?'Mittag':'Abend';
     const profCtx=profileTxt();
     const planCtx=plan?`Aktiver Plan: ${plan.title||''}, Woche ${getCurrentWeekIdx()+1}/${plan.weeks.length}, ${plan.weeks.flatMap(w=>w.sessions).filter(s=>s.done).length} Sessions abgeschlossen.`:'Kein aktiver Trainingsplan.';
-    /*COACH*/const raw=await callAPI([{role:'user',content:`Heute ist ${todayIso()}, ${timeOfDay}. Du bist Trainingswissenschaftler und persönlicher Coach.${profCtx?'\n\nNutzer-Profil: '+profCtx:''}\n\nAktiver Trainingsplan: ${planCtx}\n\nSTATUS HEUTE: ${todayStatusTxt()}\n\nTrainingsverlauf (neueste zuerst):\n${histTxt()}${journalCtx()?'\n\nTagebuch des Nutzers (neueste Einträge): '+journalCtx():''}\n\nGib eine kurze, persönliche Empfehlung für heute. Wende diese Regeln an: Letztes RPE >=9 -> heute leicht oder Pause. Gleiche Muskelgruppe vor <48h trainiert -> andere Muskelgruppe oder Erholung. 3+ Trainingstage in Folge -> Pausentag empfehlen. Mehr als 5 Tage Pause -> sanfter Wiedereinstieg, nicht ueberkompensieren. Notizen und Tagebucheinträge zu Schmerzen, Schlafmangel oder Stress ernst nehmen und die Empfehlung daran anpassen (Schmerz -> betroffene Region schonen; schlechter Schlaf -> Intensität runter). Wenn laut STATUS HEUTE bereits trainiert wurde: NICHT zu einem weiteren Workout raten, sondern Erholung/Ernährung/Ausblick. Ist heute ein geplanter Trainingstag und noch offen, beziehe dich darauf. Ernährungstipps MÜSSEN zur angegebenen Ernährungsform passen (bei vegetarisch keine Fleisch-/Fischempfehlung, bei vegan zusätzlich keine Milch/Ei). Ohne Angabe zur Ernährung keine spezifischen Lebensmittel-Empfehlungen. Sei konkret, keine Floskeln.\n\nNUR JSON: {"message":"2-3 persönliche Sätze DE","tip":"1 konkreter Tipp DE"}`}],500);
+    /*COACH*/const raw=await callAPI([{role:'user',content:`Heute ist ${todayIso()}, ${timeOfDay}. Du bist Trainingswissenschaftler und persönlicher Coach.${profCtx?'\n\nNutzer-Profil: '+profCtx:''}\n\nAktiver Trainingsplan: ${planCtx}\n\nSTATUS HEUTE: ${todayStatusTxt()}\n\nTrainingsverlauf (neueste zuerst):\n${histTxt()}${journalCtx()?'\n\nTagebuch des Nutzers (neueste Einträge): '+journalCtx():''}\n\nGib eine kurze, persönliche Empfehlung für heute. Wende diese Regeln an: Letztes RPE >=9 -> heute leicht oder Pause. Gleiche Muskelgruppe vor <48h trainiert -> andere Muskelgruppe oder Erholung. 3+ Trainingstage in Folge -> Pausentag empfehlen. Mehr als 5 Tage Pause -> sanfter Wiedereinstieg, nicht ueberkompensieren. Notizen und Tagebucheinträge zu Schmerzen, Schlafmangel oder Stress ernst nehmen und die Empfehlung daran anpassen (Schmerz -> betroffene Region schonen; schlechter Schlaf -> Intensität runter). Wenn laut STATUS HEUTE bereits trainiert wurde: NICHT zu einem weiteren Workout raten, sondern Erholung/Ernährung/Ausblick. Ist heute ein geplanter Trainingstag und noch offen, beziehe dich darauf. Ernährungstipps MÜSSEN zur angegebenen Ernährungsform passen (bei vegetarisch keine Fleisch-/Fischempfehlung, bei vegan zusätzlich keine Milch/Ei). Ohne Angabe zur Ernährung keine spezifischen Lebensmittel-Empfehlungen. Sei konkret, keine Floskeln. LÄNGE: message MAXIMAL 2 kurze Sätze (zusammen unter 30 Wörtern). tip MAXIMAL 1 Satz unter 15 Wörtern. Keine Wiederholungen, keine Einleitungen wie 'dein Körper sendet ein Signal'.\n\nNUR JSON: {"message":"2-3 persönliche Sätze DE","tip":"1 konkreter Tipp DE"}`}],500);
     const s=extractJSON(raw);const obj=Array.isArray(s)?s[0]:s;
     document.getElementById('c-text').textContent=obj.message||'—';
     if(obj.tip){document.getElementById('c-tip').style.display='block';document.getElementById('c-tip').textContent='💡 '+obj.tip;}
@@ -1654,7 +1662,7 @@ function sendChat(){const v=document.getElementById('chat-in').value.trim();if(!
 function handleChatDelete(){
   if(!log.length){addAIMsg('Du hast noch keine Trainings gespeichert.',['Neues Training starten']);return;}
   const last=log[log.length-1];
-  const muscles=(last.muscles||[]).map(m=>MUSCLE_DE[m]||MUSCLE_DE_SHORT[m]||m).filter(Boolean).join(', ')||'Workout';
+  const muscles=mainMuscles(last.muscles,3).join(', ')||'Workout';
   chatCtx._pendingDelete=true;
   addAIMsg(`Letztes Training: ${muscles} · ${fmtD(last.date)} · RPE ${last.rpe}/10.
 
@@ -1758,25 +1766,48 @@ function renderAdjustCard(){
   if(!sug){el.style.display='none';return;}
   const dayName=['So','Mo','Di','Mi','Do','Fr','Sa'][sug.next.s.dow];
   const soreTxt=sug.hit.slice(0,3).map(m=>MUSCLE_DE_SHORT[m]||MUSCLE_DE[m]||m).join(', ');
+  const fresh=freshFocusFor(new Set(sug.sore));
   const txt=document.getElementById('adjust-text');
   const acts=document.getElementById('adjust-actions');
-  if(sug.alt){
-    txt.innerHTML=`Als Nächstes steht <b>${sug.next.s.focus}</b> (${dayName}) an — trifft aber ${soreTxt}, was gerade belastet ist. <b>${sug.alt.s.focus}</b> wäre erholt.`;
-    acts.innerHTML=`
-      <button onclick="applyPlanSwap()" style="flex:1;padding:10px;border-radius:10px;background:rgba(var(--amRGB),.18);border:1px solid rgba(var(--amRGB),.4);color:var(--am);font-size:12px;font-weight:600;font-family:var(--f)">🔄 Tauschen</button>
-      <button onclick="applyPlanDelay()" style="flex:1;padding:10px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">📅 Verschieben</button>
-      <button onclick="dismissAdjust()" style="padding:10px 12px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-family:var(--f)">✕</button>`;
-  }else{
-    txt.innerHTML=`Als Nächstes steht <b>${sug.next.s.focus}</b> (${dayName}) an — trifft aber ${soreTxt}, was gerade belastet ist. Kein passender Tausch im Plan.`;
-    acts.innerHTML=`
-      <button onclick="applyPlanDelay()" style="flex:1;padding:10px;border-radius:10px;background:rgba(var(--amRGB),.18);border:1px solid rgba(var(--amRGB),.4);color:var(--am);font-size:12px;font-weight:600;font-family:var(--f)">📅 Später trainieren</button>
-      <button onclick="dismissAdjust()" style="padding:10px 12px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-family:var(--f)">✕</button>`;
+  const btn=(fn,label,primary)=>`<button onclick="${fn}" style="flex:1;padding:10px 8px;border-radius:10px;background:${primary?'rgba(var(--amRGB),.18)':'var(--up)'};border:1px solid ${primary?'rgba(var(--amRGB),.4)':'var(--br)'};color:${primary?'var(--am)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f)">${label}</button>`;
+  // Training with a different focus beats not training — offer that first.
+  let line=`<b>${sug.next.s.focus}</b> (${dayName}) trifft ${soreTxt} — gerade belastet.`;
+  const buttons=[];
+  if(fresh){
+    line+=` <b>${fresh.focus}</b> wäre frisch.`;
+    buttons.push(btn('applyPlanRefocus()','🦵 Auf '+fresh.focus.split(' ')[0]+' umstellen',true));
   }
+  if(sug.alt)buttons.push(btn('applyPlanSwap()','🔄 Tauschen',!fresh));
+  buttons.push(btn('applyPlanDelay()','📅 Später',false));
+  if(!fresh&&!sug.alt)line+=' Kein passender Tausch im Plan.';
+  txt.innerHTML=line;
+  acts.innerHTML=buttons.join('')+`<button onclick="dismissAdjust()" style="padding:10px 11px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-family:var(--f)">✕</button>`;
   el.style.display='block';
 }
 function dismissAdjust(){
   try{safeSet('coach_adjust_dismissed',todayIso());}catch{}
   const el=document.getElementById('adjust-card');if(el)el.style.display='none';
+}
+
+// Collapse fine-grained/duplicate muscle keys into a short, readable set.
+// Avoids nonsense like "Core, abs, rectus abdominis, Beine, Hamstrings".
+const MUSCLE_MAIN={
+  chest:'Brust',
+  back:'Rücken',lats:'Rücken',upper_back:'Rücken',lower_back:'Rücken',
+  shoulders:'Schultern',rear_shoulders:'Schultern',
+  arms:'Arme',biceps:'Arme',triceps:'Arme',
+  core:'Core',abs:'Core',obliques:'Core',rectus_abdominis:'Core',hip_flexors:'Core',
+  glutes:'Gesäß',
+  legs:'Beine',quads:'Beine',hams:'Beine',hamstrings:'Beine',calves:'Beine',inner_thighs:'Beine'
+};
+function mainMuscles(list,max){
+  const out=[];
+  (list||[]).forEach(m=>{
+    const key=String(m).toLowerCase().replace(/\s+/g,'_');
+    const label=MUSCLE_MAIN[key]||MUSCLE_DE_SHORT[key]||MUSCLE_DE[key]||m;
+    if(!out.includes(label))out.push(label);
+  });
+  return out.slice(0,max||4);
 }
 
 function focusMuscleGroups(focus){
@@ -1851,6 +1882,46 @@ function suggestPlanAdjustment(){
   }));
   return{next,alt,sore:[...sore],hit};
 }
+// Rebuild today's session around the muscles that are actually fresh, instead
+// of skipping training entirely. Keeps day and duration, changes focus + title.
+function freshFocusFor(soreSet){
+  const legs=['quads','hams','glutes','calves','legs'];
+  const push=['chest','shoulders','triceps'];
+  const pull=['back','lats','biceps','upper_back'];
+  const core=['core','abs','obliques'];
+  const freshIn=g=>g.filter(m=>!soreSet.has(m)).length>=Math.ceil(g.length/2);
+  if(freshIn(legs)&&freshIn(core))return{focus:'Beine & Core',groups:[...legs,...core]};
+  if(freshIn(legs))return{focus:'Beine & Gesäß',groups:legs};
+  if(freshIn(pull)&&freshIn(core))return{focus:'Rücken & Core',groups:[...pull,...core]};
+  if(freshIn(push))return{focus:'Oberkörper Drücken',groups:push};
+  if(freshIn(pull))return{focus:'Rücken & Bizeps',groups:pull};
+  if(freshIn(core))return{focus:'Core & Mobilität',groups:core};
+  return null;
+}
+function applyPlanRefocus(){
+  const sug=suggestPlanAdjustment();
+  if(!sug)return;
+  const sore=new Set(sug.sore);
+  const fresh=freshFocusFor(sore);
+  if(!fresh){showErr('Zu viele Muskelgruppen belastet — heute lieber Pause.');return;}
+  const s=plan.weeks[sug.next.wi].sessions[sug.next.si];
+  // Remember the original so it can be restored after the session
+  if(!s.origFocus)s.origFocus=s.focus;
+  s.focus=fresh.focus;
+  s.refocused=true;
+  s.avoidMuscles=[...sore];
+  // Exercise count follows the new focus (a split needs fewer than fullbody)
+  if(s.autoCount!==false){
+    const rec=recommendExercises(s.durationMin||30,s.focus,plan?.goal,s.intensity);
+    s.exerciseCount=rec.count;
+  }
+  // Any saved workout no longer matches the new focus
+  if(s.savedWorkout)delete s.savedWorkout;
+  savePlan();updateHome();
+  if(document.getElementById('s-plan')?.classList.contains('active'))renderPlanView(currentWeekIdx||0);
+  showErr('✓ Umgestellt auf '+fresh.focus+' — belastete Muskeln bleiben außen vor.');
+}
+
 function applyPlanSwap(){
   const sug=suggestPlanAdjustment();
   if(!sug||!sug.alt)return;
@@ -2503,7 +2574,7 @@ function setRepDirectSide(side,v){
 function showInfo(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx];if(!ex)return;openInfoModal(ex);}
 
 // ─── Rating ───────────────────────────────────────────────────────────────────
-function initRating(){const tot=Object.values(tReps).reduce((s,v)=>s+v,0);document.getElementById('rat-sub').textContent=(curSetup.muscles||[]).map(m=>MUSCLE_DE_SHORT[m]||m).join(', ')+' · '+tot+' Wdh';document.getElementById('rat-note').value='';rpe=6;const w=document.getElementById('rpe-btns');w.innerHTML='';for(let n=1;n<=10;n++){const nc=rpc(n),btn=document.createElement('button');btn.style.cssText=`flex:1;padding:9px 0;border-radius:7px;font-size:12px;font-family:var(--m);cursor:pointer;border:1.5px solid ${n===rpe?nc:'var(--br)'};background:${n===rpe?nc+'18':'var(--up)'};color:${n===rpe?nc:'var(--mu)'};font-weight:${n===rpe?700:400};transition:all .15s`;btn.textContent=n;btn.onclick=()=>{rpe=n;w.querySelectorAll('button').forEach((b,i)=>{const bc=rpc(i+1);b.style.borderColor=(i+1)===n?bc:'var(--br)';b.style.background=(i+1)===n?bc+'18':'var(--up)';b.style.color=(i+1)===n?bc:'var(--mu)';b.style.fontWeight=(i+1)===n?700:400;});document.getElementById('rpe-lbl').textContent=RPE_L[n];document.getElementById('rpe-lbl').style.color=nc;};w.appendChild(btn);}document.getElementById('rpe-lbl').textContent=RPE_L[rpe];document.getElementById('rpe-lbl').style.color=rpc(rpe);document.getElementById('rat-reps').innerHTML=curExercises.map((ex,i)=>{
+function initRating(){const tot=Object.values(tReps).reduce((s,v)=>s+v,0);document.getElementById('rat-sub').textContent=mainMuscles(curSetup.muscles,3).join(', ')+' · '+tot+' Wdh';document.getElementById('rat-note').value='';rpe=6;const w=document.getElementById('rpe-btns');w.innerHTML='';for(let n=1;n<=10;n++){const nc=rpc(n),btn=document.createElement('button');btn.style.cssText=`flex:1;padding:9px 0;border-radius:7px;font-size:12px;font-family:var(--m);cursor:pointer;border:1.5px solid ${n===rpe?nc:'var(--br)'};background:${n===rpe?nc+'18':'var(--up)'};color:${n===rpe?nc:'var(--mu)'};font-weight:${n===rpe?700:400};transition:all .15s`;btn.textContent=n;btn.onclick=()=>{rpe=n;w.querySelectorAll('button').forEach((b,i)=>{const bc=rpc(i+1);b.style.borderColor=(i+1)===n?bc:'var(--br)';b.style.background=(i+1)===n?bc+'18':'var(--up)';b.style.color=(i+1)===n?bc:'var(--mu)';b.style.fontWeight=(i+1)===n?700:400;});document.getElementById('rpe-lbl').textContent=RPE_L[n];document.getElementById('rpe-lbl').style.color=nc;};w.appendChild(btn);}document.getElementById('rpe-lbl').textContent=RPE_L[rpe];document.getElementById('rpe-lbl').style.color=rpc(rpe);document.getElementById('rat-reps').innerHTML=curExercises.map((ex,i)=>{
   const sets=ex.sets||1;let totalReps=0;const setReps=[];
   for(let s=1;s<=sets;s++){
     const rk=tRound+'_'+i+'_s'+s;
@@ -2854,6 +2925,9 @@ function startPlanSession(){
     : (sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht');
   const rec=recommendExercises(sess.durationMin||30,sess.focus,plan.goal,sess.intensity);
   const count=sess.exerciseCount||rec.count;
+  const avoidTxt=(sess.refocused&&sess.avoidMuscles?.length)
+    ? ` WICHTIG — UMGESTELLTE SESSION: Der Nutzer hat Muskelkater in ${sess.avoidMuscles.map(m=>MUSCLE_DE_SHORT[m]||MUSCLE_DE[m]||m).join(', ')}. Diese Muskelgruppen KOMPLETT meiden, auch als Hilfsmuskulatur wo möglich. Baue das Workout ausschließlich um erholte Bereiche.`
+    : '';
   const ssHint=(sess.wantSuperset||rec.superset)
     ? ' Das Zeitbudget ist für volle Pausen zu knapp: nutze 1-2 antagonistische SUPERSÄTZE (group), damit alle Bewegungsmuster reinpassen, ohne die Erholung pro Muskel zu verkürzen.'
     : '';
@@ -2870,7 +2944,7 @@ function startPlanSession(){
   const weekNote=week.note?` Wochenziel: ${week.note}`:'';
   const goalTxt=GOALS.find(g=>g.id===(plan.goal||'fitness'))?.label||'Fitness';
   const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.
-PLANKONTEXT — Ziel des Plans: ${goalTxt}. ${phase}${weekNote} ${doseTxt}${locTxt}${ssHint}`;
+PLANKONTEXT — Ziel des Plans: ${goalTxt}. ${phase}${weekNote} ${doseTxt}${locTxt}${avoidTxt}${ssHint}`;
   generateWorkout(summary);
 }
 function onDurSlider(which){
@@ -3467,6 +3541,12 @@ function saveSessEdit(){
   if(!plan?.weeks[sessEditWi]?.sessions[sessEditSi])return;
   const s=plan.weeks[sessEditWi].sessions[sessEditSi];
   s.dow=sessEditDow2;s.intensity=sessEditInt2;s.equipment=[...sessEditEquip];s.location=window._sessLoc||'home';s.exerciseCount=sessEditCount||recommendExercises(s.durationMin||30,s.focus,plan?.goal,s.intensity).count;s.autoCount=!sessEditCount;
+  // Manual count -> re-estimate duration so the badge stays honest
+  if(sessEditCount){
+    const _r=recommendExercises(s.durationMin||30,s.focus,plan?.goal,s.intensity);
+    const warm=(s.durationMin||30)>=25?6:4;
+    s.durationMin=Math.max(10,Math.round(warm+sessEditCount*_r.perExMin));
+  }
   if(sessEditTargetWi>=0&&sessEditTargetWi!==sessEditWi&&plan.weeks[sessEditTargetWi]){
     const moved={...s};
     plan.weeks[sessEditWi].sessions.splice(sessEditSi,1);
