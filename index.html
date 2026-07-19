@@ -150,7 +150,8 @@ button:active:not(:disabled){transform:scale(.96)}
       <button id="c-refresh" onclick="fetchCoach(true)" style="margin-left:auto;width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.10);border:1px solid rgba(var(--acRGB),.20);color:var(--ac);font-size:13px;display:flex;align-items:center;justify-content:center">↻</button>
     </div>
     <div id="c-text" style="font-size:13px;color:var(--su);line-height:1.65">Starte dein erstes Workout — dann analysiere ich dein Training.</div>
-    <div id="c-tip" style="display:none;font-size:12px;color:var(--mu);line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px solid var(--br)"></div>
+    <button id="c-tip-toggle" onclick="toggleCoachTip()" style="display:none;width:100%;margin-top:9px;padding-top:9px;border-top:1px solid var(--br);background:none;border-left:none;border-right:none;border-bottom:none;color:var(--mu);font-size:12px;font-family:var(--f);text-align:left">💡 Tipp anzeigen</button>
+    <div id="c-tip" style="display:none;font-size:12px;color:var(--mu);line-height:1.6;margin-top:8px"></div>
   </div>
 
   <!-- Plan today card -->
@@ -181,6 +182,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div style="display:flex;gap:8px;margin-bottom:8px">
     <button onclick="startChat()" class="btn btn-ac" style="flex:1">🏋️ Mit Coach trainieren</button>
     <button onclick="showPlan()" style="width:46px;border-radius:13px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0">📅</button>
+    <button onclick="openStretchModal()" title="Dehn-Session" style="width:52px;padding:15px 0;border-radius:13px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.3);color:#38bdf8;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0">🧘</button>
   </div>
   <div style="display:flex;gap:8px">
     <button onclick="showHistory()" id="hist-btn" style="display:none;flex:1;padding:13px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">📋 Verlauf</button>
@@ -473,6 +475,11 @@ button:active:not(:disabled){transform:scale(.96)}
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Trainings-Stil</div>
   <div id="style-cards" style="display:flex;flex-direction:column;gap:7px;margin-bottom:20px"></div>
 
+  <label style="display:flex;align-items:center;gap:10px;padding:12px 13px;border-radius:11px;background:var(--up);border:1px solid var(--br);margin-bottom:20px;cursor:pointer">
+    <input type="checkbox" id="plan-cooldown" style="width:18px;height:18px;accent-color:#38bdf8"/>
+    <span style="flex:1"><span style="font-size:13px;font-weight:600;color:var(--tx)">🧘 Nach jedem Workout dehnen</span><span style="display:block;font-size:11px;color:var(--mu);margin-top:2px">Hängt 5-8 Min statisches Dehnen an, passend zu den trainierten Muskeln.</span></span>
+  </label>
+
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px">Wo trainierst du meistens?</div>
   <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Pro Session später änderbar.</div>
   <div style="display:flex;gap:7px;margin-bottom:20px" id="plan-loc-picker"></div>
@@ -690,6 +697,22 @@ button:active:not(:disabled){transform:scale(.96)}
       <div style="font-size:17px;font-weight:700;color:var(--tx)">Training gespeichert!</div>
     </div>
     <div id="plan-link-body"></div>
+  </div>
+</div>
+
+<!-- MODAL: Stretch session -->
+<div class="modal-ov" id="modal-stretch">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700">🧘 Dehn-Session</div>
+      <button onclick="closeModal('modal-stretch')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--mu);margin-bottom:16px">Statisches Dehnen — nach dem Training oder an Ruhetagen.</div>
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Bereich</div>
+    <div id="stretch-area-picker" style="display:flex;flex-direction:column;gap:7px;margin-bottom:18px"></div>
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Dauer</div>
+    <div id="stretch-dur-picker" style="display:flex;gap:7px;margin-bottom:20px"></div>
+    <button onclick="startStretchSession()" class="btn btn-ac" style="padding:13px">Session erstellen →</button>
   </div>
 </div>
 
@@ -1140,7 +1163,7 @@ function histTxt(){
     const d=new Date(w.date.split('T')[0]+'T12:00:00');
     const daysAgo=Math.round((now-d)/86400000);
     const when=daysAgo===0?'heute':daysAgo===1?'gestern':`vor ${daysAgo} Tagen`;
-    const muscles=mainMuscles(w.muscles,3).join(', ')||'?';
+    const muscles=(w.stretch?'🧘 ':'')+(mainMuscles(w.muscles,3).join(', ')||'?');
     return`${when} | ${muscles} | RPE ${w.rpe}/10`+(w.note?` | "${w.note}"`:'')+` | ${w.durationMin||'?'} min`;
   }).join('\n');
 }
@@ -1362,6 +1385,33 @@ const STUDIO_LIB=[
   {name:'Goblet Squat',muscles:['quads','glutes'],gym:true,equip:'dumbbells',tip:'Ellenbogen innen',details:'Hantel vor der Brust, tief in die Hocke.',mistakes:'Oberkörper kippt nach vorn'}
 ];
 
+// ─── Dehnübungen ──────────────────────────────────────────────────────────────
+// Statisch = nach dem Training / an Ruhetagen (vor dem Krafttraining senkt es
+// die Kraftleistung). Dynamisch gehört ins Warmup, nicht hierher.
+const STRETCH_LIB=[
+  // Oben nach unten
+  {name:'Nacken-Seitneige',muscles:['shoulders'],stretch:true,bilateral:true,hold:30,tip:'Schulter unten lassen',details:'Kopf zur Seite neigen, Gegenschulter bewusst nach unten ziehen.',mistakes:'Schulter hochziehen'},
+  {name:'Brustdehnung an der Wand',muscles:['chest','shoulders'],stretch:true,bilateral:true,hold:30,tip:'Ellenbogen auf Schulterhöhe',details:'Unterarm an Wand/Türrahmen, Oberkörper langsam wegdrehen.',mistakes:'Zu weit drehen, Schulter schmerzt'},
+  {name:'Schulterdehnung über Kreuz',muscles:['shoulders','upper_back'],stretch:true,bilateral:true,hold:30,tip:'Arm gestreckt',details:'Arm quer vor die Brust ziehen, mit dem anderen Arm halten.',mistakes:'Schulter mit hochziehen'},
+  {name:'Trizepsdehnung über Kopf',muscles:['triceps','shoulders'],stretch:true,bilateral:true,hold:30,tip:'Ellenbogen zeigt nach oben',details:'Hand hinter den Nacken, Ellenbogen sanft nach hinten drücken.',mistakes:'Kopf nach vorne schieben'},
+  {name:'Lat-Dehnung seitlich',muscles:['lats','upper_back'],stretch:true,bilateral:true,hold:30,tip:'Zur Seite lang machen',details:'Arm über Kopf, Oberkörper zur Gegenseite neigen.',mistakes:'Nach vorne kippen'},
+  {name:'Katze-Kuh',muscles:['back','lower_back','core'],stretch:true,hold:45,tip:'Mit der Atmung',details:'Vierfüßlerstand, Wirbelsäule abwechselnd runden und strecken.',mistakes:'Zu schnell, nur aus dem Nacken'},
+  {name:'Kindeshaltung',muscles:['lower_back','lats','shoulders'],stretch:true,hold:45,tip:'Tief atmen',details:'Fersensitz, Oberkörper nach vorne ablegen, Arme lang.',mistakes:'Schultern verspannt lassen'},
+  {name:'Kobra / Sphinx',muscles:['core','lower_back','chest'],stretch:true,hold:30,tip:'Schultern tief',details:'Bauchlage, Oberkörper aufrichten, Becken bleibt am Boden.',mistakes:'Nacken überstrecken'},
+  {name:'Wirbelsäulendrehung liegend',muscles:['lower_back','obliques','glutes'],stretch:true,bilateral:true,hold:40,tip:'Schultern am Boden',details:'Rückenlage, Knie zur Seite fallen lassen, Kopf zur Gegenseite.',mistakes:'Schulter hebt ab'},
+  {name:'Hüftbeuger-Dehnung (Ausfallschritt)',muscles:['hip_flexors','quads'],stretch:true,bilateral:true,hold:40,tip:'Becken aufrichten',details:'Tiefer Ausfallschritt, hinteres Knie am Boden, Becken nach vorne schieben.',mistakes:'Hohlkreuz statt Beckenaufrichtung'},
+  {name:'Taubenhaltung (Gesäß)',muscles:['glutes','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Ruhig atmen',details:'Vorderes Bein angewinkelt, hinteres lang. Oberkörper aufrecht oder abgelegt.',mistakes:'Becken verkippen'},
+  {name:'Gesäßdehnung im Sitzen (Figure 4)',muscles:['glutes'],stretch:true,bilateral:true,hold:40,tip:'Rücken gerade',details:'Knöchel aufs andere Knie legen, Oberkörper nach vorne neigen.',mistakes:'Runder Rücken'},
+  {name:'IT-Band-Dehnung im Stehen',muscles:['glutes','quads'],stretch:true,bilateral:true,hold:40,tip:'Hüfte seitlich schieben',details:'Beine kreuzen, Hüfte zur Seite schieben, Oberkörper zur Gegenseite neigen.',mistakes:'Nach vorne beugen statt seitlich'},
+  {name:'Hamstring-Dehnung im Sitzen',muscles:['hams','calves'],stretch:true,bilateral:true,hold:40,tip:'Aus der Hüfte beugen',details:'Bein gestreckt, aus der Hüfte nach vorne neigen, Rücken lang.',mistakes:'Runder Rücken, Knie überstrecken'},
+  {name:'Quadrizeps-Dehnung im Stehen',muscles:['quads','hip_flexors'],stretch:true,bilateral:true,hold:35,tip:'Knie nach unten',details:'Fuß zum Gesäß ziehen, Knie zeigt nach unten, Becken aufgerichtet.',mistakes:'Hohlkreuz, Knie nach außen'},
+  {name:'Adduktoren-Dehnung (Schmetterling)',muscles:['inner_thighs'],stretch:true,hold:45,tip:'Knie sinken lassen',details:'Fußsohlen zusammen, Knie Richtung Boden, Rücken gerade.',mistakes:'Knie runterdrücken'},
+  {name:'Wadendehnung an der Wand',muscles:['calves'],stretch:true,bilateral:true,hold:35,tip:'Ferse am Boden',details:'Bein nach hinten strecken, Ferse gedrückt halten, Hüfte nach vorne.',mistakes:'Ferse abheben'},
+  {name:'Herabschauender Hund',muscles:['hams','calves','shoulders','lats'],stretch:true,hold:45,tip:'Sitzbeinhöcker hoch',details:'Umgekehrtes V, Fersen Richtung Boden, Rücken lang.',mistakes:'Rücken runden, um die Fersen zu erreichen'},
+  {name:'Tiefe Hocke (Malasana)',muscles:['glutes','hip_flexors','calves'],stretch:true,hold:45,tip:'Fersen am Boden',details:'Tief in die Hocke, Ellenbogen drücken die Knie nach außen.',mistakes:'Fersen heben, Rücken kollabiert'},
+  {name:'Liegende Hamstring-Dehnung',muscles:['hams'],stretch:true,bilateral:true,hold:40,tip:'Unterer Rücken am Boden',details:'Rückenlage, Bein gestreckt hochziehen, ggf. mit Handtuch.',mistakes:'Becken kippt mit'}
+];
+
 const DEFAULT_LIB=[
   {name:'Inverted Row (Tischrudern)',muscles:['back','biceps'],bilateral:false,equip:'bar',tip:'Körper bleibt gerade',details:'Stange auf Hüfthöhe (Klimmzugstange tief eingehängt, Rack oder stabiler Tisch). Darunterlegen, Brust zur Stange ziehen, Körper in einer Linie. Je waagerechter, desto schwerer.',mistakes:'Hüfte durchhängen lassen'},
   {name:'Negativ-Klimmzug',muscles:['back','biceps'],bilateral:false,equip:'bar',tip:'Langsam ablassen (3-5s)',details:'Oben starten (hochspringen), dann so langsam wie möglich herunterlassen.',mistakes:'Zu schnell fallen lassen'},
@@ -1485,7 +1535,7 @@ function updateHome(){
     document.getElementById('last-card').style.display='block';
     document.getElementById('l-name').textContent=mainMuscles(last.muscles,3).join(', ')||'Workout';
     const rc=rpc(last.rpe);
-    document.getElementById('l-tags').innerHTML=mkT(fmtD(last.date),'#64748b')+' '+mkT((last.durationMin||'?')+' min','#64748b')+' '+mkT('RPE '+last.rpe+'/10',rc)+(last.note?' '+mkT('📝','var(--mu)'):'');
+    document.getElementById('l-tags').innerHTML=mkT(fmtD(last.date),'var(--mu)')+' '+mkT((last.durationMin||'?')+' min','var(--mu)')+(last.note?' '+mkT('📝','var(--mu)'):'');
     document.getElementById('l-rpe').textContent=last.rpe+'/10';
     document.getElementById('l-rpe').style.color=rc;
   }
@@ -1623,7 +1673,7 @@ async function fetchCoach(force){
       const cached=JSON.parse(localStorage.getItem('coach_cache')||'null');
       if(cached&&cached.key===cacheKey){
         document.getElementById('c-text').textContent=cached.message||'—';
-        if(cached.tip){document.getElementById('c-tip').style.display='block';document.getElementById('c-tip').textContent='💡 '+cached.tip;}
+        setCoachTip(cached.tip);
         document.getElementById('coach-card').style.borderColor='rgba(var(--acRGB),.35)';
         document.getElementById('c-spinner').style.display='none';
         return;
@@ -1640,7 +1690,7 @@ async function fetchCoach(force){
     /*COACH*/const raw=await callAPI([{role:'user',content:`Heute ist ${todayIso()}, ${timeOfDay}. Du bist Trainingswissenschaftler und persönlicher Coach.${profCtx?'\n\nNutzer-Profil: '+profCtx:''}\n\nAktiver Trainingsplan: ${planCtx}\n\nSTATUS HEUTE: ${todayStatusTxt()}\n\nTrainingsverlauf (neueste zuerst):\n${histTxt()}${journalCtx()?'\n\nTagebuch des Nutzers (neueste Einträge): '+journalCtx():''}\n\nGib eine kurze, persönliche Empfehlung für heute. Wende diese Regeln an: Letztes RPE >=9 -> heute leicht oder Pause. Gleiche Muskelgruppe vor <48h trainiert -> andere Muskelgruppe oder Erholung. 3+ Trainingstage in Folge -> Pausentag empfehlen. Mehr als 5 Tage Pause -> sanfter Wiedereinstieg, nicht ueberkompensieren. Notizen und Tagebucheinträge zu Schmerzen, Schlafmangel oder Stress ernst nehmen und die Empfehlung daran anpassen (Schmerz -> betroffene Region schonen; schlechter Schlaf -> Intensität runter). Wenn laut STATUS HEUTE bereits trainiert wurde: NICHT zu einem weiteren Workout raten, sondern Erholung/Ernährung/Ausblick. Ist heute ein geplanter Trainingstag und noch offen, beziehe dich darauf. Ernährungstipps MÜSSEN zur angegebenen Ernährungsform passen (bei vegetarisch keine Fleisch-/Fischempfehlung, bei vegan zusätzlich keine Milch/Ei). Ohne Angabe zur Ernährung keine spezifischen Lebensmittel-Empfehlungen. Sei konkret, keine Floskeln. LÄNGE: message MAXIMAL 2 kurze Sätze (zusammen unter 30 Wörtern). tip MAXIMAL 1 Satz unter 15 Wörtern. Keine Wiederholungen, keine Einleitungen wie 'dein Körper sendet ein Signal'.\n\nNUR JSON: {"message":"2-3 persönliche Sätze DE","tip":"1 konkreter Tipp DE"}`}],500);
     const s=extractJSON(raw);const obj=Array.isArray(s)?s[0]:s;
     document.getElementById('c-text').textContent=obj.message||'—';
-    if(obj.tip){document.getElementById('c-tip').style.display='block';document.getElementById('c-tip').textContent='💡 '+obj.tip;}
+    setCoachTip(obj.tip);
     document.getElementById('coach-card').style.borderColor='rgba(var(--acRGB),.35)';
     // Cache result
     try{localStorage.setItem('coach_cache',JSON.stringify({key:cacheKey,message:obj.message,tip:obj.tip}));}catch{}
@@ -1760,13 +1810,32 @@ Wenn ready:true, fülle summary mit allem nötigen für das Workout.`;
 // ─── Plan-Autoregulation ──────────────────────────────────────────────────────
 // Welche Muskelregionen trifft eine geplante Session? Aus dem Fokus-Namen
 // abgeleitet, damit wir Sessions sinnvoll tauschen können.
+// Tip stays collapsed by default — the home screen should answer one question,
+// not stack advice the user has to scroll past.
+function setCoachTip(tip){
+  const t=document.getElementById('c-tip'),btn=document.getElementById('c-tip-toggle');
+  if(!t||!btn)return;
+  if(!tip){t.style.display='none';btn.style.display='none';t.textContent='';return;}
+  t.textContent=tip;
+  t.style.display='none';
+  btn.style.display='block';
+  btn.textContent='💡 Tipp anzeigen';
+}
+function toggleCoachTip(){
+  const t=document.getElementById('c-tip'),btn=document.getElementById('c-tip-toggle');
+  if(!t||!btn)return;
+  const open=t.style.display==='block';
+  t.style.display=open?'none':'block';
+  btn.textContent=open?'💡 Tipp anzeigen':'💡 Tipp ausblenden';
+}
+
 function renderAdjustCard(){
   const el=document.getElementById('adjust-card');if(!el)return;
   const sug=suggestPlanAdjustment();
   if(!sug){el.style.display='none';return;}
   const dayName=['So','Mo','Di','Mi','Do','Fr','Sa'][sug.next.s.dow];
   const soreTxt=sug.hit.slice(0,3).map(m=>MUSCLE_DE_SHORT[m]||MUSCLE_DE[m]||m).join(', ');
-  const fresh=freshFocusFor(new Set(sug.sore));
+  const fresh=freshFocusFor(new Set(sug.sore),sug.next.s.focus);
   const txt=document.getElementById('adjust-text');
   const acts=document.getElementById('adjust-actions');
   const btn=(fn,label,primary)=>`<button onclick="${fn}" style="flex:1;padding:10px 8px;border-radius:10px;background:${primary?'rgba(var(--amRGB),.18)':'var(--up)'};border:1px solid ${primary?'rgba(var(--amRGB),.4)':'var(--br)'};color:${primary?'var(--am)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f)">${label}</button>`;
@@ -1774,15 +1843,21 @@ function renderAdjustCard(){
   let line=`<b>${sug.next.s.focus}</b> (${dayName}) trifft ${soreTxt} — gerade belastet.`;
   const buttons=[];
   if(fresh){
-    line+=` <b>${fresh.focus}</b> wäre frisch.`;
-    buttons.push(btn('applyPlanRefocus()','🦵 Auf '+fresh.focus.split(' ')[0]+' umstellen',true));
+    line+=` <b>${fresh.short}</b> ist erholt — Session umbauen zu „${fresh.focus}".`;
+    buttons.push(btn('applyPlanRefocus()','🔧 Umbauen',true));
   }
   if(sug.alt)buttons.push(btn('applyPlanSwap()','🔄 Tauschen',!fresh));
   buttons.push(btn('applyPlanDelay()','📅 Später',false));
+  buttons.push(btn("openStretchModal('last')",'🧘 Dehnen',false));
   if(!fresh&&!sug.alt)line+=' Kein passender Tausch im Plan.';
   txt.innerHTML=line;
   acts.innerHTML=buttons.join('')+`<button onclick="dismissAdjust()" style="padding:10px 11px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-family:var(--f)">✕</button>`;
   el.style.display='block';
+  // This card is the primary message right now — let the coach step back
+  const tipBtn=document.getElementById('c-tip-toggle');
+  if(tipBtn)tipBtn.style.display='none';
+  const tip=document.getElementById('c-tip');
+  if(tip)tip.style.display='none';
 }
 function dismissAdjust(){
   try{safeSet('coach_adjust_dismissed',todayIso());}catch{}
@@ -1884,27 +1959,36 @@ function suggestPlanAdjustment(){
 }
 // Rebuild today's session around the muscles that are actually fresh, instead
 // of skipping training entirely. Keeps day and duration, changes focus + title.
-function freshFocusFor(soreSet){
+function freshFocusFor(soreSet,originalFocus){
   const legs=['quads','hams','glutes','calves','legs'];
   const push=['chest','shoulders','triceps'];
   const pull=['back','lats','biceps','upper_back'];
   const core=['core','abs','obliques'];
   const freshIn=g=>g.filter(m=>!soreSet.has(m)).length>=Math.ceil(g.length/2);
-  if(freshIn(legs)&&freshIn(core))return{focus:'Beine & Core',groups:[...legs,...core]};
-  if(freshIn(legs))return{focus:'Beine & Gesäß',groups:legs};
-  if(freshIn(pull)&&freshIn(core))return{focus:'Rücken & Core',groups:[...pull,...core]};
-  if(freshIn(push))return{focus:'Oberkörper Drücken',groups:push};
-  if(freshIn(pull))return{focus:'Rücken & Bizeps',groups:pull};
-  if(freshIn(core))return{focus:'Core & Mobilität',groups:core};
-  return null;
+  const wasFullbody=/ganzkörper|ganzkorper|fullbody|^gk\b/i.test(originalFocus||'');
+  // Pick the freshest region, then name it honestly: a rebuilt fullbody session
+  // is still fullbody — just with a shifted emphasis.
+  let region=null;
+  if(freshIn(legs))region={key:'Unterkörper',short:'Beine',groups:[...legs,...(freshIn(core)?core:[])]};
+  else if(freshIn(pull))region={key:'Rücken & Bizeps',short:'Rücken',groups:[...pull,...(freshIn(core)?core:[])]};
+  else if(freshIn(push))region={key:'Drücken',short:'Brust',groups:[...push,...(freshIn(core)?core:[])]};
+  else if(freshIn(core))region={key:'Core & Mobilität',short:'Core',groups:core};
+  if(!region)return null;
+  const focus=wasFullbody
+    ? `Ganzkörper – Fokus ${region.key}`
+    : (region.groups.some(m=>core.includes(m))&&region.key!=='Core & Mobilität'
+        ? `${region.key} & Core`
+        : region.key);
+  return{focus,short:region.short,groups:region.groups};
 }
 function applyPlanRefocus(){
   const sug=suggestPlanAdjustment();
   if(!sug)return;
   const sore=new Set(sug.sore);
-  const fresh=freshFocusFor(sore);
-  if(!fresh){showErr('Zu viele Muskelgruppen belastet — heute lieber Pause.');return;}
   const s=plan.weeks[sug.next.wi].sessions[sug.next.si];
+  // Name the rebuilt session relative to what it originally was
+  const fresh=freshFocusFor(sore,s.origFocus||s.focus);
+  if(!fresh){showErr('Zu viele Muskelgruppen belastet — heute lieber Pause.');return;}
   // Remember the original so it can be restored after the session
   if(!s.origFocus)s.origFocus=s.focus;
   s.focus=fresh.focus;
@@ -1956,6 +2040,7 @@ function recentStressedMuscles(){
   const out=new Set();
   const now=new Date(todayIso()+'T12:00:00');
   log.slice(-6).forEach(w=>{
+    if(w.stretch)return;                       // stretching aids recovery, doesn't block it
     const d=new Date(w.date.slice(0,10)+'T12:00:00');
     const daysAgo=(now-d)/86400000;
     if(daysAgo>=2)return;
@@ -1977,6 +2062,97 @@ function recoveryContext(){
   });
   return lines.join(' | ');
 }
+// ─── Dehn-Sessions ────────────────────────────────────────────────────────────
+const STRETCH_AREAS={
+  full:{label:'Ganzkörper',icon:'🧍',muscles:null},
+  hips:{label:'Hüfte & Beine',icon:'🦵',muscles:['hip_flexors','glutes','quads','hams','calves','inner_thighs']},
+  upper:{label:'Schultern & Brust',icon:'💪',muscles:['shoulders','chest','triceps','lats','upper_back']},
+  back:{label:'Rücken',icon:'🔙',muscles:['back','lower_back','lats','upper_back','core']},
+  last:{label:'Zum letzten Training',icon:'🎯',muscles:null}
+};
+// Which muscles did the last workout hit? Used for "stretch what you trained".
+function lastTrainedMuscles(){
+  const last=[...log].reverse().find(w=>!w.stretch);
+  if(!last)return[];
+  const out=new Set([...(last.muscles||[])]);
+  (last.exercises||[]).forEach(ex=>(ex.muscles||[]).forEach(m=>out.add(m)));
+  return[...out];
+}
+let stretchArea='full',stretchDur=12;
+function openStretchModal(preselect){
+  stretchArea=preselect||'full';stretchDur=12;
+  const ap=document.getElementById('stretch-area-picker');ap.innerHTML='';
+  const hasLog=log.some(w=>!w.stretch);
+  Object.entries(STRETCH_AREAS).forEach(([id,a])=>{
+    if(id==='last'&&!hasLog)return;
+    const b=document.createElement('button');
+    const paint=()=>{const s=stretchArea===id;b.style.cssText=`display:flex;align-items:center;gap:10px;padding:12px 13px;border-radius:11px;border:1.5px solid ${s?'#38bdf8':'var(--br)'};background:${s?'rgba(56,189,248,.12)':'var(--up)'};color:${s?'#38bdf8':'var(--tx)'};font-size:13px;font-weight:600;font-family:var(--f);text-align:left;width:100%`;};
+    let sub='';
+    if(id==='last'){const lm=mainMuscles(lastTrainedMuscles(),3);sub=lm.length?lm.join(', '):'';}
+    b.innerHTML=`<span style="font-size:17px">${a.icon}</span><span style="flex:1">${a.label}${sub?`<span style="display:block;font-size:11px;color:var(--mu);font-weight:400;margin-top:1px">${sub}</span>`:''}</span>`;
+    paint();
+    b.onclick=()=>{stretchArea=id;[...ap.children].forEach((x,i)=>{const xid=Object.keys(STRETCH_AREAS).filter(k=>k!=='last'||hasLog)[i];const s=xid===id;x.style.borderColor=s?'#38bdf8':'var(--br)';x.style.background=s?'rgba(56,189,248,.12)':'var(--up)';x.style.color=s?'#38bdf8':'var(--tx)';});};
+    ap.appendChild(b);
+  });
+  const dp=document.getElementById('stretch-dur-picker');dp.innerHTML='';
+  [8,12,20].forEach(m=>{
+    const b=document.createElement('button');
+    b.className='chip'+(m===stretchDur?' ac':'');
+    b.textContent=m+' min';
+    b.onclick=()=>{stretchDur=m;dp.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};
+    dp.appendChild(b);
+  });
+  document.getElementById('modal-stretch').classList.add('open');
+}
+function startStretchSession(){
+  closeModal('modal-stretch');
+  generateStretchSession(stretchArea,stretchDur);
+}
+
+async function generateStretchSession(areaId,minutes,opts){
+  const area=STRETCH_AREAS[areaId]||STRETCH_AREAS.full;
+  let target=area.muscles;
+  if(areaId==='last'){
+    const lm=lastTrainedMuscles();
+    target=lm.length?lm:null;
+  }
+  const mins=minutes||12;
+  const count=Math.max(4,Math.min(10,Math.round(mins*0.8)));
+  const targetTxt=target?`Fokus auf: ${mainMuscles(target,5).join(', ')}.`:'Ganzkörper von oben nach unten: Nacken/Schultern → Brust → Rücken → Hüfte → Oberschenkel → Waden.';
+  const sys=`Du bist Physiotherapeut und Beweglichkeitstrainer. Erstelle eine STATISCHE DEHN-SESSION auf Deutsch.
+Dauer: ${mins} Minuten, genau ${count} Übungen. ${targetTxt}
+${(loadProfile()?.limits)?'Einschränkungen des Nutzers: '+loadProfile().limits+' — betroffene Bereiche behutsam oder meiden.':''}
+REGELN:
+- Nur statisches Dehnen (Position halten), KEINE dynamischen oder kräftigenden Übungen, keine Sprünge.
+- Haltezeit 30-60s je Position (Feld duration). Bei einseitigen Dehnungen bilateral:true, dann gilt die Zeit je Seite.
+- type IMMER "hold". sets IMMER 1. rest 10-15s zwischen den Übungen.
+- Reihenfolge anatomisch sinnvoll (von oben nach unten oder gruppiert), nicht springen.
+- tip: max 8 Wörter. details: max 12 Wörter, worauf zu achten ist. mistakes: max 8 Wörter.
+- Intensität: leichtes Ziehen, kein Schmerz. Erwähne ruhiges Weiteratmen.
+Antworte NUR mit JSON-Array: [{"name":"...","type":"hold","duration":40,"reps":null,"rest":12,"sets":1,"icon":"◈","tip":"...","muscles":["hams"],"bilateral":true,"details":"...","mistakes":"...","warmup":false}]
+Bekannte Dehnübungen als Orientierung: ${STRETCH_LIB.slice(0,14).map(e=>e.name).join(', ')}.`;
+  show('s-gen');
+  const gt=document.getElementById('gen-title');if(gt)gt.textContent='Dehn-Session wird erstellt...';
+  try{
+    const raw=await callAPI([{role:'user',content:'Erstelle die Dehn-Session jetzt. Antworte NUR mit JSON.'}],1100,sys);
+    const arr=extractJSON(raw);
+    let exArr=Array.isArray(arr)?arr:[arr].filter(Boolean);
+    exArr.forEach(ex=>{
+      ex.type='hold';ex.sets=1;ex.warmup=false;ex.stretch=true;
+      if(!ex.duration||ex.duration<15)ex.duration=35;
+      if(ex.duration>90)ex.duration=60;
+      if(!ex.rest)ex.rest=12;
+    });
+    if(!exArr.length)throw new Error('Keine Übungen');
+    curExercises=exArr;wuExercises=[];
+    curSetup={muscles:[...new Set(exArr.flatMap(e=>e.muscles||[]))],durationMin:mins,stretch:true,areaId};
+    window._isStretchSession=true;
+    showReview();
+  }catch(e){
+    showErr('Fehler: '+e.message);show('s-home');
+  }
+}
+
 async function generateWorkout(summaryOverride){
   show('s-gen');document.getElementById('gen-text').textContent='Workout wird erstellt';
   const summary=summaryOverride||chatCtx.summary||'Ganzkörper, 30 Minuten, Körpergewicht, mittlere Intensität';
@@ -2024,7 +2200,7 @@ TRAININGSWISSENSCHAFTLICHE REGELN:
 - Warmup nach RAMP-Prinzip: 1 Übung Puls anheben (z.B. Hampelmann leicht), 1-2 Übungen Zielmuskulatur aktivieren/mobilisieren (dynamisch, keine statischen Dehnungen).
 
 Typen: type:"time" zeitbasiert, type:"reps" zählbar (dann reps:N), type:"hold" Halten, type:"amrap" max Wdh in Zeit. 5-7 Hauptübungen + 2-3 Warmup.
-Antworte NUR mit JSON-Array: [{"name":"...","type":"time","duration":40,"reps":null,"rest":20,"sets":3,"group":null,"icon":"◈","tip":"max 8 Wörter","muscles":["chest"],"bilateral":false,"details":"max 12 Wörter","mistakes":"max 8 Wörter","warmup":false}]
+Antworte NUR mit JSON-Array: [{"name":"...","type":"time","duration":40,"reps":null,"rest":20,"sets":3,"group":null,"icon":"◈","tip":"max 8 Wörter","muscles":["chest"],"bilateral":false,"details":"max 12 Wörter","mistakes":"max 8 Wörter","warmup":false,"cooldown":false}]
 Halte tip/details/mistakes SEHR kurz (Stichworte, keine Sätze).
 sets: Zahl 2-4 für Hauptübungen (je nach Ziel/Intensität), 1 für Warmup.
 group (optional): Übungen, die als SUPERSATZ im direkten Wechsel laufen, bekommen denselben group-String ("A","B"). Gruppierte Übungen: gleiche sets-Zahl, kurze rest (10-30s), im Array direkt nebeneinander.
@@ -2057,6 +2233,7 @@ WANN Supersatz: antagonistische Paare (Drücken+Ziehen, Quads+Hamstrings) — sp
     }
     if(_isGymWorkout)exArr.forEach(ex=>{if(!ex.warmup&&ex.trackWeight===undefined)ex.trackWeight=true;});
     exArr.forEach(ex=>{
+      if(ex.cooldown){ex.type='hold';ex.sets=1;ex.stretch=true;ex.warmup=false;if(!ex.duration||ex.duration<20)ex.duration=35;}
       let s=parseInt(ex.sets);
       if(!s||s<1)s=ex.warmup?1:3;      // sensible default: 3 working sets
       ex.sets=ex.warmup?1:Math.min(5,Math.max(1,s));
@@ -2632,6 +2809,9 @@ function adoptExercisesToLibrary(exercises){
 
 function saveWorkout(){
   const entry={id:Date.now(),date:new Date().toISOString(),muscles:curSetup.muscles||[],durationMin:curSetup.durationMin||20,exercises:curExercises,repLog:{...tReps},rpe,note:document.getElementById('rat-note').value.trim()};
+  // Stretch sessions count for consistency, but not as training load
+  if(curSetup.stretch||window._isStretchSession){entry.stretch=true;entry.areaId=curSetup.areaId||null;}
+  window._isStretchSession=false;
   // Snapshot challenge completion before adding this workout
   const _chBefore={};loadChallenges().forEach(ch=>{_chBefore[ch.id]=calcChallengeProgress(ch).pct>=100;});
   log.push(entry);persist();
@@ -2928,6 +3108,9 @@ function startPlanSession(){
   const avoidTxt=(sess.refocused&&sess.avoidMuscles?.length)
     ? ` WICHTIG — UMGESTELLTE SESSION: Der Nutzer hat Muskelkater in ${sess.avoidMuscles.map(m=>MUSCLE_DE_SHORT[m]||MUSCLE_DE[m]||m).join(', ')}. Diese Muskelgruppen KOMPLETT meiden, auch als Hilfsmuskulatur wo möglich. Baue das Workout ausschließlich um erholte Bereiche.`
     : '';
+  const coolTxt=plan.cooldown
+    ? ` COOLDOWN: Hänge am Ende 3-4 statische Dehnübungen an (30-45s halten, type "hold", sets 1, cooldown:true) — gezielt für die trainierten Muskelgruppen. Diese zählen NICHT zu den ${count} Hauptübungen.`
+    : '';
   const ssHint=(sess.wantSuperset||rec.superset)
     ? ' Das Zeitbudget ist für volle Pausen zu knapp: nutze 1-2 antagonistische SUPERSÄTZE (group), damit alle Bewegungsmuster reinpassen, ohne die Erholung pro Muskel zu verkürzen.'
     : '';
@@ -2944,7 +3127,7 @@ function startPlanSession(){
   const weekNote=week.note?` Wochenziel: ${week.note}`:'';
   const goalTxt=GOALS.find(g=>g.id===(plan.goal||'fitness'))?.label||'Fitness';
   const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.
-PLANKONTEXT — Ziel des Plans: ${goalTxt}. ${phase}${weekNote} ${doseTxt}${locTxt}${avoidTxt}${ssHint}`;
+PLANKONTEXT — Ziel des Plans: ${goalTxt}. ${phase}${weekNote} ${doseTxt}${locTxt}${avoidTxt}${coolTxt}${ssHint}`;
   generateWorkout(summary);
 }
 function onDurSlider(which){
@@ -2958,6 +3141,7 @@ function onDurSlider(which){
 }
 
 function buildPlanCreate(){const gc=document.getElementById('goal-cards');if(!gc){console.error('goal-cards missing');return;}gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<span style="font-size:22px">${g.icon}</span><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');if(wc){wc.innerHTML='';[4,6,8,12].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});}const fc=document.getElementById('freq-chips');if(fc){fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' co':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';};fc.appendChild(b);});}const dmS=document.getElementById('dur-min-slider'),dxS=document.getElementById('dur-max-slider');if(dmS){dmS.value=planOpts.durMin;document.getElementById('dur-min-val').textContent=planOpts.durMin+' min';}if(dxS){dxS.value=planOpts.durMax;document.getElementById('dur-max-val').textContent=planOpts.durMax+' min';}const bdp=document.getElementById('blocked-days-picker');if(bdp){bdp.innerHTML='';const dayOrder=[1,2,3,4,5,6,0];const dayLbl={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};dayOrder.forEach(d=>{const active=!planOpts.blockedDays.includes(d);const b=document.createElement('button');b.style.cssText=`flex:1;padding:11px 0;border-radius:9px;border:1.5px solid ${active?'var(--ac)':'var(--br)'};background:${active?'rgba(var(--acRGB),.15)':'var(--up)'};color:${active?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f);opacity:${active?1:.5}`;b.textContent=dayLbl[d];b.onclick=()=>{if(planOpts.blockedDays.includes(d))planOpts.blockedDays=planOpts.blockedDays.filter(x=>x!==d);else planOpts.blockedDays=[...planOpts.blockedDays,d];const on=!planOpts.blockedDays.includes(d);b.style.borderColor=on?'var(--ac)':'var(--br)';b.style.background=on?'rgba(var(--acRGB),.15)':'var(--up)';b.style.color=on?'var(--ac)':'var(--mu)';b.style.opacity=on?1:.5;};bdp.appendChild(b);});}const sc=document.getElementById('style-cards');if(sc){sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<span style="font-size:18px">${s.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}sc.appendChild(b);});}const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';const gri=document.getElementById('goal-reason-inp');if(gri)gri.value=planOpts.goalReason||'';
+  const cdb=document.getElementById('plan-cooldown');if(cdb)cdb.checked=!!planOpts.cooldown;
   const plp=document.getElementById('plan-loc-picker');
   if(plp){
     plp.innerHTML='';window._planLoc=planOpts.defaultLocation||'home';
@@ -3162,7 +3346,7 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
     }
     // Extend locally if more weeks requested than AI generated
     if(weeks>planData.weeks.length)extendPlanWeeks(planData,weeks,allowedTrainingDays,isFullbody);
-    planData.blockedDays=planOpts.blockedDays||[];planData.goalReason=goalReason;planData.defaultLocation=window._planLoc||'home';
+    planData.blockedDays=planOpts.blockedDays||[];planData.goalReason=goalReason;planData.defaultLocation=window._planLoc||'home';planData.cooldown=!!document.getElementById('plan-cooldown')?.checked;
     // Frequency ramp: low fitness level + ambitious frequency -> build up over weeks
     let rampMsg='';
     if(fitnessLevelLow()&&planOpts.freq>=3&&planData.weeks.length>=3){
@@ -3488,7 +3672,7 @@ function openSessEdit(wi,si){
   const sess=plan.weeks[wi].sessions[si];
   sessEditDow2=sess.dow;sessEditInt2=sess.intensity||'medium';sessEditEquip=sess.equipment?[...sess.equipment]:['bodyweight'];sessEditCount=sess.autoCount?null:(sess.exerciseCount||null);
   document.getElementById('sess-wi').value=wi;document.getElementById('sess-si').value=si;document.getElementById('sess-modal-title').textContent=sess.focus;
-  const dp=document.getElementById('sess-day-picker');dp.innerHTML='';DAYS.forEach((d,dow)=>{const b=document.createElement('button');b.className='day-pill'+(dow===sessEditDow2?' active':'');b.textContent=d;b.onclick=()=>{sessEditDow2=dow;dp.querySelectorAll('.day-pill').forEach(x=>x.className='day-pill');b.className='day-pill active';};dp.appendChild(b);});
+  const dp=document.getElementById('sess-day-picker');dp.innerHTML='';[1,2,3,4,5,6,0].forEach(dow=>{const d=DAYS[dow];const b=document.createElement('button');b.className='day-pill'+(dow===sessEditDow2?' active':'');b.textContent=d;b.onclick=()=>{sessEditDow2=dow;dp.querySelectorAll('.day-pill').forEach(x=>x.className='day-pill');b.className='day-pill active';};dp.appendChild(b);});
   const ip=document.getElementById('sess-int-picker');ip.innerHTML='';['easy','medium','hard'].forEach(int=>{const b=document.createElement('button');b.className='chip'+(int===sessEditInt2?' '+(int==='easy'?'co':int==='medium'?'am':'hot'):'');b.textContent=INT_LABELS[int];b.onclick=()=>{sessEditInt2=int;ip.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip '+(int==='easy'?'co':int==='medium'?'am':'hot');};ip.appendChild(b);});
   const ep=document.getElementById('sess-equip-picker');ep.innerHTML='';EQUIPMENT.forEach(eq=>{const b=document.createElement('button');const active=sessEditEquip.includes(eq.id);b.className='chip'+(active?' ac':'');b.innerHTML=`${eq.icon} ${eq.label}`;b.onclick=()=>{if(sessEditEquip.includes(eq.id)){if(sessEditEquip.length===1)return;sessEditEquip=sessEditEquip.filter(e=>e!==eq.id);b.className='chip';}else{sessEditEquip=[...sessEditEquip,eq.id];b.className='chip ac';};};ep.appendChild(b);});
   // Location picker — decides which exercise pool and progression style is used
@@ -3838,7 +4022,7 @@ function saveCustomEx(){
 
 function showExDetail(idx){const ex=curExercises[idx];if(!ex)return;openInfoModal(ex);}
 
-function bodyMapSVG(muscles){
+function bodyMapSVG(muscles,isStretch){
   // Normalize fine-grained muscle keys to drawable regions
   const REGION={chest:'chest',shoulders:'shoulders',rear_shoulders:'shoulders',
     arms:'armsF|armsB',biceps:'armsF',triceps:'armsB',
@@ -3848,7 +4032,7 @@ function bodyMapSVG(muscles){
     calves:'calves',inner_thighs:'quads',fullbody:'chest|shoulders|armsF|armsB|core|backU|backL|glutes|quads|hams|calves'};
   const r=new Set();
   (muscles||[]).forEach(k=>{(REGION[k]||'').split('|').forEach(x=>x&&r.add(x));});
-  const ac='var(--ac)',off='var(--bodyOff)',skin='var(--bodySkin)',skinD='var(--bodySkinD)',line='var(--bodyLine)';
+  const ac=isStretch?'#38bdf8':'var(--ac)',off='var(--bodyOff)',skin='var(--bodySkin)',skinD='var(--bodySkinD)',line='var(--bodyLine)';
   const f=k=>r.has(k)?ac:off;
   // Shared silhouette pieces
   const head=`<ellipse cx="45" cy="14" rx="10" ry="12" fill="${skin}" stroke="${skinD}"/><rect x="41" y="25" width="8" height="7" rx="2.5" fill="${skin}"/>`;
@@ -3951,16 +4135,18 @@ function renderLibrary(){
   const overridden=new Set(library.filter(e=>e.overrides).map(e=>e.name.toLowerCase()));
   const base=DEFAULT_LIB.filter(e=>!overridden.has((e.name||'').toLowerCase()));
   const gymBase=STUDIO_LIB.filter(e=>!overridden.has((e.name||'').toLowerCase()));
-  let allEx=[...base,...gymBase,...library];
-  // Location filter: home hides gym-only exercises and vice versa
-  if(libLoc==='home')allEx=allEx.filter(e=>!e.gym);
-  else if(libLoc==='gym')allEx=allEx.filter(e=>e.gym||!e.gym); // gym includes everything
+  const stretchBase=STRETCH_LIB.filter(e=>!overridden.has((e.name||'').toLowerCase()));
+  let allEx=[...base,...gymBase,...stretchBase,...library];
+  // Filter by where/what: stretches are their own category
+  if(libLoc==='stretch')allEx=allEx.filter(e=>e.stretch);
+  else if(libLoc==='home')allEx=allEx.filter(e=>!e.gym&&!e.stretch);
+  else if(libLoc==='gym')allEx=allEx.filter(e=>!e.stretch);
   const mGroups=['all','chest','back','shoulders','arms','core','glutes','legs'];
   const mLabels={all:'Alle',chest:'Brust',back:'Rücken',shoulders:'Schultern',arms:'Arme',core:'Core',glutes:'Gesäß',legs:'Beine'};
   const lw=document.getElementById('lib-loc-filter');
   if(lw){
     lw.innerHTML='';
-    [['all','Alle'],['home','🏠 Zuhause'],['gym','🏋️ Studio']].forEach(([id,label])=>{
+    [['all','Alle'],['home','🏠 Zuhause'],['gym','🏋️ Studio'],['stretch','🧘 Dehnen']].forEach(([id,label])=>{
       const b=document.createElement('button');
       b.className='chip'+(id===libLoc?' ac':'');
       b.textContent=label;b.onclick=()=>setLibLoc(id);
@@ -4001,7 +4187,7 @@ function renderLibrary(){
         </div>
         <div style="width:38px;height:38px;border-radius:10px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.20);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--ac);flex-shrink:0">${getExIcon(ex.name)}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:3px">${ex.name}${ex.bilateral?' ↔':''}${ex.gym?' <span style="font-size:9px;color:var(--am);font-weight:700;letter-spacing:.05em">STUDIO</span>':''}${ex.fromWorkout?' <span style="font-size:9px;color:var(--co);font-weight:700;letter-spacing:.05em">AUS TRAINING</span>':''}</div>
+          <div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:3px">${ex.name}${ex.bilateral?' ↔':''}${ex.gym?' <span style="font-size:9px;color:var(--am);font-weight:700;letter-spacing:.05em">STUDIO</span>':''}${ex.stretch?' <span style="font-size:9px;color:#38bdf8;font-weight:700;letter-spacing:.05em">DEHNEN</span>':''}${ex.fromWorkout?' <span style="font-size:9px;color:var(--co);font-weight:700;letter-spacing:.05em">AUS TRAINING</span>':''}</div>
           ${ex.variants?`<div style="font-size:10px;color:var(--mu);margin-bottom:3px">Varianten: ${ex.variants}</div>`:''}
           <div style="display:flex;gap:4px;flex-wrap:wrap">${(ex.muscles||[]).map(m=>mkT(MUSCLE_DE[m]||m,'var(--ac)')).join('')}${(()=>{const eq=exEquip(ex);return eq&&eq!=='bodyweight'?mkT('🔧 '+(EQUIP_ICON[eq]||eq),'var(--am)'):'';})()}</div>
           ${ex.tip?`<div style="font-size:11px;color:var(--mu);margin-top:3px">${ex.tip}</div>`:''}
@@ -4085,7 +4271,7 @@ function googleExercise(){
 function openInfoModal(ex){
   _currentInfoEx=ex;
   document.getElementById('mi-name').textContent=ex.name+(ex.bilateral?' ↔ beidseitig':'');
-  document.getElementById('mi-bodymap').innerHTML=bodyMapSVG(ex.muscles||[]);
+  document.getElementById('mi-bodymap').innerHTML=bodyMapSVG(ex.muscles||[],!!ex.stretch);
   document.getElementById('mi-muscles').innerHTML=(ex.muscles||[]).map(m=>mkT(MUSCLE_DE[m]||m,'var(--ac)')).join(' ');
   document.getElementById('mi-detail').innerHTML=(ex.details||'—').replace(/\. /g,'.<br>');
   const tipEl=document.getElementById('mi-tip-wrap'),tipTxt=document.getElementById('mi-tip');
@@ -4621,6 +4807,7 @@ function renderAnalytics(range){
   // Per-exercise stats: total reps, best single session, how often trained
   const exStats={};
   filtered.forEach(w=>{
+    if(w.stretch)return;                        // no reps to speak of
     repsPerExercise(w).forEach(p=>{
       if(!p.name||p.reps<=0)return;
       const s=exStats[p.name]||(exStats[p.name]={total:0,best:0,sessions:0,last:0,lastDate:''});
