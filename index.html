@@ -1346,6 +1346,13 @@ const STUDIO_LIB=[
 ];
 
 const DEFAULT_LIB=[
+  {name:'Inverted Row (Tischrudern)',muscles:['back','biceps'],bilateral:false,equip:'bar',tip:'Körper bleibt gerade',details:'Stange auf Hüfthöhe (Klimmzugstange tief eingehängt, Rack oder stabiler Tisch). Darunterlegen, Brust zur Stange ziehen, Körper in einer Linie. Je waagerechter, desto schwerer.',mistakes:'Hüfte durchhängen lassen'},
+  {name:'Negativ-Klimmzug',muscles:['back','biceps'],bilateral:false,equip:'bar',tip:'Langsam ablassen (3-5s)',details:'Oben starten (hochspringen), dann so langsam wie möglich herunterlassen.',mistakes:'Zu schnell fallen lassen'},
+  {name:'Pike Push-up',muscles:['shoulders','triceps'],bilateral:false,tip:'Hüfte hoch, Kopf Richtung Boden',details:'Umgekehrtes V, Kopf zwischen den Händen absenken.',mistakes:'Hüfte zu tief (wird normaler Push-up)'},
+  {name:'Australian Pull-up',muscles:['back','biceps'],bilateral:false,equip:'bar',tip:'Schulterblätter zusammen',details:'Waagerecht unter der Stange, Brust zur Stange ziehen.',mistakes:'Nur mit den Armen ziehen'},
+  {name:'Hollow Body Hold',muscles:['core'],bilateral:false,tip:'Lendenwirbel am Boden',details:'Arme und Beine gestreckt anheben, unterer Rücken bleibt in Kontakt.',mistakes:'Hohlkreuz'},
+  {name:'Superman',muscles:['lower_back','glutes'],bilateral:false,tip:'Kontrolliert heben',details:'Bauchlage, Arme und Beine gleichzeitig anheben, kurz halten.',mistakes:'Nacken überstrecken'},
+  {name:'Bird Dog',muscles:['core','lower_back'],bilateral:true,tip:'Rumpf stabil halten',details:'Vierfüßlerstand, gegenüberliegenden Arm und Bein strecken.',mistakes:'Becken kippen'},
   {name:'Push-up',muscles:['chest','arms'],bilateral:false,tip:'Brust zur Matte',details:'Körper gerade, Hände schulterbreit. Kontrolliert runter, explosiv hoch.',mistakes:'Hüfte hängen lassen'},
   {name:'Knie Push-up',muscles:['chest','arms'],bilateral:false,tip:'Knie am Boden, Oberkörper gerade',details:'Knie aufsetzen. Oberkörper wie normaler Push-up.',mistakes:'Hüfte durchhängen'},
   {name:'Glute Bridge',muscles:['glutes'],bilateral:false,tip:'Oben 1 Sek halten',details:'Rücken flach, Füße hüftbreit. Hüfte heben bis Körper gerade.',mistakes:'Lendenwirbel überstrecken'},
@@ -2367,11 +2374,58 @@ function initRating(){const tot=Object.values(tReps).reduce((s,v)=>s+v,0);docume
   return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid '+border+'"><div style="font-size:13px;color:var(--su)">'+ex.name+setsLabel+'</div><div style="font-size:13px;font-family:var(--m);color:'+(tot2>0?'var(--co)':'var(--mu)')+';font-weight:'+(tot2>0?600:400)+';text-align:right">'+(tot2>0?setsStr:'—')+'</div></div>';
 }).join('');show('s-rating');}
 
+// Exercises the AI invents during a workout are not in the library yet.
+// Adopt them on save so the directory reflects what was actually trained.
+// One-off: pull exercises out of already-logged workouts into the library,
+// so the directory isn't missing things that were already trained.
+function backfillLibraryFromLog(){
+  try{
+    if(localStorage.getItem('coach_lib_backfill')==='1')return 0;
+    let total=0;
+    (log||[]).forEach(w=>{total+=adoptExercisesToLibrary(w.exercises||[]);});
+    localStorage.setItem('coach_lib_backfill','1');
+    return total;
+  }catch{return 0;}
+}
+
+function adoptExercisesToLibrary(exercises){
+  if(!Array.isArray(exercises)||!exercises.length)return 0;
+  const known=new Set([...DEFAULT_LIB,...STUDIO_LIB,...library].map(e=>(e.name||'').trim().toLowerCase()));
+  let added=0;
+  exercises.forEach(ex=>{
+    const n=(ex.name||'').trim();
+    if(!n)return;
+    const key=n.toLowerCase();
+    if(known.has(key))return;
+    known.add(key);
+    library=[...library,{
+      name:n,
+      muscles:(ex.muscles||['core']).slice(0,4),
+      bilateral:!!ex.bilateral,
+      tip:ex.tip||'',
+      details:ex.details||'',
+      mistakes:ex.mistakes||'',
+      gym:!!ex.trackWeight,
+      equip:exEquip(ex),
+      custom:true,
+      fromWorkout:true
+    }];
+    added++;
+  });
+  if(added)saveLibrary();
+  return added;
+}
+
 function saveWorkout(){
   const entry={id:Date.now(),date:new Date().toISOString(),muscles:curSetup.muscles||[],durationMin:curSetup.durationMin||20,exercises:curExercises,repLog:{...tReps},rpe,note:document.getElementById('rat-note').value.trim()};
   // Snapshot challenge completion before adding this workout
   const _chBefore={};loadChallenges().forEach(ch=>{_chBefore[ch.id]=calcChallengeProgress(ch).pct>=100;});
   log.push(entry);persist();
+  // Grow the library with whatever was actually trained
+  try{
+    const _added=adoptExercisesToLibrary([...(curExercises||[]),...(wuExercises||[])]);
+    if(_added)setTimeout(()=>showErr(`📖 ${_added} neue ${_added===1?'Übung':'Übungen'} ins Verzeichnis aufgenommen.`),1600);
+  }catch{}
   // Celebrate any challenge that crossed 100% with this workout
   try{
     const done=loadChallenges().filter(ch=>!_chBefore[ch.id]&&calcChallengeProgress(ch).pct>=100);
@@ -3644,6 +3698,24 @@ function buildFromSelection(){
 
 let libLoc='all';
 function setLibLoc(v){libLoc=v;renderLibrary();}
+// Which equipment does an exercise need? Explicit field wins, otherwise infer
+// from the name so adopted/AI-generated exercises are labelled too.
+const EQUIP_ICON={bodyweight:'Körpergewicht',bar:'Klimmzugstange',dumbbells:'Kurzhanteln',resistance_band:'Band',kettlebell:'Kettlebell',bench:'Bank',machines:'Gerät',barbell:'Langhantel',cables:'Kabelzug',rack:'Rack'};
+function exEquip(ex){
+  if(ex.equip)return ex.equip;
+  const n=(ex.name||'').toLowerCase();
+  if(/klimmzug|pull.?up|chin.?up|inverted row|tischrudern|hängend|toes.?to.?bar|muscle.?up/.test(n))return 'bar';
+  if(/kurzhantel|dumbbell|hammer curl|goblet/.test(n))return 'dumbbells';
+  if(/langhantel|barbell|sz-|schrägbankdrücken|bankdrücken|kreuzheben/.test(n))return 'barbell';
+  if(/kabel|cable|seilzug|lat.?zug|latzug/.test(n))return 'cables';
+  if(/maschine|presse|beinstrecker|beinbeuger|butterfly|crossover|multipresse/.test(n))return 'machines';
+  if(/kettlebell|swing/.test(n))return 'kettlebell';
+  if(/band|widerstands/.test(n))return 'resistance_band';
+  if(/bank|bench|step.?up|erhöh/.test(n))return 'bench';
+  if(/dip/.test(n))return 'bar';
+  return 'bodyweight';
+}
+
 function clearLibSearch(){const i=document.getElementById('lib-search');if(i){i.value='';renderLibrary();}}
 function renderLibrary(){
   // User edits of built-in exercises are stored in `library` with the same name
@@ -3701,9 +3773,9 @@ function renderLibrary(){
         </div>
         <div style="width:38px;height:38px;border-radius:10px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.20);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--ac);flex-shrink:0">${getExIcon(ex.name)}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:3px">${ex.name}${ex.bilateral?' ↔':''}${ex.gym?' <span style="font-size:9px;color:var(--am);font-weight:700;letter-spacing:.05em">STUDIO</span>':''}</div>
+          <div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:3px">${ex.name}${ex.bilateral?' ↔':''}${ex.gym?' <span style="font-size:9px;color:var(--am);font-weight:700;letter-spacing:.05em">STUDIO</span>':''}${ex.fromWorkout?' <span style="font-size:9px;color:var(--co);font-weight:700;letter-spacing:.05em">AUS TRAINING</span>':''}</div>
           ${ex.variants?`<div style="font-size:10px;color:var(--mu);margin-bottom:3px">Varianten: ${ex.variants}</div>`:''}
-          <div style="display:flex;gap:4px;flex-wrap:wrap">${(ex.muscles||[]).map(m=>mkT(MUSCLE_DE[m]||m,'var(--ac)')).join('')}</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">${(ex.muscles||[]).map(m=>mkT(MUSCLE_DE[m]||m,'var(--ac)')).join('')}${(()=>{const eq=exEquip(ex);return eq&&eq!=='bodyweight'?mkT('🔧 '+(EQUIP_ICON[eq]||eq),'var(--am)'):'';})()}</div>
           ${ex.tip?`<div style="font-size:11px;color:var(--mu);margin-top:3px">${ex.tip}</div>`:''}
         </div>
         <button onclick="event.stopPropagation();editLibEx(${idx})" style="width:32px;height:32px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">✏</button>
@@ -4406,6 +4478,7 @@ document.addEventListener('visibilitychange',()=>{
 document.addEventListener('DOMContentLoaded',()=>{
   try{
     log=loadLog();plan=loadPlan();library=loadLibrary();
+    backfillLibraryFromLog();
     updateHome();
     if(loadKey()&&log.length>=1)setTimeout(fetchCoach,800);
     document.querySelectorAll('.modal-ov').forEach(el=>el.addEventListener('click',e=>{
