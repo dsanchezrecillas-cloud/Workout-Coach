@@ -1390,24 +1390,24 @@ const STUDIO_LIB=[
 // die Kraftleistung). Dynamisch gehört ins Warmup, nicht hierher.
 const STRETCH_LIB=[
   // Oben nach unten
-  {name:'Nacken-Seitneige',muscles:['shoulders'],stretch:true,bilateral:true,hold:30,tip:'Schulter unten lassen',details:'Kopf zur Seite neigen, Gegenschulter bewusst nach unten ziehen.',mistakes:'Schulter hochziehen'},
+  {name:'Nacken-Seitneige',muscles:['upper_back','shoulders'],stretch:true,bilateral:true,hold:30,tip:'Schulter unten lassen',details:'Kopf zur Seite neigen, Gegenschulter bewusst nach unten ziehen.',mistakes:'Schulter hochziehen'},
   {name:'Brustdehnung an der Wand',muscles:['chest','shoulders'],stretch:true,bilateral:true,hold:30,tip:'Ellenbogen auf Schulterhöhe',details:'Unterarm an Wand/Türrahmen, Oberkörper langsam wegdrehen.',mistakes:'Zu weit drehen, Schulter schmerzt'},
-  {name:'Schulterdehnung über Kreuz',muscles:['shoulders','upper_back'],stretch:true,bilateral:true,hold:30,tip:'Arm gestreckt',details:'Arm quer vor die Brust ziehen, mit dem anderen Arm halten.',mistakes:'Schulter mit hochziehen'},
-  {name:'Trizepsdehnung über Kopf',muscles:['triceps','shoulders'],stretch:true,bilateral:true,hold:30,tip:'Ellenbogen zeigt nach oben',details:'Hand hinter den Nacken, Ellenbogen sanft nach hinten drücken.',mistakes:'Kopf nach vorne schieben'},
+  {name:'Schulterdehnung über Kreuz',muscles:['rear_shoulders','upper_back'],stretch:true,bilateral:true,hold:30,tip:'Arm gestreckt',details:'Arm quer vor die Brust ziehen, mit dem anderen Arm halten.',mistakes:'Schulter mit hochziehen'},
+  {name:'Trizepsdehnung über Kopf',muscles:['triceps','lats'],stretch:true,bilateral:true,hold:30,tip:'Ellenbogen zeigt nach oben',details:'Hand hinter den Nacken, Ellenbogen sanft nach hinten drücken.',mistakes:'Kopf nach vorne schieben'},
   {name:'Lat-Dehnung seitlich',muscles:['lats','upper_back'],stretch:true,bilateral:true,hold:30,tip:'Zur Seite lang machen',details:'Arm über Kopf, Oberkörper zur Gegenseite neigen.',mistakes:'Nach vorne kippen'},
   {name:'Katze-Kuh',muscles:['back','lower_back','core'],stretch:true,hold:45,tip:'Mit der Atmung',details:'Vierfüßlerstand, Wirbelsäule abwechselnd runden und strecken.',mistakes:'Zu schnell, nur aus dem Nacken'},
-  {name:'Kindeshaltung',muscles:['lower_back','lats','shoulders'],stretch:true,hold:45,tip:'Tief atmen',details:'Fersensitz, Oberkörper nach vorne ablegen, Arme lang.',mistakes:'Schultern verspannt lassen'},
+  {name:'Kindeshaltung',muscles:['lower_back','lats','upper_back'],stretch:true,hold:45,tip:'Tief atmen',details:'Fersensitz, Oberkörper nach vorne ablegen, Arme lang.',mistakes:'Schultern verspannt lassen'},
   {name:'Kobra / Sphinx',muscles:['core','lower_back','chest'],stretch:true,hold:30,tip:'Schultern tief',details:'Bauchlage, Oberkörper aufrichten, Becken bleibt am Boden.',mistakes:'Nacken überstrecken'},
   {name:'Wirbelsäulendrehung liegend',muscles:['lower_back','obliques','glutes'],stretch:true,bilateral:true,hold:40,tip:'Schultern am Boden',details:'Rückenlage, Knie zur Seite fallen lassen, Kopf zur Gegenseite.',mistakes:'Schulter hebt ab'},
   {name:'Hüftbeuger-Dehnung (Ausfallschritt)',muscles:['hip_flexors','quads'],stretch:true,bilateral:true,hold:40,tip:'Becken aufrichten',details:'Tiefer Ausfallschritt, hinteres Knie am Boden, Becken nach vorne schieben.',mistakes:'Hohlkreuz statt Beckenaufrichtung'},
   {name:'Taubenhaltung (Gesäß)',muscles:['glutes','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Ruhig atmen',details:'Vorderes Bein angewinkelt, hinteres lang. Oberkörper aufrecht oder abgelegt.',mistakes:'Becken verkippen'},
   {name:'Gesäßdehnung im Sitzen (Figure 4)',muscles:['glutes'],stretch:true,bilateral:true,hold:40,tip:'Rücken gerade',details:'Knöchel aufs andere Knie legen, Oberkörper nach vorne neigen.',mistakes:'Runder Rücken'},
-  {name:'IT-Band-Dehnung im Stehen',muscles:['glutes','quads'],stretch:true,bilateral:true,hold:40,tip:'Hüfte seitlich schieben',details:'Beine kreuzen, Hüfte zur Seite schieben, Oberkörper zur Gegenseite neigen.',mistakes:'Nach vorne beugen statt seitlich'},
+  {name:'IT-Band-Dehnung im Stehen',muscles:['glutes','quads','inner_thighs'],stretch:true,bilateral:true,hold:40,tip:'Hüfte seitlich schieben',details:'Beine kreuzen, Hüfte zur Seite schieben, Oberkörper zur Gegenseite neigen.',mistakes:'Nach vorne beugen statt seitlich'},
   {name:'Hamstring-Dehnung im Sitzen',muscles:['hams','calves'],stretch:true,bilateral:true,hold:40,tip:'Aus der Hüfte beugen',details:'Bein gestreckt, aus der Hüfte nach vorne neigen, Rücken lang.',mistakes:'Runder Rücken, Knie überstrecken'},
   {name:'Quadrizeps-Dehnung im Stehen',muscles:['quads','hip_flexors'],stretch:true,bilateral:true,hold:35,tip:'Knie nach unten',details:'Fuß zum Gesäß ziehen, Knie zeigt nach unten, Becken aufgerichtet.',mistakes:'Hohlkreuz, Knie nach außen'},
   {name:'Adduktoren-Dehnung (Schmetterling)',muscles:['inner_thighs'],stretch:true,hold:45,tip:'Knie sinken lassen',details:'Fußsohlen zusammen, Knie Richtung Boden, Rücken gerade.',mistakes:'Knie runterdrücken'},
   {name:'Wadendehnung an der Wand',muscles:['calves'],stretch:true,bilateral:true,hold:35,tip:'Ferse am Boden',details:'Bein nach hinten strecken, Ferse gedrückt halten, Hüfte nach vorne.',mistakes:'Ferse abheben'},
-  {name:'Herabschauender Hund',muscles:['hams','calves','shoulders','lats'],stretch:true,hold:45,tip:'Sitzbeinhöcker hoch',details:'Umgekehrtes V, Fersen Richtung Boden, Rücken lang.',mistakes:'Rücken runden, um die Fersen zu erreichen'},
+  {name:'Herabschauender Hund',muscles:['hams','calves','lats'],stretch:true,hold:45,tip:'Sitzbeinhöcker hoch',details:'Umgekehrtes V, Fersen Richtung Boden, Rücken lang.',mistakes:'Rücken runden, um die Fersen zu erreichen'},
   {name:'Tiefe Hocke (Malasana)',muscles:['glutes','hip_flexors','calves'],stretch:true,hold:45,tip:'Fersen am Boden',details:'Tief in die Hocke, Ellenbogen drücken die Knie nach außen.',mistakes:'Fersen heben, Rücken kollabiert'},
   {name:'Liegende Hamstring-Dehnung',muscles:['hams'],stretch:true,bilateral:true,hold:40,tip:'Unterer Rücken am Boden',details:'Rückenlage, Bein gestreckt hochziehen, ggf. mit Handtuch.',mistakes:'Becken kippt mit'}
 ];
@@ -4028,7 +4028,7 @@ function bodyMapSVG(muscles,isStretch){
     arms:'armsF|armsB',biceps:'armsF',triceps:'armsB',
     core:'core',abs:'core',hip_flexors:'core',obliques:'core',
     back:'backU|backL',lats:'backU',upper_back:'backU',lower_back:'backL',
-    glutes:'glutes',legs:'quads|hams|calves',quads:'quads',hamstrings:'hams',
+    glutes:'glutes',legs:'quads|hams|calves',quads:'quads',hamstrings:'hams',hams:'hams',
     calves:'calves',inner_thighs:'quads',fullbody:'chest|shoulders|armsF|armsB|core|backU|backL|glutes|quads|hams|calves'};
   const r=new Set();
   (muscles||[]).forEach(k=>{(REGION[k]||'').split('|').forEach(x=>x&&r.add(x));});
@@ -4155,7 +4155,13 @@ function renderLibrary(){
   }
   const fw=document.getElementById('lib-filter');fw.innerHTML='';
   mGroups.forEach(g=>{const b=document.createElement('button');b.className='chip'+(g===libFilter?' ac':'');b.textContent=mLabels[g];b.onclick=()=>{libFilter=g;renderLibrary();};fw.appendChild(b);});
-  let filtered=libFilter==='all'?allEx:allEx.filter(e=>(e.muscles||[]).includes(libFilter));
+  // Match on main groups so 'Beine' also finds quads/hams/calves
+  const filterGroup=m=>{
+    const key=String(m).toLowerCase();
+    return MUSCLE_MAIN[key]||MUSCLE_DE[key]||key;
+  };
+  const wantGroup=libFilter==='all'?null:(MUSCLE_MAIN[libFilter]||MUSCLE_DE[libFilter]||libFilter);
+  let filtered=!wantGroup?allEx:allEx.filter(e=>(e.muscles||[]).some(m=>filterGroup(m)===wantGroup));
   const q=(document.getElementById('lib-search')?.value||'').trim().toLowerCase();
   const xBtn=document.getElementById('lib-search-x');if(xBtn)xBtn.style.display=q?'block':'none';
   if(q){
