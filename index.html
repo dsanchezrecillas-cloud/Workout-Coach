@@ -337,10 +337,11 @@ button:active:not(:disabled){transform:scale(.96)}
       </div>
     </div>
   </div>
-  <div id="ex-list" style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px"></div>
+  <div id="ex-list" style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px"></div>
+  <button id="add-ex-live" onclick="addExerciseDuringWorkout()" style="width:100%;padding:10px;border-radius:10px;background:var(--up);border:1px dashed var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f);margin-bottom:12px">＋ Übung hinzufügen</button>
   <div style="display:flex;gap:8px;margin-bottom:7px">
     <button id="main-btn" class="btn btn-ac" style="flex:1">Start</button>
-    
+
   </div>
   <button id="reps-done-btn" onclick="repsDone()" style="display:none;width:100%;padding:15px;border-radius:13px;background:linear-gradient(135deg,#059669,#34d399);color:#fff;font-size:16px;font-weight:700;font-family:var(--f);letter-spacing:.02em;margin-bottom:8px">✓ Satz fertig</button>
   <div style="display:flex;gap:8px;margin-bottom:4px">
@@ -544,7 +545,16 @@ button:active:not(:disabled){transform:scale(.96)}
       <button onclick="toggleTheme()" id="theme-switch" role="switch" aria-checked="true" style="position:relative;width:52px;height:30px;border-radius:15px;border:1px solid var(--br);background:var(--ac);flex-shrink:0;transition:background .2s;padding:0">
         <span id="theme-knob" style="position:absolute;top:3px;left:25px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px">🌙</span>
       </button>
-    </div>
+    
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:1px solid var(--br)">
+      <div style="flex:1;padding-right:10px">
+        <div style="font-size:14px;font-weight:600;color:var(--tx)">Automatisch weiter</div>
+        <div style="font-size:12px;color:var(--mu);margin-top:2px">Nach der Pause direkt in den nächsten Satz. Aus = du startest selbst.</div>
+      </div>
+      <button onclick="setAutoAdvance(!autoAdvanceOn())" id="autoadv-switch" role="switch" style="position:relative;width:52px;height:30px;border-radius:15px;border:1px solid var(--br);background:var(--br);flex-shrink:0;transition:background .2s;padding:0">
+        <span id="autoadv-knob" style="position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+      </button>
+    </div></div>
   </div>
   <div class="card" style="margin-bottom:13px">
     <div style="font-size:10px;letter-spacing:.1em;color:var(--co);text-transform:uppercase;font-weight:600;margin-bottom:11px">API Key</div>
@@ -894,6 +904,7 @@ button:active:not(:disabled){transform:scale(.96)}
       <div id="mi-m-txt" style="font-size:13px;color:var(--tx);line-height:1.65"></div>
     </div>
     <div id="mi-progress"></div>
+    <button id="mi-jump" onclick="jumpToPeeked()" style="display:none;width:100%;margin-top:14px;padding:12px;border-radius:11px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.3);color:var(--ac);font-size:13px;font-weight:600;font-family:var(--f)">↪ Zu dieser Übung springen</button>
   </div>
 </div>
 
@@ -1172,7 +1183,9 @@ function histTxt(){
     const d=new Date(w.date.split('T')[0]+'T12:00:00');
     const daysAgo=Math.round((now-d)/86400000);
     const when=daysAgo===0?'heute':daysAgo===1?'gestern':`vor ${daysAgo} Tagen`;
-    const muscles=(w.stretch?'🧘 ':'')+(mainMuscles(w.muscles,3).join(', ')||'?');
+    const muscles=w.stretch
+      ?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:''))
+      :(mainMuscles(w.muscles,3).join(', ')||'?');
     return`${when} | ${muscles} | RPE ${w.rpe}/10`+(w.note?` | "${w.note}"`:'')+` | ${w.durationMin||'?'} min`;
   }).join('\n');
 }
@@ -1189,7 +1202,7 @@ function show(id){
     else if(id==='s-library'){libSelected.clear();renderLibrary();}
     else if(id==='s-home')updateHome();
     else if(id==='s-journal')renderJournal();
-    else if(id==='s-settings')applyTheme(loadTheme());
+    else if(id==='s-settings'){applyTheme(loadTheme());setAutoAdvance(autoAdvanceOn());}
     else if(id==='s-analytics'){if(typeof analyticsRange==='function')analyticsRange(typeof currentAnalyticsRange!=='undefined'?currentAnalyticsRange:'week');}
     else if(id==='s-goals'){if(typeof renderGoals==='function')renderGoals();}
   }catch(e){console.error('Screen init error:',e);}
@@ -1216,7 +1229,17 @@ function toggleTheme(){
 
 function showErr(msg){document.getElementById('err-txt').textContent=msg;document.getElementById('err').style.display='flex';setTimeout(hideErr,7000);}
 function hideErr(){document.getElementById('err').style.display='none';}
-function closeModal(id){document.getElementById(id).classList.remove('open');}
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+  // Resume a timer that was paused just to read an exercise description
+  if(id==='modal-info')window._peekIdx=undefined;
+  if(id==='modal-info'&&window._resumeAfterInfo){
+    window._resumeAfterInfo=false;
+    if(tStatus==='rest'||tStatus==='round_rest'||(tStatus==='work'&&isTimedPhase())){
+      tRun=true;updateTimer();_tickTs=Date.now();tIv=setInterval(tick,1000);
+    }
+  }
+}
 
 // ─── Wake Lock ────────────────────────────────────────────────────────────────
 async function reqWL(){try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch{}}
@@ -1531,7 +1554,7 @@ function updateHome(){
   document.getElementById('h-streak').textContent=streak()>0?streak()+'d 🔥':'—';
   {const _st=streak(),_tile=document.getElementById('h-streak-tile');
    if(_tile)_tile.style.display=_st>0?'block':'none';}
-  document.getElementById('h-total').textContent=log.length;
+  document.getElementById('h-total').textContent=log.filter(w=>!w.stretch).length;
   document.getElementById('h-last').textContent=last?(dSince(last.date)===0?'heute':'vor '+dSince(last.date)+'T'):'—';
   document.getElementById('hist-btn').style.display=log.length>0?'block':'none';
   if(loadTemplates().length)document.getElementById('tpl-btn').style.display='block';
@@ -1542,7 +1565,9 @@ function updateHome(){
   document.getElementById('greeting').textContent=(h<12?'Guten Morgen':h<18?'Guten Tag':'Guten Abend')+', Dario.';
   if(last){
     document.getElementById('last-card').style.display='block';
-    document.getElementById('l-name').textContent=mainMuscles(last.muscles,3).join(', ')||'Workout';
+    document.getElementById('l-name').textContent=last.stretch
+      ?('🧘 Dehnen'+(last.areaId&&STRETCH_AREAS[last.areaId]&&last.areaId!=='full'?' — '+STRETCH_AREAS[last.areaId].label:''))
+      :(mainMuscles(last.muscles,3).join(', ')||'Workout');
     const rc=rpc(last.rpe);
     document.getElementById('l-tags').innerHTML=mkT(fmtD(last.date),'var(--mu)')+' '+mkT((last.durationMin||'?')+' min','var(--mu)')+(last.note?' '+mkT('📝','var(--mu)'):'');
     document.getElementById('l-rpe').textContent=last.rpe+'/10';
@@ -2009,11 +2034,22 @@ const MUSCLE_MAIN={
   glutes:'Gesäß',
   legs:'Beine',quads:'Beine',hams:'Beine',hamstrings:'Beine',calves:'Beine',inner_thighs:'Beine'
 };
+const MUSCLE_FALLBACK={neck:'Nacken',spine:'Rücken',hip:'Hüfte',hips:'Hüfte',adductors:'Beine',abductors:'Gesäß',
+  forearms:'Arme',traps:'Schultern',delts:'Schultern',pecs:'Brust',shoulder:'Schultern',chest:'Brust',
+  hamstring:'Beine',quadriceps:'Beine',calf:'Beine',glute:'Gesäß',ankles:'Beine',wrists:'Arme',
+  it_band:'Beine',itband:'Beine',psoas:'Hüfte',piriformis:'Gesäß',thoracic:'Rücken',lumbar:'Rücken'};
 function mainMuscles(list,max){
   const out=[];
   (list||[]).forEach(m=>{
     const key=String(m).toLowerCase().replace(/\s+/g,'_');
-    const label=MUSCLE_MAIN[key]||MUSCLE_DE_SHORT[key]||MUSCLE_DE[key]||m;
+    let label=MUSCLE_MAIN[key]||MUSCLE_FALLBACK[key]||MUSCLE_DE_SHORT[key]||MUSCLE_DE[key];
+    if(!label){
+      // Unknown key: never show a raw english snake_case token
+      const cleaned=String(m).replace(/_/g,' ').trim();
+      label=/^[a-z_ ]+$/i.test(cleaned)&&!/[äöüß]/i.test(cleaned)
+        ? (MUSCLE_FALLBACK[cleaned.toLowerCase()]||'Sonstige')
+        : cleaned.charAt(0).toUpperCase()+cleaned.slice(1);
+    }
     if(!out.includes(label))out.push(label);
   });
   return out.slice(0,max||4);
@@ -2256,6 +2292,30 @@ function startStretchSession(){
   generateStretchSession(stretchArea,stretchDur);
 }
 
+// Safety net: even if the AI ignores the sequence, order the session so it
+// runs standing → floor → relaxation and top → bottom within each phase.
+function stretchPhase(ex){
+  const t=((ex.name||'')+' '+(ex.details||'')).toLowerCase();
+  if(/kindeshaltung|savasana|entspann|liegende drehung|wirbelsäulendrehung liegend/.test(t))return 4;
+  if(/liegend|rückenlage|bauchlage|sitzen|sitzend|taube|figure|schmetterling|kobra|sphinx|katze/.test(t))return 3;
+  if(/hocke|hund|ausfallschritt|vierfüßler|boden|knie/.test(t))return 2;
+  return 1; // standing
+}
+function stretchHeight(ex){
+  const order=['shoulders','rear_shoulders','upper_back','chest','triceps','lats','back','core','obliques','abs','lower_back','hip_flexors','glutes','quads','inner_thighs','hams','calves'];
+  const ms=ex.muscles||[];
+  let best=99;
+  ms.forEach(m=>{const i=order.indexOf(String(m).toLowerCase());if(i>=0&&i<best)best=i;});
+  return best;
+}
+function sortStretchFlow(list){
+  return [...list].sort((a,b)=>{
+    const pa=stretchPhase(a),pb=stretchPhase(b);
+    if(pa!==pb)return pa-pb;
+    return stretchHeight(a)-stretchHeight(b);
+  });
+}
+
 async function generateStretchSession(areaId,minutes,opts){
   const area=STRETCH_AREAS[areaId]||STRETCH_AREAS.full;
   let target=area.muscles;
@@ -2265,10 +2325,18 @@ async function generateStretchSession(areaId,minutes,opts){
   }
   const mins=minutes||12;
   const count=Math.max(4,Math.min(10,Math.round(mins*0.8)));
-  const targetTxt=target?`Fokus auf: ${mainMuscles(target,5).join(', ')}.`:'Ganzkörper von oben nach unten: Nacken/Schultern → Brust → Rücken → Hüfte → Oberschenkel → Waden.';
+  const targetTxt=target?`Fokus auf: ${mainMuscles(target,5).join(', ')}.`:'Ganzkörper.';
   const sys=`Du bist Physiotherapeut und Beweglichkeitstrainer. Erstelle eine STATISCHE DEHN-SESSION auf Deutsch.
 Dauer: ${mins} Minuten, genau ${count} Übungen. ${targetTxt}
 ${(loadProfile()?.limits)?'Einschränkungen des Nutzers: '+loadProfile().limits+' — betroffene Bereiche behutsam oder meiden.':''}
+ABLAUF — SEHR WICHTIG, halte diese Reihenfolge ein:
+1. STEHEND beginnen (Nacken, Schultern, Brust, Trizeps, Waden an der Wand, Quadrizeps im Stehen).
+2. Dann ÜBERGANG zum Boden (herabschauender Hund, tiefe Hocke, Ausfallschritt/Hüftbeuger).
+3. Dann SITZEND/LIEGEND (Hamstrings, Adduktoren, Taube, Figure 4, Wirbelsäulendrehung).
+4. ENDE mit einer ruhigen Entspannungsposition am Boden (Kindeshaltung, Savasana-artig, liegende Drehung).
+Innerhalb jeder Phase von OBEN nach UNTEN arbeiten (Nacken → Schulter → Brust → Rücken → Hüfte → Oberschenkel → Waden).
+NIEMALS am Ende wieder in den Stand wechseln. Keine Positionswechsel hin und her — jeder Wechsel Stand/Boden nur EINMAL.
+
 REGELN:
 - Nur statisches Dehnen (Position halten), KEINE dynamischen oder kräftigenden Übungen, keine Sprünge.
 - Haltezeit 30-60s je Position (Feld duration). Bei einseitigen Dehnungen bilateral:true, dann gilt die Zeit je Seite.
@@ -2291,6 +2359,7 @@ Bekannte Dehnübungen als Orientierung: ${STRETCH_LIB.slice(0,14).map(e=>e.name)
       if(!ex.rest)ex.rest=12;
     });
     if(!exArr.length)throw new Error('Keine Übungen');
+    exArr=sortStretchFlow(exArr);
     curExercises=exArr;wuExercises=[];
     curSetup={muscles:[...new Set(exArr.flatMap(e=>e.muscles||[]))],durationMin:mins,stretch:true,areaId};
     window._isStretchSession=true;
@@ -2649,6 +2718,36 @@ function toggleBilateralLive(){
   showErr(ex.bilateral?'↔ Übung zählt jetzt links und rechts getrennt.':'Übung zählt jetzt beidseitig zusammen.');
 }
 
+// Tapping an exercise in the list should let you look it up — not teleport you
+// into it. The timer pauses while you read; jumping is an explicit choice.
+// Add an exercise mid-workout. Pauses the clock, appends to the end of the
+// current list so the running set isn't disturbed.
+function addExerciseDuringWorkout(){
+  if(tRun){window._resumeAfterInfo=true;pauseTimer();}
+  window._addingLive=true;
+  openAddExToWorkout();
+}
+
+function peekExercise(i){
+  const exList=isWU?wuExercises:curExercises;
+  const ex=exList[i];if(!ex)return;
+  if(tRun){window._resumeAfterInfo=true;pauseTimer();}
+  window._peekIdx=i;
+  openInfoModal(ex);
+  const foot=document.getElementById('mi-jump');
+  if(foot){
+    const isCurrent=(i===tIdx)&&tStatus!=='idle'&&tStatus!=='done';
+    foot.style.display=(isCurrent||tStatus==='idle'||tStatus==='done')?'none':'block';
+    foot.textContent='↪ Zu dieser Übung springen';
+  }
+}
+function jumpToPeeked(){
+  const i=window._peekIdx;
+  window._resumeAfterInfo=false;
+  closeModal('modal-info');
+  if(typeof i==='number')jumpToExercise(i);
+}
+
 function jumpToExercise(i){
   const exList=isWU?wuExercises:curExercises;
   if(!exList[i]||tStatus==='done')return;
@@ -2674,7 +2773,7 @@ function renderExList(){
     const inG=!!g, gStart=inG&&g!==prevG, gEnd=inG&&g!==nextG;
     const gBorder=inG?`border-left:3px solid var(--am);background:rgba(var(--amRGB),.06);${gStart?'border-top-left-radius:8px;border-top-right-radius:8px;':''}${gEnd?'border-bottom-left-radius:8px;border-bottom-right-radius:8px;':''}`:'';
     const head=gStart?`<div style="font-size:9px;color:var(--am);font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 0 3px 10px">🔗 Supersatz</div>`:'';
-    return head+`<div id="erow-${i}" onclick="jumpToExercise(${i})" style="display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:8px;transition:all .25s;cursor:pointer;${gBorder}">
+    return head+`<div id="erow-${i}" onclick="peekExercise(${i})" style="display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:8px;transition:all .25s;cursor:pointer;${gBorder}">
       <div id="edot-${i}" style="width:18px;height:18px;border-radius:50%;flex-shrink:0;border:1.5px solid var(--br);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:var(--mu)">${i+1}</div>
       <div style="font-size:12px;font-weight:500;flex:1;color:${e.warmup?'var(--am)':'var(--mu)'}">${e.name}${e.bilateral?' ↔':''}</div>
       ${tot>0?`<span class="tag" style="background:rgba(var(--coRGB),.17);color:var(--co)">${tot}</span>`:''}
@@ -2686,12 +2785,12 @@ function updateTimer(){
   const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};
   const isWu=isWU||ex.warmup;
   const exType=ex.type||'time';
-  let pc=isWu&&tStatus==='work'?'#d97706':tStatus==='rest'?'var(--co)':tStatus==='done'?'var(--co)':'var(--ac)';
-  const pl={work:isWu?'AUFWÄRMEN':exType==='hold'?'HALTEN':exType==='reps'?'WIEDERHOLUNGEN':'ARBEIT',rest:'PAUSE',done:'FERTIG',idle:''}[tStatus]||'PAUSE';
+  let pc=tStatus==='ready'?'var(--am)':isWu&&tStatus==='work'?'#d97706':tStatus==='rest'?'var(--co)':tStatus==='done'?'var(--co)':'var(--ac)';
+  const pl={work:isWu?'AUFWÄRMEN':exType==='hold'?'HALTEN':exType==='reps'?'WIEDERHOLUNGEN':'ARBEIT',rest:'PAUSE',ready:'BEREIT',done:'FERTIG',idle:''}[tStatus]||'PAUSE';
   const mt=tStatus==='work'?(ex.duration||40):tStatus==='rest'?(ex.rest||20):RREST;
   const pg=mt>0?((mt-tLeft)/mt)*100:0;
   const arc=document.getElementById('timer-arc');arc.setAttribute('stroke',pc);
-  const isRM=exType==='reps'&&tStatus==='work';
+  const isRM=exType==='reps'&&(tStatus==='work'||tStatus==='ready');
   if(isRM){arc.setAttribute('stroke-dashoffset',CIRC);}else{arc.setAttribute('stroke-dashoffset',CIRC-(pg/100)*CIRC);}
   arc.style.filter=`drop-shadow(0 0 9px ${pc}55)`;
   document.getElementById('ph-label').textContent=pl;document.getElementById('ph-label').style.color=pc;
@@ -2713,12 +2812,17 @@ function updateTimer(){
   if(tStatus!=='idle'&&tStatus!=='done'){
     if(isWU)ctrTxt='Warmup '+(tIdx+1)+'/'+wuExercises.length;
     else{
+      const _twoSided=curExC.bilateral&&(curExC.type==='hold'||curExC.stretch);
+      if(_twoSided&&tStatus==='work'){
+        ctrTxt=((window._holdSide||1)===1?'⬅ Linke Seite':'➡ Rechte Seite')+' · '+(tIdx+1)+'/'+curExercises.length;
+      }else{
       const grc=_groupRange(tIdx);
       if(grc){
         const ts=curExercises[grc.start]?.sets||1;
         ctrTxt='🔗 Supersatz '+(tIdx-grc.start+1)+'/'+(grc.end-grc.start+1)+' · Runde '+tSet+'/'+ts;
       }else{
         ctrTxt=(tIdx+1)+'/'+curExercises.length+(totalSetsC>1?' · Satz '+tSet+'/'+totalSetsC:'');
+      }
       }
     }
   }
@@ -2796,8 +2900,10 @@ function updateTimer(){
   const isRepsMode=exType==='reps';
   const isActive=tStatus==='work'||tStatus==='rest'||tStatus==='round_rest';
   // Reps-done button: only during work phase of reps mode
-  rd.style.display=tStatus==='work'&&isRepsMode?'block':'none';
+  rd.style.display=(tStatus==='work'||tStatus==='ready')&&isRepsMode?'block':'none';
   // Skip: during work phase, hidden in reps mode (use Satz fertig instead), hidden in done
+  const liveAdd=document.getElementById('add-ex-live');
+  if(liveAdd)liveAdd.style.display=(tStatus!=='done'&&!isWU)?'block':'none';
   if(skipExBtn){
     skipExBtn.style.display=isActive&&tStatus!=='done'?'flex':'none';
     skipExBtn.style.opacity='1';
@@ -2805,15 +2911,78 @@ function updateTimer(){
     if(tStatus==='rest'||tStatus==='round_rest')skipExBtn.innerHTML='⏭ Pause überspringen';
     else skipExBtn.innerHTML='⏭ Übung skippen';
   }
-  // Pause reps-mode timer
-  if(tStatus==='work'&&isRepsMode&&tRun){clearInterval(tIv);tRun=false;}
+  // (Interval ownership lives in startTimer/_beginPhase — nothing to do here)
   const card=document.getElementById('ex-card');card.style.borderColor=tStatus!=='idle'&&tStatus!=='done'?pc+'44':'var(--br)';card.style.boxShadow=tStatus!=='idle'&&tStatus!=='done'?`0 0 16px ${pc}10`:'none';
   const btn=document.getElementById('main-btn');
   if(tStatus==='done'){btn.textContent='Bewerten →';btn.className='btn btn-co';btn.style.flex='1';btn.style.border='none';btn.onclick=()=>initRating();}
-  else if(!tRun){btn.textContent=tStatus==='idle'?'Start':'Weiter';btn.className='btn btn-ac';btn.style.flex='1';btn.style.border='none';btn.style.color='#fff';btn.onclick=()=>startTimer();}
-  else{btn.textContent='Pause';btn.className='btn btn-ol';btn.style.flex='1';btn.style.borderColor=pc;btn.style.color=pc;btn.onclick=()=>pauseTimer();}
+  else if(tStatus==='ready'){btn.textContent='▶ Weiter';btn.className='btn btn-ac';btn.style.flex='1';btn.style.border='none';btn.style.color='#fff';btn.onclick=()=>continueTimer();}
+  else if(tStatus==='work'&&exType==='reps'){btn.textContent='⏸ Angehalten';btn.className='btn btn-ol';btn.style.flex='1';btn.style.borderColor='var(--br)';btn.style.color='var(--mu)';btn.onclick=()=>{};}
+  else if(!tRun){btn.textContent=tStatus==='idle'?'Start':'▶ Weiter';btn.className='btn btn-ac';btn.style.flex='1';btn.style.border='none';btn.style.color='#fff';btn.onclick=()=>startTimer();}
+  else{btn.textContent='⏸ Pause';btn.className='btn btn-ol';btn.style.flex='1';btn.style.borderColor=pc;btn.style.color=pc;btn.onclick=()=>pauseTimer();}
 }
-function startTimer(){if(tStatus==='idle'){tStatus='work';const f=isWU?wuExercises[0]:curExercises[0];tLeft=f?.duration||40;tRound=1;tIdx=0;}tRun=true;reqWL();updateTimer();tIv=setInterval(tick,1000);}
+// A countdown only makes sense when time is the target: timed sets, holds,
+// AMRAP windows and rest. Rep-based work waits for the user to finish the set.
+// Begin the phase that advance() just set up. Rep sets and (unless auto-advance
+// is on) the set after a rest wait for a tap instead of rolling on by themselves.
+function _beginPhase(){
+  const timed=isTimedPhase();
+  if(!timed){tRun=false;updateTimer();renderExList();return;}
+  if(!autoAdvanceOn()&&tStatus==='work'){
+    // Ready state: countdown is armed but paused until the user says go
+    tStatus='ready';tRun=false;updateTimer();renderExList();return;
+  }
+  tRun=true;updateTimer();renderExList();_tickTs=Date.now();tIv=setInterval(tick,1000);
+}
+
+// Hold the clock without losing your place. Also used automatically when a
+// modal opens, so reading an exercise description doesn't cost you time.
+// Pause while a modal is open, resume afterwards if the user hadn't paused
+function pauseForModal(){
+  if(tRun){clearInterval(tIv);tIv=null;tRun=false;window._pausedByModal=true;updateTimer();}
+}
+function resumeAfterModal(){
+  if(window._pausedByModal&&!window._pausedByUser&&isTimedPhase()&&tStatus!=='idle'&&tStatus!=='done'){
+    tRun=true;_tickTs=Date.now();tIv=setInterval(tick,1000);
+  }
+  window._pausedByModal=false;
+  updateTimer();
+}
+
+function isTimedPhase(){
+  if(tStatus==='rest'||tStatus==='round_rest')return true;
+  if(tStatus!=='work')return false;
+  const exList=isWU?wuExercises:curExercises;
+  const t=(exList[tIdx]||{}).type||'time';
+  return t!=='reps';
+}
+function autoAdvanceOn(){
+  try{return localStorage.getItem('coach_autoadvance')==='1';}catch{return false;}
+}
+function setAutoAdvance(v){
+  try{safeSet('coach_autoadvance',v?'1':'0');}catch{}
+  const el=document.getElementById('autoadv-label');
+  if(el)el.textContent=v?'An':'Aus';
+  const sw=document.getElementById('autoadv-switch'),kn=document.getElementById('autoadv-knob');
+  if(sw&&kn){sw.style.background=v?'var(--ac)':'var(--br)';kn.style.left=v?'25px':'3px';}
+}
+// Continue from a waiting state into the next working set
+function continueTimer(){
+  if(tStatus!=='ready')return;
+  tStatus='work';
+  const exList=isWU?wuExercises:curExercises;
+  const ex=exList[tIdx]||{};
+  tLeft=ex.duration||40;
+  updateTimer();renderExList();
+  if(isTimedPhase()){tRun=true;_tickTs=Date.now();tIv=setInterval(tick,1000);}
+}
+
+function startTimer(){
+  if(tStatus==='ready'){continueTimer();return;}
+  if(tStatus==='idle'){tStatus='work';const f=isWU?wuExercises[0]:curExercises[0];tLeft=f?.duration||40;tRound=1;tIdx=0;}
+  reqWL();
+  if(isTimedPhase()){tRun=true;updateTimer();_tickTs=Date.now();tIv=setInterval(tick,1000);}
+  else{tRun=false;updateTimer();}   // reps: wait for "Satz fertig"
+}
 function pauseTimer(){tRun=false;clearInterval(tIv);updateTimer();}
 let _tickTs=0;
 function tick(){_tickTs=Date.now();if(tLeft<=4&&tLeft>1)beep(660,.08);if(tLeft<=1){clearInterval(tIv);tRun=false;advance();return;}tLeft--;document.getElementById('t-disp').textContent=fmtT(tLeft);const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};const mt=tStatus==='work'?(ex.duration||40):tStatus==='rest'?(ex.rest||20):RREST;document.getElementById('timer-arc').setAttribute('stroke-dashoffset',CIRC-((mt-tLeft)/mt)*CIRC);}
@@ -2827,36 +2996,49 @@ function _groupRange(i){
   while(e<curExercises.length-1&&_groupOf(e+1)===g)e++;
   return{start:s,end:e,group:g};
 }
-function advance(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};if(tStatus==='work'){tStatus='rest';tLeft=ex.rest||20;beep(660,.15);}else if(tStatus==='rest'){
+function advance(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};
+  if(tStatus==='work'){
+    // Two-sided holds (stretches) run the full time per side
+    const twoSided=ex.bilateral&&(ex.type==='hold'||ex.stretch);
+    if(twoSided&&(window._holdSide||1)===1){
+      window._holdSide=2;
+      tLeft=ex.duration||35;
+      beep(880,.12);
+      _beginPhase();
+      return;
+    }
+    window._holdSide=1;
+    tStatus='rest';tLeft=ex.rest||20;beep(660,.15);
+  }else if(tStatus==='rest'){
       const gr=!isWU?_groupRange(tIdx):null;
       if(gr){
         // Inside a superset: rotate through the group, then repeat the rotation for each set
         const totalSets=curExercises[gr.start]?.sets||1;
         if(tIdx<gr.end){
           // next exercise within the same rotation, same set number
-          tIdx++;tStatus='work';tLeft=curExercises[tIdx].duration||40;beep(880,.1);
-          tRun=true;updateTimer();tIv=setInterval(tick,1000);return;
+          window._holdSide=1;tIdx++;tStatus='work';tLeft=curExercises[tIdx].duration||40;beep(880,.1);
+          _beginPhase();return;
         }
         if(tSet<totalSets){
           // rotation finished -> next round of the superset, back to first exercise
-          tSet++;tIdx=gr.start;tStatus='work';tLeft=curExercises[tIdx].duration||40;beep(880,.15);
-          tRun=true;updateTimer();tIv=setInterval(tick,1000);return;
+          tSet++;window._holdSide=1;tIdx=gr.start;tStatus='work';tLeft=curExercises[tIdx].duration||40;beep(880,.15);
+          _beginPhase();return;
         }
         // superset done -> continue after the group
         const nxg=gr.end+1;
-        if(nxg<curExercises.length){tIdx=nxg;tSet=1;tStatus='work';tLeft=curExercises[nxg].duration||40;beep(880,.1);tRun=true;updateTimer();tIv=setInterval(tick,1000);return;}
+        if(nxg<curExercises.length){window._holdSide=1;tIdx=nxg;tSet=1;tStatus='work';tLeft=curExercises[nxg].duration||40;beep(880,.1);_beginPhase();return;}
         // nothing after the group -> fall through to round/done handling below
         tIdx=curExercises.length-1;
       }else{
       // Remaining sets of the same exercise first
       const totalSets=isWU?1:(ex.sets||1);
-      if(!isWU&&tSet<totalSets){tSet++;tStatus='work';tLeft=ex.duration||40;beep(880,.1);tRun=true;updateTimer();tIv=setInterval(tick,1000);return;}
+      if(!isWU&&tSet<totalSets){tSet++;tStatus='work';tLeft=ex.duration||40;beep(880,.1);_beginPhase();return;}
       }
-      const nx=tIdx+1;if(nx<exList.length){tIdx=nx;tSet=1;tStatus='work';tLeft=exList[nx].duration||40;beep(880,.1);}else if(isWU){isWU=false;tIdx=0;tStatus='work';tLeft=curExercises[0]?.duration||40;beep(1100,.3);renderExList();}else{
+      const nx=tIdx+1;if(nx<exList.length){window._holdSide=1;tIdx=nx;tSet=1;tStatus='work';tLeft=exList[nx].duration||40;beep(880,.1);}else if(isWU){isWU=false;tIdx=0;tStatus='work';tLeft=curExercises[0]?.duration||40;beep(1100,.3);renderExList();}else{
         const totalRounds=curSetup.trainingMode==='circuit'?(curSetup.rounds||1):1;
         if(tRound<totalRounds){tRound++;tIdx=0;tSet=1;tStatus='round_rest';tLeft=RREST;beep(880,.2);}
         else{tStatus='done';beep(1100,.5);updateTimer();return;}
-      }}else if(tStatus==='round_rest'){tStatus='work';tLeft=curExercises[0].duration||40;beep(880,.1);}tRun=true;updateTimer();tIv=setInterval(tick,1000);}
+      }}else if(tStatus==='round_rest'){tStatus='work';tLeft=curExercises[0].duration||40;beep(880,.1);}_beginPhase();}
 function skipEx(){
   clearInterval(tIv);tRun=false;
   if(tStatus==='rest'||tStatus==='round_rest'){
@@ -2870,7 +3052,12 @@ function skipEx(){
     tStatus='rest';tLeft=1;advance();return;
   }
 }
-function repsDone(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};clearInterval(tIv);tRun=false;tStatus='rest';tLeft=ex.rest||20;beep(660,.15);tRun=true;updateTimer();tIv=setInterval(tick,1000);}
+function repsDone(){
+  const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};
+  clearInterval(tIv);tRun=false;
+  tStatus='rest';tLeft=ex.rest||20;beep(660,.15);
+  tRun=true;updateTimer();renderExList();_tickTs=Date.now();tIv=setInterval(tick,1000);
+}
 async function endEarly(){const ok=await appConfirm('Training beenden?','Dein Fortschritt wird gespeichert.','Beenden','rgba(var(--hotRGB),.9)');if(!ok)return;clearInterval(tIv);tRun=false;tStatus='done';relWL();updateTimer();}
 function addRep(side,d){
   const rk=tRound+'_'+tIdx+'_s'+tSet+(side?'_'+side:'');
@@ -2895,7 +3082,12 @@ function setRepDirectSide(side,v){
   const rk=tRound+'_'+tIdx+'_s'+tSet+'_'+side;
   tReps[rk]=Math.max(0,parseInt(v)||0);
 }
-function showInfo(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx];if(!ex)return;openInfoModal(ex);}
+function showInfo(){
+  const exList=isWU?wuExercises:curExercises,ex=exList[tIdx];if(!ex)return;
+  // Reading up on an exercise shouldn't cost you rest time
+  if(tRun){window._resumeAfterInfo=true;pauseTimer();}
+  openInfoModal(ex);
+}
 
 // ─── Rating ───────────────────────────────────────────────────────────────────
 function initRating(){const tot=Object.values(tReps).reduce((s,v)=>s+v,0);document.getElementById('rat-sub').textContent=mainMuscles(curSetup.muscles,3).join(', ')+' · '+tot+' Wdh';document.getElementById('rat-note').value='';rpe=6;const w=document.getElementById('rpe-btns');w.innerHTML='';for(let n=1;n<=10;n++){const nc=rpc(n),btn=document.createElement('button');btn.style.cssText=`flex:1;padding:9px 0;border-radius:7px;font-size:12px;font-family:var(--m);cursor:pointer;border:1.5px solid ${n===rpe?nc:'var(--br)'};background:${n===rpe?nc+'18':'var(--up)'};color:${n===rpe?nc:'var(--mu)'};font-weight:${n===rpe?700:400};transition:all .15s`;btn.textContent=n;btn.onclick=()=>{rpe=n;w.querySelectorAll('button').forEach((b,i)=>{const bc=rpc(i+1);b.style.borderColor=(i+1)===n?bc:'var(--br)';b.style.background=(i+1)===n?bc+'18':'var(--up)';b.style.color=(i+1)===n?bc:'var(--mu)';b.style.fontWeight=(i+1)===n?700:400;});document.getElementById('rpe-lbl').textContent=RPE_L[n];document.getElementById('rpe-lbl').style.color=nc;};w.appendChild(btn);}document.getElementById('rpe-lbl').textContent=RPE_L[rpe];document.getElementById('rpe-lbl').style.color=rpc(rpe);document.getElementById('rat-reps').innerHTML=curExercises.map((ex,i)=>{
@@ -3009,7 +3201,7 @@ function linkToSession(wi,si){markSessDone(wi,si,true);show('s-home');}
 function addAsExtraSession(wi,muscles){if(!plan?.weeks[wi])return;const todayDow=new Date().getDay();const muscleStr=(muscles||[]).map(m=>MUSCLE_DE[m]||m).join(' & ')||'Zusatz';plan.weeks[wi].sessions.push({dow:todayDow,focus:muscleStr,intensity:'medium',durationMin:20,done:true,doneDate:todayIso(),extra:true});savePlan();show('s-home');}
 
 // ─── History ──────────────────────────────────────────────────────────────────
-function showHistory(){const rd=log.slice(-8).map(w=>({l:fmtD(w.date),v:w.rpe,c:rpc(w.rpe)}));const hw=document.getElementById('hist-chart');if(rd.length>1){hw.style.display='block';setTimeout(()=>drawBars('rpe-chart',rd,60),30);}else hw.style.display='none';document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.values(w.repLog||{}).reduce((s,v)=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${(w.muscles||[]).map(m=>MUSCLE_DE_SHORT[m]||m).join(', ')||'Workout'}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{const per=repsPerExercise(w).filter(p=>p.reps>0);if(!per.length)return'';return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${per.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''}</span><span style="color:var(--su);font-weight:600;margin-left:8px">${p.reps} Wdh</span></div>`).join('')}</div>`;})()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${w.note}</div>`:''}</div>`;}).join('');show('s-history');}
+function showHistory(){const rd=log.slice(-8).map(w=>({l:fmtD(w.date),v:w.rpe,c:rpc(w.rpe)}));const hw=document.getElementById('hist-chart');if(rd.length>1){hw.style.display='block';setTimeout(()=>drawBars('rpe-chart',rd,60),30);}else hw.style.display='none';document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.values(w.repLog||{}).reduce((s,v)=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${w.stretch?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:'')):(mainMuscles(w.muscles,3).join(', ')||'Workout')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{const per=repsPerExercise(w).filter(p=>p.reps>0);if(!per.length)return'';return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${per.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''}</span><span style="color:var(--su);font-weight:600;margin-left:8px">${p.reps} Wdh</span></div>`).join('')}</div>`;})()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${w.note}</div>`:''}</div>`;}).join('');show('s-history');}
 async function delW(idx){const ok=await appConfirm('Training löschen?','Diese Aktion kann nicht rückgängig gemacht werden.');if(!ok)return;log.splice(idx,1);persist();updateHome();showHistory();}
 async function delLastWorkout(){if(!log.length)return;const last=log[log.length-1];const ok=await appConfirm('Letztes Training löschen?','RPE '+(last.rpe||'?')+'/10 · '+fmtD(last.date));if(!ok)return;log.pop();persist();updateHome();}
 // ─── Wiederholungen je Übung / je Satz ────────────────────────────────────────
@@ -4460,6 +4652,8 @@ function googleExercise(){
 }
 function openInfoModal(ex){
   _currentInfoEx=ex;
+  const _mj=document.getElementById('mi-jump');
+  if(_mj&&window._peekIdx===undefined)_mj.style.display='none';
   document.getElementById('mi-name').textContent=ex.name+(ex.bilateral?' ↔ beidseitig':'');
   document.getElementById('mi-bodymap').innerHTML=bodyMapSVG(ex.muscles||[],!!ex.stretch);
   document.getElementById('mi-muscles').innerHTML=(ex.muscles||[]).map(m=>mkT(MUSCLE_DE[m]||m,'var(--ac)')).join(' ');
@@ -4670,6 +4864,19 @@ function addExToWorkout(exOrStr){
   else if(n.match(/push|liegest|klimmzug|pull.up|dip|curl|lunge|squat|kniebeug|row|raise/)||ex.bilateral)type='reps';
   curExercises.push({...ex,type,duration:type==='hold'?45:40,rest:20,reps:10,sets:1,icon:getExIcon(ex.name)});
   closeModal('modal-add-to-workout');
+  if(window._addingLive){
+    // Added while training: stay in the timer, just refresh the list
+    window._addingLive=false;
+    renderExList();updateTimer();
+    showErr('✓ '+(ex.name||'Übung')+' ans Ende angehängt.');
+    if(window._resumeAfterInfo){
+      window._resumeAfterInfo=false;
+      if(isTimedPhase()&&tStatus!=='idle'&&tStatus!=='done'&&tStatus!=='ready'){
+        tRun=true;_tickTs=Date.now();tIv=setInterval(tick,1000);updateTimer();
+      }
+    }
+    return;
+  }
   showReview();
 }
 
