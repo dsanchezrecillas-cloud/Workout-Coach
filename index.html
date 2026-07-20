@@ -631,12 +631,12 @@ button:active:not(:disabled){transform:scale(.96)}
       <button onclick="closeModal('modal-plan-edit')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <!-- End date change -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
-      <div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:8px">
+      <div style="min-width:0">
         <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Startdatum</div>
         <input type="date" id="edit-start-date" class="inp" oninput="updateEditDateCalc()"/>
       </div>
-      <div>
+      <div style="min-width:0">
         <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Enddatum</div>
         <input type="date" id="edit-end-date" class="inp" oninput="updateEditDateCalc()"/>
       </div>
@@ -651,16 +651,14 @@ button:active:not(:disabled){transform:scale(.96)}
     </div>
     <!-- Freq change -->
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Sessions/Woche</div>
-    <div style="display:flex;gap:7px;margin-bottom:8px" id="edit-freq-chips"></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px" id="edit-freq-chips"></div>
     <div id="freq-change-hint" style="display:none;font-size:11px;color:var(--am);background:rgba(var(--amRGB),.12);border:1px solid rgba(var(--amRGB),.25);border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.4">⚡ Der Plan wird komplett neu aufgebaut (KI), um die neue Häufigkeit sinnvoll zu strukturieren.</div>
     <button onclick="applyFreqChange()" class="btn btn-ac" style="padding:12px;margin-bottom:18px">Sessions/Woche übernehmen</button>
     <!-- Redistribute days -->
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Trainingstage</div>
     <div style="font-size:12px;color:var(--mu);margin-bottom:10px;line-height:1.4">Verteilt die Tage neu mit Erholungspausen. Ohne KI, erledigte Sessions bleiben.</div>
-    <button onclick="redistributePlanDays()" class="btn" style="padding:12px;border:1.5px solid var(--br);color:var(--tx)">Tage neu verteilen</button>
-  </div>
-
-  <div class="card" style="margin-bottom:13px">
+    <button onclick="redistributePlanDays()" class="btn" style="padding:12px;border:1.5px solid var(--br);color:var(--tx);margin-bottom:18px">Tage neu verteilen</button>
+    <!-- Balance -->
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Balance</div>
     <div id="balance-info" style="font-size:12px;color:var(--mu);margin-bottom:10px;line-height:1.4"></div>
     <button onclick="rebalancePlan()" class="btn" style="padding:12px;border:1.5px solid var(--br);color:var(--tx)">An bisherige Trainings anpassen</button>
