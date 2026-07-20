@@ -219,7 +219,10 @@ button:active:not(:disabled){transform:scale(.96)}
 
 <!-- REVIEW -->
 <div id="s-review" class="screen">
-  <button class="back" onclick="reviewBackToChat()">← neu besprechen</button>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <button class="back" onclick="reviewBackToChat()" style="margin:0">← neu besprechen</button>
+    <button onclick="exitReview()" title="Schließen" style="width:34px;height:34px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+  </div>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
     <div style="font-size:21px;font-weight:700;letter-spacing:-.02em">Dein Workout</div>
   </div>
@@ -3634,6 +3637,17 @@ function _startSessAt_legacy(wi,si){
   const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);
 }
 
+// Leave the review without starting the workout. Goes back to the plan when the
+// review belongs to a plan session, otherwise home.
+function exitReview(){
+  if(pendingPlanSession&&plan?.weeks[pendingPlanSession.wi]){
+    const wi=pendingPlanSession.wi;
+    renderPlanView(wi);show('s-plan');
+  }else{
+    show('s-home');
+  }
+}
+
 function reviewBackToChat(){
   // If this review belongs to a plan session, keep the plan context instead of
   // starting a blank chat that forgets phase, week, dose, equipment.
@@ -3947,8 +3961,12 @@ function attachWorkoutToSession(wi,si,isTpl){if(!plan?.weeks[wi]?.sessions[si])r
   // Reflect the actual saved workout in the session badges
   sess.exerciseCount=(exercises||[]).length;sess.autoCount=false;
   const estMin=estimateWorkoutMinutes(exercises||[],warmup||[]);if(estMin)sess.durationMin=estMin;
-  savePlan();closeModal('modal-save-later');showErr('✓ Workout in Session gespeichert.');window._planningTemplate=null;}
-function addNewSessionWithWorkout(wi,isTpl){const idx=window._planningTemplate;const exercises=isTpl&&idx!=null?loadTemplates()[idx]?.exercises:curExercises;const warmup=isTpl&&idx!=null?loadTemplates()[idx]?.warmup:wuExercises;const muscles=(isTpl&&idx!=null?loadTemplates()[idx]?.muscles:curSetup.muscles)||[];const todayDow=new Date().getDay();plan.weeks[wi].sessions.push({dow:todayDow,focus:muscles.map(m=>MUSCLE_DE[m]||m).join(' & ')||'Workout',intensity:'medium',durationMin:Math.round(((warmup||[]).length*35+(exercises||[]).length*60)/60)||30,done:false,savedWorkout:{exercises:[...(exercises||[])],warmup:[...(warmup||[])],savedAt:todayIso()}});savePlan();closeModal('modal-save-later');showErr('✓ Neue Session erstellt.');window._planningTemplate=null;}
+  savePlan();closeModal('modal-save-later');showErr('✓ Workout gespeichert — bereit für '+DAYS[sess.dow]+'.');
+  // Task finished: go to the plan so the user sees where it landed
+  setTimeout(()=>{renderPlanView(wi);show('s-plan');},250);
+  window._planningTemplate=null;}
+function addNewSessionWithWorkout(wi,isTpl){const idx=window._planningTemplate;const exercises=isTpl&&idx!=null?loadTemplates()[idx]?.exercises:curExercises;const warmup=isTpl&&idx!=null?loadTemplates()[idx]?.warmup:wuExercises;const muscles=(isTpl&&idx!=null?loadTemplates()[idx]?.muscles:curSetup.muscles)||[];const todayDow=new Date().getDay();plan.weeks[wi].sessions.push({dow:todayDow,focus:muscles.map(m=>MUSCLE_DE[m]||m).join(' & ')||'Workout',intensity:'medium',durationMin:Math.round(((warmup||[]).length*35+(exercises||[]).length*60)/60)||30,done:false,savedWorkout:{exercises:[...(exercises||[])],warmup:[...(warmup||[])],savedAt:todayIso()}});savePlan();closeModal('modal-save-later');showErr('✓ Neue Session erstellt.');
+  setTimeout(()=>{show('s-plan');},250);window._planningTemplate=null;}
 
 // Custom exercise
 let addExMuscles=[];
