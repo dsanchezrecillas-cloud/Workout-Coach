@@ -113,7 +113,7 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
 
   <div style="display:flex;gap:8px;margin-bottom:14px">
-    <div id="h-streak-tile" style="flex:1;background:var(--up);border:1px solid var(--br);border-radius:11px;padding:12px"><div style="font-size:9px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:5px">Streak</div><div style="font-size:16px;font-weight:700;color:var(--am)" id="h-streak">—</div></div>
+    <div id="h-streak-tile" style="flex:1;background:var(--up);border:1px solid var(--br);border-radius:11px;padding:12px"><div style="font-size:9px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:5px">Aktive Wochen</div><div style="font-size:15px;font-weight:700;color:var(--am)" id="h-streak">—</div></div>
     <div style="flex:1;background:var(--up);border:1px solid var(--br);border-radius:11px;padding:12px"><div style="font-size:9px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:5px">Workouts</div><div style="font-size:16px;font-weight:700;color:var(--ac)" id="h-total">0</div></div>
     <div style="flex:1;background:var(--up);border:1px solid var(--br);border-radius:11px;padding:12px"><div style="font-size:9px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:5px">Zuletzt</div><div style="font-size:16px;font-weight:700;color:var(--co)" id="h-last">—</div></div>
   </div>
@@ -1069,6 +1069,21 @@ function dateKey(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
+// Weeks in a row with at least one session. A day-based streak punishes the
+// rest days a periodised plan explicitly schedules, so it is the wrong metric.
+function weekStreak(){
+  if(!log.length)return 0;
+  const weeks=new Set(log.map(w=>weekKeyOf(w.date.slice(0,10))));
+  const today=new Date(todayIso()+'T12:00:00');
+  let cursor=new Date(today);
+  cursor.setDate(cursor.getDate()-((cursor.getDay()+6)%7));   // Monday of this week
+  // The current week still counts even if it has no session yet
+  if(!weeks.has(dateKey(cursor)))cursor.setDate(cursor.getDate()-7);
+  let s=0;
+  while(weeks.has(dateKey(cursor))){s++;cursor.setDate(cursor.getDate()-7);}
+  return s;
+}
+
 function streak(){
   if(!log.length)return 0;
   const days=new Set(log.map(w=>dateKey(new Date(w.date))));
@@ -1551,8 +1566,8 @@ function updateHome(){
   try{renderWeekReport();}catch(e){}
   const hasKey=!!loadKey(),last=log[log.length-1];
   document.getElementById('no-key').style.display=hasKey?'none':'flex';
-  document.getElementById('h-streak').textContent=streak()>0?streak()+'d 🔥':'—';
-  {const _st=streak(),_tile=document.getElementById('h-streak-tile');
+  document.getElementById('h-streak').textContent=weekStreak()>0?weekStreak()+(weekStreak()===1?' Woche 🔥':' Wochen 🔥'):'—';
+  {const _st=weekStreak(),_tile=document.getElementById('h-streak-tile');
    if(_tile)_tile.style.display=_st>0?'block':'none';}
   document.getElementById('h-total').textContent=log.filter(w=>!w.stretch).length;
   document.getElementById('h-last').textContent=last?(dSince(last.date)===0?'heute':'vor '+dSince(last.date)+'T'):'—';
@@ -1782,7 +1797,7 @@ async function sendChatMsg(msg){
   }
   // Streak / stats question
   if(lower.match(/streak|wie oft|wie viele|statistik|fortschritt/)){
-    const s=streak();const tot=log.length;const last=log[log.length-1];
+    const s=weekStreak();const tot=log.filter(w=>!w.stretch).length;const last=log[log.length-1];
     addAIMsg(`Du hast ${tot} Workouts gespeichert${s>0?', aktueller Streak: '+s+' Tag(e)':''}. Letztes Training: ${last?fmtD(last.date)+' (RPE '+last.rpe+'/10)':'noch keins'}.`,['Neues Training starten','Verlauf anzeigen']);return;
   }
   // ── End local intents ────────────────────────────────────────────────────
