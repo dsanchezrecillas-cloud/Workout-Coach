@@ -649,6 +649,12 @@ button:active:not(:disabled){transform:scale(.96)}
     <div style="font-size:12px;color:var(--mu);margin-bottom:10px;line-height:1.4">Verteilt die Tage neu mit Erholungspausen. Ohne KI, erledigte Sessions bleiben.</div>
     <button onclick="redistributePlanDays()" class="btn" style="padding:12px;border:1.5px solid var(--br);color:var(--tx)">Tage neu verteilen</button>
   </div>
+
+  <div class="card" style="margin-bottom:13px">
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Balance</div>
+    <div id="balance-info" style="font-size:12px;color:var(--mu);margin-bottom:10px;line-height:1.4"></div>
+    <button onclick="rebalancePlan()" class="btn" style="padding:12px;border:1.5px solid var(--br);color:var(--tx)">An bisherige Trainings anpassen</button>
+  </div>
 </div>
 
 <!-- MODAL: Swap Exercise -->
@@ -1832,10 +1838,135 @@ function toggleCoachTip(){
   btn.textContent=open?'💡 Tipp anzeigen':'💡 Tipp ausblenden';
 }
 
+// After a refocused session, the originally planned stimulus is missing.
+// Offer to catch it up in the next session instead of silently losing it.
+// Which main groups were actually trained over the last two weeks, and which
+// fell behind? Used to rebalance the remaining plan.
+function trainingBalance(days){
+  const since=new Date(todayIso()+'T12:00:00');
+  since.setDate(since.getDate()-(days||14));
+  const counts={Brust:0,'Rücken':0,Schultern:0,Arme:0,Core:0,'Gesäß':0,Beine:0};
+  log.forEach(w=>{
+    if(w.stretch)return;
+    const d=new Date(w.date.slice(0,10)+'T12:00:00');
+    if(d<since)return;
+    const groups=new Set(mainMuscles([...(w.muscles||[]),...(w.exercises||[]).flatMap(e=>e.muscles||[])],9));
+    groups.forEach(g=>{if(counts[g]!==undefined)counts[g]++;});
+  });
+  const vals=Object.values(counts);
+  const avg=vals.reduce((a,b)=>a+b,0)/vals.length||0;
+  const behind=Object.entries(counts).filter(([g,n])=>n<avg-0.5).sort((a,b)=>a[1]-b[1]).map(([g])=>g);
+  const ahead=Object.entries(counts).filter(([g,n])=>n>avg+0.5).sort((a,b)=>b[1]-a[1]).map(([g])=>g);
+  return{counts,avg,behind,ahead};
+}
+function updateBalanceInfo(){
+  const el=document.getElementById('balance-info');if(!el)return;
+  const b=trainingBalance(14);
+  const trained=Object.values(b.counts).some(n=>n>0);
+  if(!trained){el.textContent='Noch zu wenig Trainingsdaten für eine Auswertung.';return;}
+  el.innerHTML=b.behind.length
+    ? `Letzte 2 Wochen: <b style="color:var(--am)">${b.behind.slice(0,3).join(', ')}</b> kam zu kurz. Passt die nächsten offenen Sessions entsprechend an.`
+    : 'Letzte 2 Wochen sind ausgewogen — keine Anpassung nötig.';
+}
+// Shift the focus of upcoming sessions towards whatever fell behind.
+function rebalancePlan(){
+  if(!plan?.weeks?.length)return;
+  const b=trainingBalance(14);
+  if(!b.behind.length){showErr('Plan ist bereits ausgewogen.');return;}
+  const GROUP_FOCUS={
+    Beine:'Ganzkörper – Fokus Unterkörper','Gesäß':'Ganzkörper – Fokus Unterkörper',
+    'Rücken':'Ganzkörper – Fokus Rücken',Brust:'Ganzkörper – Fokus Drücken',
+    Schultern:'Ganzkörper – Fokus Schultern',Arme:'Ganzkörper – Fokus Arme',Core:'Ganzkörper – Fokus Core'
+  };
+  const now=new Date(todayIso()+'T12:00:00');
+  const upcoming=[];
+  plan.weeks.forEach((wk,wi)=>(wk.sessions||[]).forEach((s,si)=>{
+    if(s.done)return;
+    const d=getSessionDate(wi,s.dow);
+    if(d&&d>=now)upcoming.push({wi,si,s,date:d});
+  }));
+  upcoming.sort((a,b2)=>a.date-b2.date);
+  if(!upcoming.length){showErr('Keine offenen Sessions im Plan.');return;}
+  // Only touch the next two — beyond that the plan should follow its own progression
+  let changed=0;
+  b.behind.slice(0,2).forEach((g,i)=>{
+    const slot=upcoming[i];
+    if(!slot)return;
+    const newFocus=GROUP_FOCUS[g];
+    if(!newFocus||slot.s.focus===newFocus)return;
+    if(!slot.s.origPlanFocus)slot.s.origPlanFocus=slot.s.focus;
+    slot.s.focus=newFocus;
+    if(slot.s.autoCount!==false){
+      slot.s.exerciseCount=recommendExercises(slot.s.durationMin||30,newFocus,plan.goal,slot.s.intensity).count;
+    }
+    if(slot.s.savedWorkout)delete slot.s.savedWorkout;
+    changed++;
+  });
+  if(!changed){showErr('Die nächsten Sessions passen schon.');return;}
+  savePlan();closeModal('modal-plan-edit');renderPlanView(currentViewWeek||0);updateHome();
+  showErr(`✓ ${changed} Session${changed>1?'s':''} angepasst — ${b.behind.slice(0,changed).join(', ')} kommt jetzt dran.`);
+}
+
+function catchUpSuggestion(){
+  if(!plan?.skipped)return null;
+  // Expires after a week — no point catching up a stale session
+  const age=(new Date(todayIso()+'T12:00:00')-new Date(plan.skipped.date+'T12:00:00'))/86400000;
+  if(age>7){delete plan.skipped;savePlan();return null;}
+  const sore=new Set([...soreMusclesFromJournal(),...recentStressedMuscles()]);
+  const skippedGroups=focusMuscleGroups(plan.skipped.focus);
+  // Only worth suggesting once those muscles have actually recovered
+  if(skippedGroups.filter(m=>sore.has(m)).length>=2)return null;
+  const now=new Date(todayIso()+'T12:00:00');
+  let next=null;
+  plan.weeks.forEach((wk,wi)=>(wk.sessions||[]).forEach((s,si)=>{
+    if(s.done||s.refocused)return;
+    const d=getSessionDate(wi,s.dow);
+    if(!d||d<now)return;
+    if(!next||d<next.date)next={wi,si,s,date:d};
+  }));
+  if(!next)return null;
+  // Already covers the skipped groups? Then nothing to do.
+  const covers=focusMuscleGroups(next.s.focus).filter(m=>skippedGroups.includes(m)).length;
+  if(covers>=Math.ceil(skippedGroups.length/2))return null;
+  return{next,skipped:plan.skipped};
+}
+function applyCatchUp(){
+  const cu=catchUpSuggestion();
+  if(!cu)return;
+  const s=plan.weeks[cu.next.wi].sessions[cu.next.si];
+  s.focus=cu.skipped.focus;
+  if(s.autoCount!==false){
+    const rec=recommendExercises(s.durationMin||30,s.focus,plan?.goal,s.intensity);
+    s.exerciseCount=rec.count;
+  }
+  if(s.savedWorkout)delete s.savedWorkout;
+  delete plan.skipped;
+  savePlan();updateHome();
+  if(document.getElementById('s-plan')?.classList.contains('active'))renderPlanView(currentViewWeek||0);
+  showErr('✓ Nachgeholt: '+cu.skipped.focus+' am '+DAYS[s.dow]+'.');
+}
+function dismissCatchUp(){
+  if(plan?.skipped){delete plan.skipped;savePlan();}
+  updateHome();
+}
+
 function renderAdjustCard(){
   const el=document.getElementById('adjust-card');if(!el)return;
   const sug=suggestPlanAdjustment();
-  if(!sug){el.style.display='none';return;}
+  // Soreness has priority; otherwise check whether something needs catching up
+  if(!sug){
+    const cu=catchUpSuggestion();
+    if(cu){
+      const dn=DAYS[cu.next.s.dow];
+      document.getElementById('adjust-text').innerHTML=`<b>${cu.skipped.focus}</b> ist ausgefallen, weil du umgestellt hast. Als Nächstes steht <b>${cu.next.s.focus}</b> (${dn}) an.`;
+      document.getElementById('adjust-actions').innerHTML=
+        `<button onclick="applyCatchUp()" style="flex:1;padding:10px 8px;border-radius:10px;background:rgba(var(--amRGB),.18);border:1px solid rgba(var(--amRGB),.4);color:var(--am);font-size:12px;font-weight:600;font-family:var(--f)">↩ Nachholen</button>`+
+        `<button onclick="dismissCatchUp()" style="padding:10px 11px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-family:var(--f)">✕</button>`;
+      el.style.display='block';
+      return;
+    }
+    el.style.display='none';return;
+  }
   const dayName=['So','Mo','Di','Mi','Do','Fr','Sa'][sug.next.s.dow];
   const soreTxt=sug.hit.slice(0,3).map(m=>MUSCLE_DE_SHORT[m]||MUSCLE_DE[m]||m).join(', ');
   const fresh=freshFocusFor(new Set(sug.sore),sug.next.s.focus);
@@ -1892,6 +2023,19 @@ function focusMuscleGroups(focus){
   const f=(focus||'').toLowerCase();
   const upper=['chest','back','shoulders','arms','lats','biceps','triceps','upper_back'];
   const lower=['quads','hams','glutes','calves','legs'];
+  // "Ganzkörper – Fokus X" is not full coverage: the emphasis decides what
+  // actually gets a meaningful stimulus.
+  const m=/fokus\s+(.+)$/.exec(f);
+  if(m){
+    const t=m[1];
+    if(/unterkörper|bein|glute|gesäß/.test(t))return[...lower,'core'];
+    if(/rücken|ruecken|zieh|bizeps|lat/.test(t))return['back','lats','biceps','upper_back','arms','core'];
+    if(/drücken|druecken|brust|push/.test(t))return['chest','shoulders','triceps','arms','core'];
+    if(/schulter/.test(t))return['shoulders','upper_back','triceps','core'];
+    if(/arme/.test(t))return['arms','biceps','triceps','core'];
+    if(/core|rumpf|bauch/.test(t))return['core','abs','obliques'];
+    if(/oberkörper|oberkoerper/.test(t))return[...upper,'core'];
+  }
   if(/ganzkörper|ganzkorper|fullbody|^gk\b/.test(f))return[...upper,...lower,'core'];
   if(/unter|lower|bein|leg|glute|gesäß|quad|waden|hamstring/.test(f))return lower;
   if(/ober|upper|push|drück|brust|chest|schulter|trizeps/.test(f))return['chest','shoulders','triceps','arms'];
@@ -3613,7 +3757,28 @@ function renderPlanView(wi=0){
 
 function _refreshPlanCalendarIfActive(){if(_planView==='calendar'&&plan)renderPlanCalendar();}
 
-function markSessDone(wi,si,done){if(!plan?.weeks[wi]?.sessions[si])return;plan.weeks[wi].sessions[si].done=done;if(done)plan.weeks[wi].sessions[si].doneDate=todayIso();else delete plan.weeks[wi].sessions[si].doneDate;savePlan();renderPlanView(currentViewWeek);updatePlanHome();_refreshPlanCalendarIfActive();}
+function markSessDone(wi,si,done){
+  if(!plan?.weeks[wi]?.sessions[si])return;
+  const s=plan.weeks[wi].sessions[si];
+  s.done=done;
+  if(done){
+    s.doneDate=todayIso();
+    // A refocused session was a one-off. Restore the planned focus and note
+    // which muscle groups got skipped so the plan can catch up.
+    if(s.refocused&&s.origFocus){
+      plan.skipped={focus:s.origFocus,muscles:s.avoidMuscles||[],date:todayIso()};
+      s.focus=s.origFocus;
+      delete s.origFocus;delete s.refocused;delete s.avoidMuscles;
+      if(s.autoCount!==false){
+        const rec=recommendExercises(s.durationMin||30,s.focus,plan?.goal,s.intensity);
+        s.exerciseCount=rec.count;
+      }
+    }
+  }else{
+    delete s.doneDate;
+  }
+  savePlan();renderPlanView(currentViewWeek);updatePlanHome();_refreshPlanCalendarIfActive();
+}
 
 function startSessAt(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;pendingPlanSession={wi,si};
@@ -3811,7 +3976,8 @@ function openPlanEdit(){if(!plan)return;let editFreqLocal=plan.freq||3;const end
       if(hint)hint.style.display=(n!==plan.freq)?'block':'none';
     };
     fc.appendChild(b);
-  });document.getElementById('modal-plan-edit').classList.add('open');}
+  });document.getElementById('modal-plan-edit').classList.add('open');
+  try{updateBalanceInfo();}catch(e){}}
 function updateEditDateCalc(){const v=document.getElementById('edit-end-date').value;const sv=document.getElementById('edit-start-date')?.value||plan?.startDate||todayIso();if(!v){document.getElementById('edit-date-calc').textContent='';return;}const startMs=new Date(sv+'T12:00:00').getTime();const days=Math.ceil((new Date(v+'T12:00:00').getTime()-startMs)/86400000);const w=Math.max(1,Math.ceil(days/7));const cur=plan?.weeks?.length||0;const diff=w-cur;const diffTxt=diff>0?`+${diff} Wo`:diff<0?`${diff} Wo`:'gleich';document.getElementById('edit-date-calc').textContent=days<1?'Vor Startdatum':`${w} Wochen (${diffTxt})`;document.getElementById('edit-date-calc').style.color=diff>0?'var(--co)':diff<0?'var(--hot)':'var(--mu)';}
 function _applyPlanDayRules(){
   // After a date/structure change: ensure week 1 has no days before start, and spread all weeks with recovery.
