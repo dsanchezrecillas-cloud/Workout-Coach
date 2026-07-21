@@ -141,17 +141,9 @@ button:active:not(:disabled){transform:scale(.96)}
     <button onclick="openDiaryFromCheckin()" style="width:100%;margin-top:9px;font-size:11px;color:var(--mu);background:none;border:none;text-decoration:underline">oder frei schreiben</button>
   </div>
 
-  <!-- Morning routine -->
+  <!-- Daily routines -->
   <div id="morning-card" class="card" style="display:none;margin-bottom:12px;border-color:rgba(var(--coRGB),.3);background:linear-gradient(135deg,rgba(var(--coRGB),.06),var(--card))">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="font-size:20px;flex-shrink:0">🌅</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:10px;letter-spacing:.08em;color:var(--co);text-transform:uppercase;font-weight:700">Morgenroutine</div>
-        <div id="morning-sub" style="font-size:12px;color:var(--mu);margin-top:2px"></div>
-      </div>
-      <button id="morning-start" onclick="startMorningRoutine()" style="flex-shrink:0;padding:10px 16px;border-radius:11px;background:linear-gradient(135deg,#059669,#34d399);border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--f);box-shadow:0 3px 12px rgba(var(--coRGB),.3)">▶ Start</button>
-      <button onclick="openMorningSetup()" aria-label="Morgenroutine ändern" style="flex-shrink:0;width:32px;height:32px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">⋯</button>
-    </div>
+    <div id="routine-rows" style="display:flex;flex-direction:column;gap:11px"></div>
   </div>
 
   <!-- Plan adjustment suggestion (soreness / recovery) -->
@@ -875,7 +867,7 @@ button:active:not(:disabled){transform:scale(.96)}
 <div class="modal-ov" id="modal-morning">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <div style="font-size:16px;font-weight:700">🌅 Morgenroutine</div>
+      <div style="font-size:16px;font-weight:700" id="morning-modal-title">🌅 Morgenroutine</div>
       <button aria-label="Schließen" onclick="closeModal('modal-morning')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <div style="font-size:12px;color:var(--mu);margin-bottom:14px;line-height:1.5">Eine feste Dehnroutine, die vom Startbildschirm ohne Generierung sofort losläuft.</div>
@@ -2713,81 +2705,129 @@ function applyProgression(i){
   showErr('↗ '+ex.name+': '+s.label+' — weiter so.');
 }
 
-// ─── Morning routine ─────────────────────────────────────────────────────────
-// Head-to-toe default, ~8 min. Stored in profile.morningRoutine.
-const MORNING_DEFAULT_NAMES=['Nacken-Seitneige','Brustdehnung an der Wand','Katze-Kuh','Kindeshaltung','Hüftbeuger-Dehnung (Ausfallschritt)','Hamstring-Dehnung im Sitzen','Herabschauender Hund'];
-function _buildMorningDefault(){
-  return MORNING_DEFAULT_NAMES
-    .map(n=>STRETCH_LIB.find(e=>e.name===n)).filter(Boolean)
-    .map(e=>({...e,type:'hold',duration:e.hold||40,rest:8,sets:1,icon:'🧘'}));
+// ─── Daily routines (morning / evening) ──────────────────────────────────────
+// Stored in profile.routines={morning:{name,exercises},evening:{...}}.
+const ROUTINE_KINDS={
+  morning:{icon:'🌅',label:'Morgenroutine',defaultName:'Kopf bis Fuß',entryFlag:'morning',
+    defaults:['Nacken-Seitneige','Brustdehnung an der Wand','Katze-Kuh','Kindeshaltung','Hüftbeuger-Dehnung (Ausfallschritt)','Hamstring-Dehnung im Sitzen','Herabschauender Hund']},
+  evening:{icon:'🌙',label:'Abendroutine',defaultName:'Runterfahren',entryFlag:'evening',
+    defaults:['Nacken-Seitneige','Kindeshaltung','Wirbelsäulendrehung liegend','Taubenhaltung (Gesäß)','Adduktoren-Dehnung (Schmetterling)','Liegende Hamstring-Dehnung']}
+};
+function loadRoutines(){
+  const p=loadProfile()||{};
+  const r=p.routines||{};
+  // Migrate legacy single morning routine
+  if(!r.morning&&p.morningRoutine)r.morning=p.morningRoutine;
+  return r;
 }
-function _morningMinutes(r){
+function saveRoutines(r){
+  const p=loadProfile()||{};
+  p.routines=r;delete p.morningRoutine;
+  saveProfile(p);
+}
+function _buildRoutineDefault(kind){
+  const k=ROUTINE_KINDS[kind];
+  const holdBoost=kind==='evening'?10:0; // evening: longer, calmer holds
+  return k.defaults
+    .map(n=>STRETCH_LIB.find(e=>e.name===n)).filter(Boolean)
+    .map(e=>({...e,type:'hold',duration:(e.hold||40)+holdBoost,rest:8,sets:1,icon:'🧘'}));
+}
+function _routineMinutes(r){
   const sec=(r.exercises||[]).reduce((s,e)=>s+((e.duration||40)+(e.rest||8))*(e.bilateral?2:1),0);
   return Math.max(3,Math.round(sec/60));
 }
+function _routineDoneToday(kind){
+  const flag=ROUTINE_KINDS[kind].entryFlag;
+  return log.some(w=>w.stretch&&w[flag]&&w.date.slice(0,10)===todayIso());
+}
 function updateMorningCard(){
   const card=document.getElementById('morning-card');if(!card)return;
-  const p=loadProfile()||{};
-  const r=p.morningRoutine;
+  const rows=document.getElementById('routine-rows');if(!rows)return;
   card.style.display='block';
-  const sub=document.getElementById('morning-sub'),start=document.getElementById('morning-start');
-  if(r?.exercises?.length){
-    sub.textContent=r.exercises.length+' Dehnungen · ~'+_morningMinutes(r)+' min';
-    start.style.display='block';start.textContent='▶ Start';start.onclick=startMorningRoutine;
-    // Done today?
-    const doneToday=log.some(w=>w.stretch&&w.morning&&w.date.slice(0,10)===todayIso());
-    if(doneToday){sub.textContent='✓ Heute schon gemacht — stark.';start.style.display='none';}
-  }else{
-    sub.textContent='1× anlegen, dann jeden Morgen 1 Tap.';
-    start.style.display='block';start.textContent='Anlegen';start.onclick=openMorningSetup;
-  }
+  const routines=loadRoutines();
+  // Evening first after 15:00
+  const kinds=new Date().getHours()>=15?['evening','morning']:['morning','evening'];
+  rows.innerHTML=kinds.map(kind=>{
+    const k=ROUTINE_KINDS[kind],r=routines[kind];
+    let sub,cta;
+    if(r?.exercises?.length){
+      if(_routineDoneToday(kind)){sub='✓ Heute schon gemacht — stark.';cta='';}
+      else{sub=r.exercises.length+' Dehnungen · ~'+_routineMinutes(r)+' min';
+        cta=`<button onclick="startRoutine('${kind}')" style="flex-shrink:0;padding:10px 16px;border-radius:11px;background:linear-gradient(135deg,#059669,#34d399);border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--f);box-shadow:0 3px 12px rgba(var(--coRGB),.3)">▶ Start</button>`;}
+    }else{
+      sub='1× anlegen, dann täglich 1 Tap.';
+      cta=`<button onclick="openRoutineSetup('${kind}')" style="flex-shrink:0;padding:10px 16px;border-radius:11px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">Anlegen</button>`;
+    }
+    return`<div style="display:flex;align-items:center;gap:10px">
+      <div style="font-size:20px;flex-shrink:0">${k.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;letter-spacing:.08em;color:var(--co);text-transform:uppercase;font-weight:700">${k.label}</div>
+        <div style="font-size:12px;color:var(--mu);margin-top:2px">${sub}</div>
+      </div>
+      ${cta}
+      <button onclick="openRoutineSetup('${kind}')" aria-label="${k.label} ändern" style="flex-shrink:0;width:32px;height:32px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">⋯</button>
+    </div>`;
+  }).join('<div style="height:1px;background:var(--br)"></div>');
 }
-function startMorningRoutine(){
-  const p=loadProfile()||{};const r=p.morningRoutine;
-  if(!r?.exercises?.length){openMorningSetup();return;}
+function startRoutine(kind){
+  const r=loadRoutines()[kind];
+  if(!r?.exercises?.length){openRoutineSetup(kind);return;}
   curExercises=r.exercises.map(e=>({...e}));wuExercises=[];
-  curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:_morningMinutes(r),stretch:true,morning:true};
+  curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:_routineMinutes(r),stretch:true,routine:kind};
   startWorkout();
 }
-function openMorningSetup(){
-  const p=loadProfile()||{};const r=p.morningRoutine;
+let _routineKind='morning';
+function openRoutineSetup(kind){
+  _routineKind=kind;
+  const k=ROUTINE_KINDS[kind];
+  document.getElementById('morning-modal-title').textContent=k.icon+' '+k.label;
+  const r=loadRoutines()[kind];
   const templates=loadTemplates();
   let html='';
   if(r?.exercises?.length){
-    html+=`<div class="card" style="margin-bottom:12px"><div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px">Aktuelle Routine · ~${_morningMinutes(r)} min</div>${r.exercises.map(e=>`<div style="font-size:12px;color:var(--su);padding:3px 0">🧘 ${e.name}${e.bilateral?' ↔':''} · ${e.duration||40}s</div>`).join('')}</div>`;
-    html+=`<button onclick="removeMorningRoutine()" style="width:100%;padding:10px;border-radius:10px;background:rgba(var(--hotRGB),.09);border:1px solid rgba(var(--hotRGB),.25);color:var(--hot);font-size:12px;font-weight:600;font-family:var(--f);margin-bottom:14px">Routine entfernen</button>`;
+    html+=`<div class="card" style="margin-bottom:12px"><div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px">Aktuelle Routine · ~${_routineMinutes(r)} min</div>${r.exercises.map(e=>`<div style="font-size:12px;color:var(--su);padding:3px 0">🧘 ${e.name}${e.bilateral?' ↔':''} · ${e.duration||40}s</div>`).join('')}</div>`;
+    html+=`<button onclick="removeRoutine()" style="width:100%;padding:10px;border-radius:10px;background:rgba(var(--hotRGB),.09);border:1px solid rgba(var(--hotRGB),.25);color:var(--hot);font-size:12px;font-weight:600;font-family:var(--f);margin-bottom:14px">Routine entfernen</button>`;
     html+=`<div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px">Ersetzen durch</div>`;
   }
-  html+=`<button onclick="setMorningDefault()" class="btn btn-co" style="padding:13px;font-size:13px;text-transform:none;margin-bottom:8px">Standard: Kopf bis Fuß (~8 min)</button>`;
+  const defDesc=kind==='evening'?'Standard: Runterfahren (~8 min, ruhig & bodennah)':'Standard: Kopf bis Fuß (~8 min)';
+  html+=`<button onclick="setRoutineDefault()" class="btn btn-co" style="padding:13px;font-size:13px;text-transform:none;margin-bottom:8px">${defDesc}</button>`;
   if(templates.length){
     html+=`<div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin:12px 0 8px">Oder aus Vorlage</div>`;
     templates.forEach((t,i)=>{
-      html+=`<button onclick="setMorningFromTemplate(${i})" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:11px 13px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;font-family:var(--f)"><span style="font-size:14px">💾</span><span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600;color:var(--tx)">${t.name}</span><span style="display:block;font-size:11px;color:var(--mu)">${t.exercises.length} Übungen</span></span></button>`;
+      html+=`<button onclick="setRoutineFromTemplate(${i})" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:11px 13px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;font-family:var(--f)"><span style="font-size:14px">💾</span><span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600;color:var(--tx)">${t.name}</span><span style="display:block;font-size:11px;color:var(--mu)">${t.exercises.length} Übungen</span></span></button>`;
     });
   }
   html+=`<div style="font-size:11px;color:var(--mu);margin-top:10px;line-height:1.5">Tipp: Du kannst auch jede Dehn-Session im Review "Als Vorlage speichern" und sie hier auswählen.</div>`;
   document.getElementById('morning-setup-body').innerHTML=html;
   document.getElementById('modal-morning').classList.add('open');
 }
-function setMorningDefault(){
-  const p=loadProfile()||{};
-  p.morningRoutine={name:'Kopf bis Fuß',exercises:_buildMorningDefault()};
-  saveProfile(p);closeModal('modal-morning');updateMorningCard();
-  showErr('✓ Morgenroutine angelegt — ab jetzt 1 Tap.');
+function setRoutineDefault(){
+  const k=ROUTINE_KINDS[_routineKind];
+  const r=loadRoutines();
+  r[_routineKind]={name:k.defaultName,exercises:_buildRoutineDefault(_routineKind)};
+  saveRoutines(r);closeModal('modal-morning');updateMorningCard();
+  showErr('✓ '+k.label+' angelegt — ab jetzt 1 Tap.');
 }
-function setMorningFromTemplate(i){
+function setRoutineFromTemplate(i){
   const t=loadTemplates()[i];if(!t)return;
-  const p=loadProfile()||{};
-  p.morningRoutine={name:t.name,exercises:t.exercises.map(e=>({...e}))};
-  saveProfile(p);closeModal('modal-morning');updateMorningCard();
-  showErr('✓ "'+t.name+'" ist jetzt deine Morgenroutine.');
+  const r=loadRoutines();
+  r[_routineKind]={name:t.name,exercises:t.exercises.map(e=>({...e}))};
+  saveRoutines(r);closeModal('modal-morning');updateMorningCard();
+  showErr('✓ "'+t.name+'" ist jetzt deine '+ROUTINE_KINDS[_routineKind].label+'.');
 }
-async function removeMorningRoutine(){
-  const ok=await appConfirm('Morgenroutine entfernen?','Die Karte bleibt, du kannst jederzeit eine neue anlegen.','Entfernen');
+async function removeRoutine(){
+  const k=ROUTINE_KINDS[_routineKind];
+  const ok=await appConfirm(k.label+' entfernen?','Die Karte bleibt, du kannst jederzeit eine neue anlegen.','Entfernen');
   if(!ok)return;
-  const p=loadProfile()||{};delete p.morningRoutine;saveProfile(p);
+  const r=loadRoutines();delete r[_routineKind];saveRoutines(r);
   closeModal('modal-morning');updateMorningCard();
 }
+// Legacy aliases (older saved onclick strings / tests)
+function startMorningRoutine(){startRoutine('morning');}
+function openMorningSetup(){openRoutineSetup('morning');}
+function setMorningDefault(){_routineKind='morning';setRoutineDefault();}
+function setMorningFromTemplate(i){_routineKind='morning';setRoutineFromTemplate(i);}
+function removeMorningRoutine(){_routineKind='morning';return removeRoutine();}
 
 function smartSortExercises(){
   if(curExercises.length<2)return;
@@ -3419,7 +3459,7 @@ function adoptExercisesToLibrary(exercises){
 function saveWorkout(){
   const entry={id:Date.now(),date:new Date().toISOString(),muscles:curSetup.muscles||[],durationMin:curSetup.durationMin||20,exercises:curExercises,repLog:{...tReps},rpe,note:document.getElementById('rat-note').value.trim()};
   // Stretch sessions count for consistency, but not as training load
-  if(curSetup.stretch||window._isStretchSession){entry.stretch=true;entry.areaId=curSetup.areaId||null;if(curSetup.morning)entry.morning=true;}
+  if(curSetup.stretch||window._isStretchSession){entry.stretch=true;entry.areaId=curSetup.areaId||null;if(curSetup.routine==='morning'||curSetup.morning)entry.morning=true;if(curSetup.routine==='evening')entry.evening=true;}
   window._isStretchSession=false;
   // Snapshot challenge completion before adding this workout
   const _chBefore={};loadChallenges().forEach(ch=>{_chBefore[ch.id]=calcChallengeProgress(ch).pct>=100;});
