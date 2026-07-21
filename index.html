@@ -64,6 +64,10 @@ button:active:not(:disabled){transform:scale(.96)}
 .card{background:var(--card);border:1px solid var(--br);border-radius:13px;padding:15px 17px;box-shadow:var(--shadow)}
 .tag{font-size:11px;padding:3px 8px;border-radius:16px;font-weight:500;white-space:nowrap;display:inline-block}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:9px;border:1.5px solid var(--br);background:var(--up);color:var(--mu);font-size:13px;font-family:var(--f);transition:all .15s;cursor:pointer;user-select:none;font-weight:500}
+.dragging{position:relative;z-index:50;opacity:.94;box-shadow:0 10px 28px rgba(0,0,0,.45);pointer-events:none;transition:none!important}
+.drop-above{box-shadow:0 -3px 0 0 var(--ac)}
+.drop-below{box-shadow:0 3px 0 0 var(--ac)}
+.drag-handle:active{cursor:grabbing;color:var(--ac)}
 .chip.ac{border-color:var(--ac);background:rgba(var(--acRGB),.12);color:var(--ac);font-weight:600}
 .chip.co{border-color:var(--co);background:rgba(var(--coRGB),.1);color:var(--co);font-weight:600}
 .chip.am{border-color:var(--am);background:rgba(var(--amRGB),.1);color:var(--am);font-weight:600}
@@ -1474,7 +1478,14 @@ const STRETCH_LIB=[
   {name:'Wadendehnung an der Wand',muscles:['calves'],stretch:true,bilateral:true,hold:35,tip:'Ferse am Boden',details:'Bein nach hinten strecken, Ferse gedrückt halten, Hüfte nach vorne.',mistakes:'Ferse abheben'},
   {name:'Herabschauender Hund',muscles:['hams','calves','lats'],stretch:true,hold:45,tip:'Sitzbeinhöcker hoch',details:'Umgekehrtes V, Fersen Richtung Boden, Rücken lang.',mistakes:'Rücken runden, um die Fersen zu erreichen'},
   {name:'Tiefe Hocke (Malasana)',muscles:['glutes','hip_flexors','calves'],stretch:true,hold:45,tip:'Fersen am Boden',details:'Tief in die Hocke, Ellenbogen drücken die Knie nach außen.',mistakes:'Fersen heben, Rücken kollabiert'},
-  {name:'Liegende Hamstring-Dehnung',muscles:['hams'],stretch:true,bilateral:true,hold:40,tip:'Unterer Rücken am Boden',details:'Rückenlage, Bein gestreckt hochziehen, ggf. mit Handtuch.',mistakes:'Becken kippt mit'}
+  {name:'Liegende Hamstring-Dehnung',muscles:['hams'],stretch:true,bilateral:true,hold:40,tip:'Unterer Rücken am Boden',details:'Rückenlage, Bein gestreckt hochziehen, ggf. mit Handtuch.',mistakes:'Becken kippt mit'},
+  {name:'90/90 Hüftrotation',muscles:['glutes','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Beide Sitzbeinhöcker am Boden',details:'Sitzend beide Beine im 90°-Winkel ablegen (vorderes Bein Außenrotation, hinteres Innenrotation). Oberkörper aufrecht über das vordere Schienbein neigen.',mistakes:'Hinteres Gesäß hebt ab, Rücken rundet'},
+  {name:'Couch Stretch',muscles:['quads','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Gesäß anspannen, Becken aufrichten',details:'Hinterer Fuß an Wand oder Sofa hoch, Knie am Boden nahe der Wand, vorderes Bein aufgestellt. Oberkörper langsam aufrichten.',mistakes:'Ins Hohlkreuz ausweichen'},
+  {name:'Halber Spagat (Half Split)',muscles:['hams','calves'],stretch:true,bilateral:true,hold:40,tip:'Aus der Hüfte kippen, Rücken lang',details:'Kniestand, vorderes Bein gestreckt nach vorn, Zehen angezogen. Hüfte über dem hinteren Knie halten und Oberkörper mit geradem Rücken nach vorne neigen.',mistakes:'Rücken runden, Hüfte nach hinten schieben'},
+  {name:'Frosch-Dehnung',muscles:['inner_thighs','hip_flexors'],stretch:true,hold:50,tip:'Langsam reingehen, ruhig atmen',details:'Vierfüßler, Knie weit auseinander, Füße nach außen, Unterschenkel parallel. Hüfte langsam nach hinten Richtung Fersen schieben.',mistakes:'Zu schnell zu tief, Hohlkreuz'},
+  {name:'Thread the Needle',muscles:['upper_back','shoulders','obliques'],stretch:true,bilateral:true,hold:40,tip:'Schulter zum Boden sinken lassen',details:'Vierfüßlerstand, einen Arm unter dem Körper durchfädeln, Schulter und Ohr Richtung Boden ablegen.',mistakes:'Aus dem Arm statt aus der Brustwirbelsäule drehen'},
+  {name:'BWS-Rotation im Vierfüßler',muscles:['upper_back','obliques'],stretch:true,bilateral:true,hold:35,tip:'Hüfte bleibt stabil',details:'Vierfüßlerstand, eine Hand an den Hinterkopf, Ellenbogen zur Decke aufdrehen und dem Ellenbogen mit dem Blick folgen.',mistakes:'Aus der Lendenwirbelsäule statt der Brustwirbelsäule drehen'},
+  {name:'World\u2019s Greatest Stretch',muscles:['hip_flexors','hams','upper_back'],stretch:true,bilateral:true,hold:40,tip:'Groß machen beim Aufdrehen',details:'Tiefer Ausfallschritt, beide Hände innen neben den vorderen Fuß. Dann den inneren Arm zur Decke aufdrehen, Blick folgt der Hand.',mistakes:'Hinteres Bein durchhängen lassen'}
 ];
 
 const DEFAULT_LIB=[
@@ -2578,8 +2589,9 @@ function showReview(){
     const canLink=i<curExercises.length-1;
     const linked=canLink&&g&&g===nextG;
     return`${groupStart?`<div style="font-size:10px;color:var(--am);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:6px 0 4px 2px">🔗 Supersatz — Rotation</div>`:''}
-  <div class="card" id="rev-${i}" style="${border}">
+  <div class="card" id="rev-${i}" data-revi="${i}" style="${border}">
     <div style="display:flex;align-items:center;gap:8px">
+      <div class="drag-handle" onpointerdown="dragExStart(event,${i})" aria-label="Übung verschieben" style="width:22px;align-self:stretch;display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:15px;flex-shrink:0;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none">⠿</div>
       <button onclick="openInfoModal(curExercises[${i}])" style="width:34px;height:34px;border-radius:8px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.20);font-size:13px;color:var(--ac);flex-shrink:0">${ex.icon||'ℹ'}</button>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}${ex.bilateral?' ↔':''}</div>
@@ -2632,6 +2644,66 @@ function toggleWarmup(){wuVisible=!wuVisible;const list=document.getElementById(
 function cycleAlt(idx){const ex=curExercises[idx];const muscles=ex.muscles||[];const candidates=[...DEFAULT_LIB,...library].filter(e=>e.name!==ex.name&&(e.muscles||[]).some(m=>muscles.includes(m)));if(!candidates.length){showErr('Keine lokalen Alternativen.');return;}ex._altIdx=((ex._altIdx||0)+1)%candidates.length;const alt=candidates[ex._altIdx];const info=document.getElementById('alt-info-'+idx);info.style.display='block';info.innerHTML=`<b style="color:var(--tx)">${alt.name}</b>${alt.bilateral?' ↔':''} — ${alt.tip||''} <button onclick="applyAlt(${idx})" style="color:var(--ac);font-weight:600;font-size:12px;background:none;border:none;cursor:pointer;font-family:var(--f);margin-left:6px">Annehmen →</button>`;}
 function applyAlt(idx){const ex=curExercises[idx];const muscles=ex.muscles||[];const candidates=[...DEFAULT_LIB,...library].filter(e=>e.name!==ex.name&&(e.muscles||[]).some(m=>muscles.includes(m)));const alt=candidates[ex._altIdx%candidates.length]||candidates[0];if(!alt)return;curExercises[idx]={...ex,name:alt.name,tip:alt.tip||'',details:alt.details||'',mistakes:alt.mistakes||'',muscles:alt.muscles,bilateral:alt.bilateral||false,icon:getExIcon(alt.name),_altIdx:ex._altIdx};showReview();}
 function deleteEx(idx){curExercises.splice(idx,1);showReview();}
+
+// ─── Drag to reorder (review list) ───────────────────────────────────────────
+let _drag=null;
+function dragExStart(e,idx){
+  e.preventDefault();
+  const card=document.getElementById('rev-'+idx);if(!card)return;
+  try{e.target.setPointerCapture(e.pointerId);}catch{}
+  _drag={idx,target:idx,startY:e.clientY,card,h:card.offsetHeight};
+  card.classList.add('dragging');
+  document.addEventListener('pointermove',dragExMove,{passive:false});
+  document.addEventListener('pointerup',dragExEnd);
+  document.addEventListener('pointercancel',dragExEnd);
+  if(navigator.vibrate)try{navigator.vibrate(10);}catch{}
+}
+function dragExMove(e){
+  if(!_drag)return;e.preventDefault();
+  const dy=e.clientY-_drag.startY;
+  _drag.card.style.transform=`translateY(${dy}px) scale(1.02)`;
+  // Find card under pointer (dragged card has pointer-events:none via .dragging)
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  const over=el&&el.closest?el.closest('[data-revi]'):null;
+  document.querySelectorAll('.drop-above,.drop-below').forEach(x=>x.classList.remove('drop-above','drop-below'));
+  if(over&&over!==_drag.card){
+    const oi=+over.dataset.revi;
+    const r=over.getBoundingClientRect();
+    const below=e.clientY>r.top+r.height/2;
+    _drag.target=below?(oi>_drag.idx?oi:oi+1):(oi<_drag.idx?oi:oi-1<0?0:oi);
+    over.classList.add(below?'drop-below':'drop-above');
+  }else{_drag.target=_drag.idx;}
+  // Auto-scroll near screen edges
+  const vh=window.innerHeight;
+  if(e.clientY<90)window.scrollBy(0,-9);else if(e.clientY>vh-90)window.scrollBy(0,9);
+}
+function dragExEnd(){
+  if(!_drag)return;
+  document.removeEventListener('pointermove',dragExMove);
+  document.removeEventListener('pointerup',dragExEnd);
+  document.removeEventListener('pointercancel',dragExEnd);
+  document.querySelectorAll('.drop-above,.drop-below').forEach(x=>x.classList.remove('drop-above','drop-below'));
+  const{idx,target,card}=_drag;_drag=null;
+  card.classList.remove('dragging');card.style.transform='';
+  let to=Math.max(0,Math.min(curExercises.length-1,target));
+  if(to===idx)return;
+  const[moved]=curExercises.splice(idx,1);
+  curExercises.splice(to,0,moved);
+  sanitizeGroups();
+  showReview();
+}
+// Dissolve superset membership that is no longer adjacent after a reorder
+function sanitizeGroups(){
+  curExercises.forEach((ex,i)=>{
+    if(!ex.group)return;
+    const prevSame=i>0&&curExercises[i-1].group===ex.group;
+    const nextSame=i<curExercises.length-1&&curExercises[i+1].group===ex.group;
+    if(!prevSame&&!nextSame)ex.group=null;
+  });
+  // Groups reduced to one member: clear
+  const counts={};curExercises.forEach(e=>{if(e.group)counts[e.group]=(counts[e.group]||0)+1;});
+  curExercises.forEach(e=>{if(e.group&&counts[e.group]<2)e.group=null;});
+}
 function adjEx(idx,field,delta){if(!curExercises[idx])return;const ex=curExercises[idx];if(field==='reps'){ex.reps=Math.max(1,Math.min(100,(ex.reps||10)+delta));const el=document.getElementById(`dur-val-${idx}`);if(el)el.textContent=ex.reps;}else if(field==='duration'){ex.duration=Math.min(300,Math.max(10,(ex.duration||40)+delta));const el=document.getElementById(`dur-val-${idx}`);if(el)el.textContent=ex.duration+'s';}else if(field==='rest'){ex.rest=Math.min(120,Math.max(5,(ex.rest||20)+delta));const el=document.getElementById(`rest-val-${idx}`);if(el)el.textContent=ex.rest+'s';}}
 
 
@@ -4331,7 +4403,18 @@ function openTemplates(){const templates=loadTemplates();const el=document.getEl
 async function deleteTpl(idx){const ok=await appConfirm('Vorlage löschen?');if(!ok)return;const templates=loadTemplates();templates.splice(idx,1);saveTemplates(templates);openTemplates();}
 function startFromTemplate(idx){const templates=loadTemplates();const t=templates[idx];if(!t)return;curExercises=[...t.exercises];wuExercises=[...(t.warmup||[])];curSetup={muscles:t.muscles,durationMin:Math.round(((t.warmup||[]).length*35+t.exercises.length*60)/60)};closeModal('modal-templates');startWorkout();}
 function planFromTemplate(idx){closeModal('modal-templates');window._planningTemplate=idx;openSaveForLater(loadTemplates()[idx]);}
-function openSaveForLater(template){if(!plan?.weeks?.length){showErr('Kein aktiver Trainingsplan.');return;}const wi=getCurrentWeekIdx();let html=`<div style="font-size:12px;color:var(--mu);margin-bottom:14px">Wähle den Trainingstag, an dem du dieses Workout machen willst. Es wird genau so gespeichert und startet später ohne neue Generierung.</div>`;html+=`<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none">`;plan.weeks.forEach((w,i)=>{html+=`<button onclick="renderSaveLaterWeek(${i},${!!template})" id="sl-tab-${i}" style="white-space:nowrap;padding:7px 13px;border-radius:9px;border:1.5px solid ${i===wi?'var(--ac)':'var(--br)'};background:${i===wi?'rgba(var(--acRGB),.13)':'var(--up)'};color:${i===wi?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f)">Wo ${i+1}</button>`;});html+=`</div><div id="sl-sessions"></div>`;html+=`<div style="margin-top:10px;border-top:1px solid var(--br);padding-top:12px"><button onclick="addNewSessionWithWorkout(${wi},${!!template})" class="btn" style="border:1.5px solid var(--br);color:var(--mu);padding:12px;font-size:13px;font-family:var(--f)">+ Neue Session erstellen</button></div>`;document.getElementById('save-later-body').innerHTML=html;renderSaveLaterWeek(wi,!!template);document.getElementById('modal-save-later').classList.add('open');}
+function openSaveForLater(template){if(!plan?.weeks?.length){showErr('Kein aktiver Trainingsplan.');return;}const wi=getCurrentWeekIdx();
+  // Quick action: plan for today — attach to today's open session, or add as extra session
+  const todayDow=new Date().getDay();
+  const wk=plan.weeks[wi];
+  const todaySi=wk.sessions.findIndex(s=>s.dow===todayDow&&!s.done);
+  let html=`<div class="card" style="margin-bottom:14px;border-color:rgba(var(--acRGB),.35);background:linear-gradient(135deg,rgba(var(--acRGB),.09),var(--card))">
+    <div style="font-size:10px;color:var(--ac);letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:8px">📅 Heute</div>
+    ${todaySi>=0
+      ?`<div style="font-size:13px;color:var(--su);margin-bottom:10px">Für heute ist "<b style="color:var(--tx)">${wk.sessions[todaySi].focus}</b>" offen. Dieses Workout dafür verwenden?</div><button onclick="attachWorkoutToSession(${wi},${todaySi},${!!template})" class="btn btn-ac" style="padding:12px;font-size:13px;text-transform:none">✓ Für heute einplanen</button>`
+      :`<div style="font-size:13px;color:var(--su);margin-bottom:10px">Heute ist keine Session geplant. Als Zusatz-Training für heute eintragen?</div><button onclick="addNewSessionWithWorkout(${wi},${!!template})" class="btn btn-ac" style="padding:12px;font-size:13px;text-transform:none">＋ Für heute einplanen</button>`}
+  </div>
+  <div style="font-size:12px;color:var(--mu);margin-bottom:14px">Oder wähle einen anderen Trainingstag. Das Workout wird genau so gespeichert und startet später ohne neue Generierung.</div>`;html+=`<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none">`;plan.weeks.forEach((w,i)=>{html+=`<button onclick="renderSaveLaterWeek(${i},${!!template})" id="sl-tab-${i}" style="white-space:nowrap;padding:7px 13px;border-radius:9px;border:1.5px solid ${i===wi?'var(--ac)':'var(--br)'};background:${i===wi?'rgba(var(--acRGB),.13)':'var(--up)'};color:${i===wi?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f)">Wo ${i+1}</button>`;});html+=`</div><div id="sl-sessions"></div>`;html+=`<div style="margin-top:10px;border-top:1px solid var(--br);padding-top:12px"><button onclick="addNewSessionWithWorkout(${wi},${!!template})" class="btn" style="border:1.5px solid var(--br);color:var(--mu);padding:12px;font-size:13px;font-family:var(--f)">+ Neue Session erstellen</button></div>`;document.getElementById('save-later-body').innerHTML=html;renderSaveLaterWeek(wi,!!template);document.getElementById('modal-save-later').classList.add('open');}
 function renderSaveLaterWeek(wi,isTpl){const week=plan.weeks[wi];if(!week)return;plan.weeks.forEach((_,i)=>{const t=document.getElementById('sl-tab-'+i);if(t){t.style.borderColor=i===wi?'var(--ac)':'var(--br)';t.style.background=i===wi?'rgba(var(--acRGB),.13)':'var(--up)';t.style.color=i===wi?'var(--ac)':'var(--mu)';}});const el=document.getElementById('sl-sessions');if(!el)return;el.innerHTML=week.sessions.map((s,si)=>`<button onclick="attachWorkoutToSession(${wi},${si},${isTpl})" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:12px 14px;border-radius:11px;border:1.5px solid ${s.savedWorkout?'var(--co)':'var(--br)'};background:${s.savedWorkout?'rgba(var(--coRGB),.08)':'var(--card)'};margin-bottom:8px;cursor:pointer;font-family:var(--f)"><div style="width:36px;height:36px;border-radius:9px;background:var(--up);border:1px solid var(--br);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--mu);flex-shrink:0">${DAYS[s.dow]}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.focus}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.durationMin||30} min${s.savedWorkout?' · 💾 Gespeichert':''}</div></div><div style="font-size:11px;color:var(--ac);font-weight:600">→</div></button>`).join('');}
 // Estimate real session minutes from the actual exercises (sets × work + rests).
 function estimateWorkoutMinutes(exercises,warmup){
@@ -4854,8 +4937,8 @@ function openAddExToWorkout(){
   renderAddExList('');
   // Filter chips
   const fc=document.getElementById('add-ex-filter-chips');fc.innerHTML='';
-  const groups=['all','chest','back','shoulders','arms','core','glutes','legs'];
-  const labels={all:'Alle',chest:'Brust',back:'Rücken',shoulders:'Schultern',arms:'Arme',core:'Core',glutes:'Gesäß',legs:'Beine'};
+  const groups=['all','stretch','chest','back','shoulders','arms','core','glutes','legs'];
+  const labels={all:'Alle',stretch:'🧘 Dehnen',chest:'Brust',back:'Rücken',shoulders:'Schultern',arms:'Arme',core:'Core',glutes:'Gesäß',legs:'Beine'};
   groups.forEach(g=>{const b=document.createElement('button');b.className='chip'+(g==='all'?' ac':'');b.textContent=labels[g];b.onclick=()=>{_addExFilter=g;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';renderAddExList(document.getElementById('add-ex-search').value);};fc.appendChild(b);});
   document.getElementById('add-ex-search').value='';
   document.getElementById('modal-add-to-workout').classList.add('open');
@@ -4864,11 +4947,12 @@ function openAddExToWorkout(){
 function filterAddExList(query){renderAddExList(query);}
 
 function renderAddExList(query){
-  const all=[...DEFAULT_LIB,...library];
+  const all=[...DEFAULT_LIB,...library,...STRETCH_LIB];
   const q=(query||'').toLowerCase();
   const existing=new Set(curExercises.map(e=>e.name.toLowerCase()));
   let filtered=all.filter(ex=>{
-    if(_addExFilter!=='all'&&!(ex.muscles||[]).includes(_addExFilter))return false;
+    if(_addExFilter==='stretch'&&!ex.stretch)return false;
+    if(_addExFilter!=='all'&&_addExFilter!=='stretch'&&!(ex.muscles||[]).includes(_addExFilter))return false;
     if(q&&!(ex.name.toLowerCase().includes(q)||(ex.tip||'').toLowerCase().includes(q)))return false;
     return true;
   });
@@ -4876,10 +4960,10 @@ function renderAddExList(query){
   el.innerHTML=filtered.map((ex,idx)=>{
     const already=existing.has(ex.name.toLowerCase());
     return`<div style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:11px;border:1px solid ${already?'var(--co)':'var(--br)'};background:${already?'rgba(var(--coRGB),.10)':'var(--card)'};opacity:${already?'.7':'1'}">
-      <div style="width:34px;height:34px;border-radius:9px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.17);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--ac);flex-shrink:0">${getExIcon(ex.name)}</div>
+      <div style="width:34px;height:34px;border-radius:9px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.17);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--ac);flex-shrink:0">${ex.stretch?'🧘':getExIcon(ex.name)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}${ex.bilateral?' ↔':''}</div>
-        <div style="font-size:11px;color:var(--mu)">${(ex.muscles||[]).map(m=>MUSCLE_DE[m]||m).join(', ')}</div>
+        <div style="font-size:11px;color:var(--mu)">${ex.stretch?'Dehnung · ':''}${(ex.muscles||[]).map(m=>MUSCLE_DE[m]||m).join(', ')}</div>
       </div>
       ${already
         ?'<span style="font-size:11px;color:var(--co);font-weight:600">✓ drin</span>'
@@ -4893,10 +4977,11 @@ function renderAddExList(query){
 function addExToWorkout(exOrStr){
   let ex;try{ex=typeof exOrStr==='object'?exOrStr:JSON.parse(exOrStr);}catch{return;}
   const n=(ex.name||'').toLowerCase();
-  let type='time';
-  if(n.match(/plank|wall sit|hollow|dead hang|l-sit/))type='hold';
+  let type='time',dur=40,rest=20;
+  if(ex.stretch){type='hold';dur=ex.hold||40;rest=10;}
+  else if(n.match(/plank|wall sit|hollow|dead hang|l-sit/))type='hold';
   else if(n.match(/push|liegest|klimmzug|pull.up|dip|curl|lunge|squat|kniebeug|row|raise/)||ex.bilateral)type='reps';
-  curExercises.push({...ex,type,duration:type==='hold'?45:40,rest:20,reps:10,sets:1,icon:getExIcon(ex.name)});
+  curExercises.push({...ex,type,duration:type==='hold'?(ex.stretch?dur:45):dur,rest,reps:10,sets:1,icon:ex.stretch?'🧘':getExIcon(ex.name)});
   closeModal('modal-add-to-workout');
   if(window._addingLive){
     // Added while training: stay in the timer, just refresh the list
