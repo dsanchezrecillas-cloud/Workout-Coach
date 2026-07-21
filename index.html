@@ -21,19 +21,22 @@ try{
 <style>
 :root{--f:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;--m:'SF Mono',SFMono-Regular,ui-monospace,monospace}
 /* Dark (default) */
-html[data-theme="dark"]{--bg:#0e0b1a;--card:#181330;--up:#221a3d;--br:#332a52;--ac:#a78bfa;--hot:#fb7185;--co:#34d399;--am:#fbbf24;--tx:#ece9f5;--mu:#8a7fb0;--su:#b8afd6;
+html[data-theme="dark"]{color-scheme:dark;--bg:#0e0b1a;--card:#181330;--up:#221a3d;--br:#332a52;--ac:#a78bfa;--hot:#fb7185;--co:#34d399;--am:#fbbf24;--tx:#ece9f5;--mu:#8a7fb0;--su:#b8afd6;
   --acRGB:167,139,250;--hotRGB:251,113,133;--coRGB:52,211,153;--amRGB:251,191,36;
   --grad1:#231b42;--gradAm:#2a2312;--ring:#2b2348;--toastBg:#2d1520;--warnBg:#2a2312;
-  --bodyOff:#2b2348;--bodySkin:#3a3355;--bodySkinD:#4a4270;--bodyLine:#4a4270;--chartLbl:#8a7fb0;--shadow:0 1px 3px rgba(0,0,0,.35)}
+  --bodyOff:#2b2348;--bodySkin:#3a3355;--bodySkinD:#4a4270;--bodyLine:#4a4270;--chartLbl:#8a7fb0;--shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.22)}
 /* Light */
-html[data-theme="light"]{--bg:#f7f4ff;--card:#ffffff;--up:#efe9ff;--br:#ddd5f7;--ac:#7c3aed;--hot:#f43f5e;--co:#059669;--am:#d97706;--tx:#1e1740;--mu:#9181b4;--su:#5c4f82;
+html[data-theme="light"]{color-scheme:light;--bg:#f7f4ff;--card:#ffffff;--up:#efe9ff;--br:#ddd5f7;--ac:#7c3aed;--hot:#f43f5e;--co:#059669;--am:#d97706;--tx:#1e1740;--mu:#9181b4;--su:#5c4f82;
   --acRGB:124,58,237;--hotRGB:244,63,94;--coRGB:5,150,105;--amRGB:217,119,6;
   --grad1:#f5f0ff;--gradAm:#fffbeb;--ring:#ede9ff;--toastBg:#fff0f3;--warnBg:#fffbeb;
   --bodyOff:#e8e4f8;--bodySkin:#f0e6d6;--bodySkinD:#ddd0be;--bodyLine:#d8d0ee;--chartLbl:#64748b;--shadow:0 1px 4px rgba(124,58,237,.06)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 button,input,a{touch-action:manipulation}
 html,body{background:var(--bg);min-height:100%}
-body{font-family:var(--f);color:var(--tx);min-height:100vh;min-height:-webkit-fill-available;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{font-family:var(--f);color:var(--tx);min-height:100vh;min-height:-webkit-fill-available;-webkit-font-smoothing:antialiased;overflow-x:hidden;overscroll-behavior-y:none;font-variant-numeric:tabular-nums}
+::selection{background:rgba(var(--acRGB),.3)}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:4px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideup{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
@@ -68,9 +71,12 @@ button:active:not(:disabled){transform:scale(.96)}
 .back{color:var(--mu);font-size:13px;font-weight:500;padding:0 0 20px;display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;font-family:var(--f)}
 .inp{width:100%;background:var(--up);border:1px solid var(--br);border-radius:9px;padding:12px 14px;color:var(--tx);font-size:14px;outline:none;-webkit-appearance:none;font-family:var(--f)}
 .inp:focus{border-color:var(--ac)}
-.modal-ov{display:none;position:fixed;inset:0;background:rgba(30,23,64,.45);backdrop-filter:blur(4px);z-index:100;align-items:flex-end;justify-content:center}
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(14,10,30,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:100;align-items:flex-end;justify-content:center}
 .modal-ov.open{display:flex}
-.modal-box{background:var(--card);border:1px solid var(--br);border-radius:18px 18px 0 0;padding:22px 18px max(env(safe-area-inset-bottom,18px),18px);width:100%;max-width:480px;animation:slideup .28s cubic-bezier(.16,1,.3,1);max-height:88vh;overflow-y:auto}
+.modal-box{position:relative;background:var(--card);border:1px solid var(--br);border-bottom:none;border-radius:20px 20px 0 0;padding:30px 18px max(env(safe-area-inset-bottom,18px),18px);width:100%;max-width:480px;animation:slideup .28s cubic-bezier(.16,1,.3,1);max-height:88vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--br) transparent}
+.modal-box::before{content:'';position:absolute;top:9px;left:50%;transform:translateX(-50%);width:38px;height:4px;border-radius:2px;background:var(--br)}
+.modal-box::-webkit-scrollbar{width:4px}
+.modal-box::-webkit-scrollbar-thumb{background:var(--br);border-radius:2px}
 #timer-arc{transition:stroke-dashoffset .9s linear,stroke .3s}
 .rep-btn{width:50px;height:50px;border-radius:12px;font-size:26px;display:flex;align-items:center;justify-content:center;border:1px solid}
 .rep-btn:active{transform:scale(.93)}
@@ -104,7 +110,7 @@ button:active:not(:disabled){transform:scale(.96)}
         <div style="font-size:20px;font-weight:700;letter-spacing:-.02em;margin-top:1px" id="greeting">Hallo, Dario.</div>
       </div>
     </div>
-    <button onclick="show('s-settings')" style="width:38px;height:38px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">⚙</button>
+    <button aria-label="Einstellungen" onclick="show('s-settings')" style="width:38px;height:38px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;display:flex;align-items:center;justify-content:center">⚙</button>
   </div>
 
   <div id="no-key" style="background:var(--warnBg);border:1px solid rgba(var(--amRGB),.26);border-radius:11px;padding:12px 15px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
@@ -590,7 +596,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <div style="font-size:16px;font-weight:700">🧬 Über dich</div>
-      <button onclick="closeModal('modal-onboarding')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-onboarding')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <div style="font-size:12px;color:var(--mu);margin-bottom:14px;line-height:1.5">Damit der Plan zu deinem Körper und Level passt. Alles bleibt lokal auf deinem Gerät.</div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:7px">Trainingsstatus</div>
@@ -612,7 +618,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <div style="font-size:16px;font-weight:700">Fitness-Check</div>
-      <button onclick="closeModal('modal-assessment')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-assessment')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <div style="font-size:12px;color:var(--mu);margin-bottom:16px;line-height:1.5">Drei kurze Tests kalibrieren deine Startintensität. Ausgeruht durchführen, zwischen den Tests 2-3 min Pause.</div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Max. Liegestütze am Stück</div>
@@ -628,7 +634,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
       <div style="font-size:16px;font-weight:700">Plan anpassen</div>
-      <button onclick="closeModal('modal-plan-edit')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-plan-edit')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <!-- End date change -->
     <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:8px">
@@ -670,7 +676,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:700" id="swap-title">Übung tauschen</div>
-      <button onclick="closeModal('modal-swap')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-swap')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <input type="hidden" id="swap-idx"/>
     <div style="display:flex;gap:7px;margin-bottom:14px">
@@ -690,7 +696,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div style="font-size:16px;font-weight:700" id="add-ex-title">Übung hinzufügen</div>
-      <button onclick="closeModal('modal-add-ex')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-add-ex')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <input id="add-ex-name" class="inp" placeholder="Übungsname *" style="margin-bottom:10px"/>
     <input id="add-ex-tip" class="inp" placeholder="Kurz-Tipp (optional)" style="margin-bottom:10px"/>
@@ -722,7 +728,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <div style="font-size:16px;font-weight:700">🧘 Dehn-Session</div>
-      <button onclick="closeModal('modal-stretch')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-stretch')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <div style="font-size:12px;color:var(--mu);margin-bottom:16px">Statisches Dehnen — nach dem Training oder an Ruhetagen.</div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Bereich</div>
@@ -738,7 +744,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div style="font-size:16px;font-weight:700">Workout einplanen</div>
-      <button onclick="closeModal('modal-save-later')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-save-later')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <div id="save-later-body"></div>
   </div>
@@ -749,7 +755,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div style="font-size:16px;font-weight:700">Gespeicherte Workouts</div>
-      <button onclick="closeModal('modal-templates')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-templates')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <div id="templates-list"></div>
   </div>
@@ -763,7 +769,7 @@ button:active:not(:disabled){transform:scale(.96)}
         <div style="font-size:18px;font-weight:700">⚡ Schnelle Nummer</div>
         <div style="font-size:12px;color:var(--mu);margin-top:2px">Kein Zeitplan? Trotzdem trainieren.</div>
       </div>
-      <button onclick="closeModal('modal-quick')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-quick')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Fokus</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:18px" id="quick-focus-grid"></div>
@@ -811,7 +817,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-size:16px;font-weight:700">⚖ Gewicht eintragen</div>
-      <button onclick="closeModal('modal-weight')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-weight')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <div style="font-size:12px;color:var(--mu);margin-bottom:12px;line-height:1.45">Ein Wert pro Woche reicht. Ein weiterer Eintrag in derselben Woche überschreibt den alten.</div>
     <input id="weight-log-inp" class="inp" type="text" inputmode="decimal" pattern="[0-9.]*" placeholder="z.B. 79.5" style="margin-bottom:12px"/>
@@ -824,7 +830,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div style="font-size:16px;font-weight:700">Neue Challenge</div>
-      <button onclick="closeModal('modal-new-challenge')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-new-challenge')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <input id="ch-name" class="inp" placeholder="Name der Challenge *" style="margin-bottom:10px"/>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Typ</div>
@@ -847,7 +853,7 @@ button:active:not(:disabled){transform:scale(.96)}
 
 <!-- MODAL: Custom confirm (replaces confirm() which fails in iOS PWA) -->
 <div class="modal-ov" id="modal-confirm">
-  <div class="modal-box" style="padding:22px 20px">
+  <div class="modal-box" style="padding:28px 20px 22px">
     <div id="confirm-msg" style="font-size:16px;font-weight:600;color:var(--tx);margin-bottom:6px;line-height:1.4"></div>
     <div id="confirm-sub" style="font-size:13px;color:var(--mu);margin-bottom:20px"></div>
     <div style="display:flex;gap:9px">
@@ -862,7 +868,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box" style="max-height:82vh;display:flex;flex-direction:column">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-shrink:0">
       <div style="font-size:16px;font-weight:700">Übung hinzufügen</div>
-      <button onclick="closeModal('modal-add-to-workout')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-add-to-workout')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <!-- Search -->
     <input id="add-ex-search" type="text" class="inp" placeholder="Suchen..." style="margin-bottom:10px;flex-shrink:0" oninput="filterAddExList(this.value)"/>
@@ -879,7 +885,7 @@ button:active:not(:disabled){transform:scale(.96)}
       <div id="mi-name" style="font-size:17px;font-weight:700;color:var(--tx)"></div>
       <div style="display:flex;gap:7px;align-items:center">
         <button id="mi-google-btn" onclick="googleExercise()" style="padding:6px 11px;border-radius:8px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">🔍 Google</button>
-        <button onclick="closeModal('modal-info')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+        <button aria-label="Schließen" onclick="closeModal('modal-info')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
       </div>
     </div>
     <!-- Muscle map -->
@@ -911,7 +917,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:700;color:var(--tx)">Workout bearbeiten</div>
-      <button onclick="closeModal('modal-edit')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-edit')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <input type="hidden" id="edit-idx"/>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:11px">RPE</div>
@@ -945,7 +951,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div style="font-size:16px;font-weight:700;color:var(--tx)" id="sess-modal-title">Session bearbeiten</div>
-      <button onclick="closeModal('modal-session')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      <button aria-label="Schließen" onclick="closeModal('modal-session')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <input type="hidden" id="sess-wi"/><input type="hidden" id="sess-si"/>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Tag verschieben</div>
@@ -1216,6 +1222,7 @@ function show(id){
     else if(id==='s-home')updateHome();
     else if(id==='s-journal')renderJournal();
     else if(id==='s-settings'){applyTheme(loadTheme());setAutoAdvance(autoAdvanceOn());}
+    else if(id==='s-history'){if(typeof renderHistory==='function')renderHistory();}
     else if(id==='s-analytics'){if(typeof analyticsRange==='function')analyticsRange(typeof currentAnalyticsRange!=='undefined'?currentAnalyticsRange:'week');}
     else if(id==='s-goals'){if(typeof renderGoals==='function')renderGoals();}
   }catch(e){console.error('Screen init error:',e);}
@@ -3214,7 +3221,8 @@ function linkToSession(wi,si){markSessDone(wi,si,true);show('s-home');}
 function addAsExtraSession(wi,muscles){if(!plan?.weeks[wi])return;const todayDow=new Date().getDay();const muscleStr=(muscles||[]).map(m=>MUSCLE_DE[m]||m).join(' & ')||'Zusatz';plan.weeks[wi].sessions.push({dow:todayDow,focus:muscleStr,intensity:'medium',durationMin:20,done:true,doneDate:todayIso(),extra:true});savePlan();show('s-home');}
 
 // ─── History ──────────────────────────────────────────────────────────────────
-function showHistory(){const rd=log.slice(-8).map(w=>({l:fmtD(w.date),v:w.rpe,c:rpc(w.rpe)}));const hw=document.getElementById('hist-chart');if(rd.length>1){hw.style.display='block';setTimeout(()=>drawBars('rpe-chart',rd,60),30);}else hw.style.display='none';document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.values(w.repLog||{}).reduce((s,v)=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${w.stretch?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:'')):(mainMuscles(w.muscles,3).join(', ')||'Workout')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{const per=repsPerExercise(w).filter(p=>p.reps>0);if(!per.length)return'';return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${per.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''}</span><span style="color:var(--su);font-weight:600;margin-left:8px">${p.reps} Wdh</span></div>`).join('')}</div>`;})()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${w.note}</div>`:''}</div>`;}).join('');show('s-history');}
+function renderHistory(){const rd=log.slice(-8).map(w=>({l:fmtD(w.date),v:w.rpe,c:rpc(w.rpe)}));const hw=document.getElementById('hist-chart');if(rd.length>1){hw.style.display='block';setTimeout(()=>drawBars('rpe-chart',rd,60),30);}else hw.style.display='none';const escN=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.values(w.repLog||{}).reduce((s,v)=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${w.stretch?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:'')):(mainMuscles(w.muscles,3).join(', ')||'Workout')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{const per=repsPerExercise(w).filter(p=>p.reps>0);if(!per.length)return'';return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${per.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''}</span><span style="color:var(--su);font-weight:600;margin-left:8px">${p.reps} Wdh</span></div>`).join('')}</div>`;})()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${escN(w.note)}</div>`:''}</div>`;}).join('');}
+function showHistory(){show('s-history');}
 async function delW(idx){const ok=await appConfirm('Training löschen?','Diese Aktion kann nicht rückgängig gemacht werden.');if(!ok)return;log.splice(idx,1);persist();updateHome();showHistory();}
 async function delLastWorkout(){if(!log.length)return;const last=log[log.length-1];const ok=await appConfirm('Letztes Training löschen?','RPE '+(last.rpe||'?')+'/10 · '+fmtD(last.date));if(!ok)return;log.pop();persist();updateHome();}
 // ─── Wiederholungen je Übung / je Satz ────────────────────────────────────────
