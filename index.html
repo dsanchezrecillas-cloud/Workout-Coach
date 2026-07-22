@@ -1688,8 +1688,40 @@ function renderJournal(){
       <div style="font-size:13px;color:var(--tx);line-height:1.55">${(e.text||'').replace(/</g,'&lt;')}</div>
       ${e.ai?`<div style="font-size:12px;color:var(--ac);margin-top:7px;padding-top:7px;border-top:1px solid var(--br);line-height:1.55">🧠 ${e.ai.replace(/</g,'&lt;')}</div>`:''}
       ${e.planPause&&!e.planApplied&&e.date===todayIso()&&plan?`<button onclick="applyJournalPause(${e.ts},${e.planPause})" class="btn" style="margin-top:9px;padding:11px;border:1.5px solid rgba(var(--amRGB),.40);color:var(--am);font-size:12px;text-transform:none">📅 Plan anpassen: ${e.planPause} Tag${e.planPause>1?'e':''} pausieren, Sessions verschieben</button>`:''}
-      ${e.planApplied?`<div style="font-size:11px;color:var(--co);margin-top:7px">✓ Plan angepasst (${e.planPause} Tag${e.planPause>1?'e':''} Pause)</div>`:''}
+      ${e.planShift&&!e.planApplied&&e.date===todayIso()&&plan?`<button onclick="applyJournalShift(${e.ts},${e.planShift})" class="btn" style="margin-top:9px;padding:11px;border:1.5px solid rgba(var(--acRGB),.40);color:var(--ac);font-size:12px;text-transform:none">📅 Heutiges Training auf ${e.planShift===1?'morgen':'den nächsten freien Tag'} verschieben</button>`:''}
+      ${e.planApplied?`<div style="font-size:11px;color:var(--co);margin-top:7px">✓ ${e.planShiftTo?'Training verschoben auf '+e.planShiftTo:'Plan angepasst ('+e.planPause+' Tag'+(e.planPause>1?'e':'')+' Pause)'}</div>`:''}
     </div>`).join('')||'<div style="text-align:center;padding:26px 0;color:var(--mu);font-size:13px">Noch keine Einträge.</div>';
+}
+async function applyJournalShift(ts,days){
+  if(!plan?.weeks?.length)return;
+  const wi=getCurrentWeekIdx();const wk=plan.weeks[wi];
+  const todayDow=new Date().getDay();
+  const si=wk.sessions.findIndex(s=>s.dow===todayDow&&!s.done);
+  if(si<0){showErr('Heute ist keine offene Session im Plan.');return;}
+  // Next free day: skip blocked days and days that already hold an open session
+  const blocked=new Set(plan.blockedDays||[]);
+  const occupied=new Set(wk.sessions.filter((s,i)=>i!==si&&!s.done).map(s=>s.dow));
+  let target=null;
+  for(let dd=days;dd<=6;dd++){
+    const dow=(todayDow+dd)%7;
+    if(blocked.has(dow)||occupied.has(dow))continue;
+    target=dow;break;
+  }
+  if(target===null){showErr('Kein freier Tag mehr in dieser Woche — nutze "Plan anpassen".');return;}
+  const ok=await appConfirm('Training verschieben?','"'+(wk.sessions[si].focus||'Session')+'" wird von heute auf '+DAYS[target]+' verschoben. Der Rest des Plans bleibt unverändert.','Verschieben');
+  if(!ok)return;
+  wk.sessions[si].dow=target;
+  // Keep week display in Mo–So order
+  const weekOrder=[1,2,3,4,5,6,0];
+  wk.sessions.sort((a,b)=>weekOrder.indexOf(a.dow)-weekOrder.indexOf(b.dow));
+  savePlan();
+  const j=loadJournal();const e=j.find(x=>x.ts===ts);
+  if(e){e.planApplied=true;e.planShiftTo=DAYS[target];delete e.planShift;safeSet('coach_journal',JSON.stringify(j.slice(-100)));}
+  try{localStorage.removeItem('coach_cache');}catch{}
+  renderJournal();
+  try{updatePlanHome();}catch{}
+  try{updateHome();}catch{}
+  showErr('✓ Verschoben auf '+DAYS[target]+'.');
 }
 async function applyJournalPause(ts,days){
   if(!plan?.weeks?.length)return;
@@ -1784,14 +1816,16 @@ WICHTIGE REGELN — deine Antwort darf dem Eintrag nicht widersprechen:
 - Muskelkater in EINER Region -> andere Muskelgruppe trainieren ist ok.
 - Muskelkater ÜBERALL / in allen Muskelgruppen -> NICHT "andere Muskelgruppe" empfehlen (es gibt keine freie). Stattdessen: bei abklingendem, leichtem Kater lockeres Training mit reduzierter Intensität ODER aktive Erholung (Spaziergang, lockeres Dehnen); bei starkem Kater 1 Tag warten.
 - Unterscheide Muskelkater (normal, Training ok) von Schmerz (Gelenk, stechend -> schonen, ggf. Pause).
-- Keine Floskeln, keine Standard-Ratschläge, die nicht zur Situation passen.${plan?'\n- Der Nutzer hat einen aktiven Trainingsplan. Wenn der Eintrag eine Trainingspause rechtfertigt (Krankheit, akuter Schmerz), gib zusätzlich planPause an: Anzahl der Pausentage (1-7). Muskelkater allein rechtfertigt KEINE planPause. Sonst planPause:null.':''}
+- Keine Floskeln, keine Standard-Ratschläge, die nicht zur Situation passen.${plan?'\n- Der Nutzer hat einen aktiven Trainingsplan. Wenn der Eintrag eine Trainingspause rechtfertigt (Krankheit, akuter Schmerz), gib planPause an: Anzahl der Pausentage (1-7). Muskelkater allein rechtfertigt KEINE planPause.\n- Wenn du empfiehlst, das HEUTIGE Training zu verschieben (z.B. starker Muskelkater, sehr schlechter Schlaf) und laut STATUS HEUTE eine Session offen ist, gib planShift:1 an (Tage). Dann bekommt der Nutzer einen Bestätigungs-Button und deine Empfehlung wird direkt umsetzbar. Nicht beides gleichzeitig setzen.\n- Sonst planPause:null und planShift:null.':''}
 
-NUR JSON: {"message":"...","planPause":null}`}],400);
+NUR JSON: {"message":"...","planPause":null,"planShift":null}`}],400);
       const p=extractJSON(raw);const obj=Array.isArray(p)?p[0]:p;const msg=obj?.message;
       if(msg){
         entry.ai=msg;
         const pd=parseInt(obj?.planPause);
         if(plan&&pd>=1&&pd<=14)entry.planPause=pd;
+        const sh=parseInt(obj?.planShift);
+        if(plan&&!entry.planPause&&sh>=1&&sh<=3)entry.planShift=sh;
         safeSet('coach_journal',JSON.stringify(j.slice(-100)));
         renderJournal();
       }
