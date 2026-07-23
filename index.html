@@ -1559,6 +1559,13 @@ const STRETCH_LIB=[
   {name:'Wadendehnung an der Wand',pos:'stand',muscles:['calves'],stretch:true,bilateral:true,hold:35,tip:'Ferse am Boden',details:'Bein nach hinten strecken, Ferse gedrückt halten, Hüfte nach vorne.',mistakes:'Ferse abheben'},
   {name:'Herabschauender Hund',pos:'quad',muscles:['hams','calves','lats'],stretch:true,hold:45,tip:'Sitzbeinhöcker hoch',details:'Umgekehrtes V, Fersen Richtung Boden, Rücken lang.',mistakes:'Rücken runden, um die Fersen zu erreichen'},
   {name:'Tiefe Hocke (Malasana)',pos:'stand',muscles:['glutes','hip_flexors','calves'],stretch:true,hold:45,tip:'Fersen am Boden',details:'Tief in die Hocke, Ellenbogen drücken die Knie nach außen.',mistakes:'Fersen heben, Rücken kollabiert'},
+  {name:'Knie zur Brust (liegend)',pos:'floor',dyn:true,muscles:['lower_back','glutes','hip_flexors'],stretch:true,hold:30,tip:'Abwechselnd, ruhig',details:'Rückenlage, abwechselnd ein Knie zur Brust ziehen und wieder ablegen. Unterer Rücken bleibt am Boden.',mistakes:'Kopf mit anheben, Bewegung reißen'},
+  {name:'Beckenkippen (liegend)',pos:'floor',dyn:true,muscles:['lower_back','core','hip_flexors'],stretch:true,hold:30,tip:'Kleine Bewegung',details:'Rückenlage, Knie angestellt. Becken langsam nach hinten kippen (Lendenwirbelsäule zum Boden) und wieder lösen.',mistakes:'Mit dem Gesäß hochdrücken'},
+  {name:'Armkreisen',pos:'stand',dyn:true,muscles:['shoulders','chest','upper_back'],stretch:true,hold:30,tip:'Groß und langsam kreisen',details:'Arme gestreckt große Kreise vorwärts, dann rückwärts. Schultern bewusst durch die volle Bahn führen.',mistakes:'Zu schnell, zu kleine Kreise'},
+  {name:'Rumpfrotation im Stehen',pos:'stand',dyn:true,muscles:['obliques','upper_back','lower_back'],stretch:true,hold:30,tip:'Becken bleibt ruhig',details:'Leicht gebeugte Knie, Arme locker hängen lassen und den Oberkörper rhythmisch nach links und rechts drehen, Arme schwingen mit.',mistakes:'Mit Schwung reißen statt kontrolliert drehen'},
+  {name:'Beinpendel',pos:'stand',dyn:true,bilateral:true,muscles:['hip_flexors','hams','glutes'],stretch:true,hold:25,tip:'An Wand abstützen',details:'Ein Bein locker vor und zurück pendeln lassen, Bewegungsumfang langsam steigern. Oberkörper bleibt aufrecht.',mistakes:'Rücken macht die Bewegung mit'},
+  {name:'Hüftkreisen',pos:'stand',dyn:true,muscles:['hip_flexors','glutes','lower_back'],stretch:true,hold:30,tip:'Große, runde Kreise',details:'Hände in die Hüfte, Becken in großen Kreisen bewegen, Richtung nach der Hälfte wechseln.',mistakes:'Nur mit den Knien wackeln'},
+  {name:'Wadendehnung im Sitzen (Handtuch)',pos:'floor',bilateral:true,muscles:['calves','hams'],stretch:true,hold:40,tip:'Bein gestreckt lassen',details:'Langsitz, Handtuch oder Gurt um den Fußballen, Fußspitze sanft zum Körper ziehen.',mistakes:'Knie beugen, um weiter zu kommen'},
   {name:'Liegende Hamstring-Dehnung',pos:'floor',muscles:['hams'],stretch:true,bilateral:true,hold:40,tip:'Unterer Rücken am Boden',details:'Rückenlage, Bein gestreckt hochziehen, ggf. mit Handtuch.',mistakes:'Becken kippt mit'},
   {name:'90/90 Hüftrotation',pos:'seat',muscles:['glutes','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Beide Sitzbeinhöcker am Boden',details:'Sitzend beide Beine im 90°-Winkel ablegen (vorderes Bein Außenrotation, hinteres Innenrotation). Oberkörper aufrecht über das vordere Schienbein neigen.',mistakes:'Hinteres Gesäß hebt ab, Rücken rundet'},
   {name:'Couch Stretch',pos:'kneel',muscles:['quads','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Gesäß anspannen, Becken aufrichten',details:'Hinterer Fuß an Wand oder Sofa hoch, Knie am Boden nahe der Wand, vorderes Bein aufgestellt. Oberkörper langsam aufrichten.',mistakes:'Ins Hohlkreuz ausweichen'},
@@ -2849,28 +2856,39 @@ function applyProgression(i){
 
 // ─── Daily routines (morning / evening) ──────────────────────────────────────
 // Stored in profile.routines={morning:{name,exercises},evening:{...}}.
+// ─── Dehnkonzept ─────────────────────────────────────────────────────────────
+// Aufbau nach gängiger Dehnpraxis:
+//  1. Kurze dynamische Mobilisation zuerst — statisches Dehnen auf kalte
+//     Muskulatur bringt weniger ROM und fühlt sich unangenehmer an.
+//  2. Danach Kopf bis Fuß, proximal vor distal: obere Kette → Rumpf → Hüfte → Beine.
+//  3. Dosis: für Beweglichkeitszuwachs zählt die Gesamtzeit pro Muskelgruppe.
+//     Richtwert aus Meta-Analysen: ~5 min pro Gruppe und Woche, also 30–60 s
+//     pro Seite und Einheit bei täglicher Praxis.
+//  4. Morgens kürzer und mobilisierend, abends länger und statisch —
+//     lange statische Halten senken kurzfristig die Kraftleistung, was abends
+//     egal ist und morgens vor einem Training ungünstig wäre.
+//  5. Intensität: deutliches Ziehen, kein Schmerz (~7/10). Ruhig weiteratmen.
+// Erlaubte Positions-Stufen je Phase und Richtung. Dadurch laufen
+// Kopf-bis-Fuß-Reihenfolge und Positionswechsel in dieselbe Richtung.
+const PHASE_TIERS={
+  down:{warmup:[0],upper:[0],trunk:[0,1],hip:[1,2],legs:[1,2]},
+  up:  {warmup:[2],upper:[1,2],trunk:[1,2],hip:[0,1],legs:[0,1]}
+};
+const STRETCH_PHASES=[
+  {id:'warmup',label:'Mobilisieren',regions:['shoulders','obliques','hip_flexors','lower_back','upper_back'],dyn:true,n:2},
+  {id:'upper', label:'Obere Kette', regions:['upper_back','shoulders','rear_shoulders','chest','triceps','lats'],n:2},
+  {id:'trunk', label:'Rumpf',       regions:['obliques','lower_back','back','core','lats'],n:1},
+  {id:'hip',   label:'Hüfte',       regions:['hip_flexors','glutes','inner_thighs'],n:2},
+  {id:'legs',  label:'Beine',       regions:['quads','hams','calves'],n:2}
+];
 const ROUTINE_KINDS={
-  morning:{icon:'🌅',label:'Morgenroutine',defaultName:'Aufwachen',entryFlag:'morning',
-    // Wake up: from the floor upward, ending standing and ready for the day
-    flow:'up',holdBoost:0,slots:[
-      {regions:['lower_back','back','core'],label:'Rücken'},
-      {regions:['upper_back','obliques'],label:'Brustwirbelsäule'},
-      {regions:['glutes'],label:'Gesäß'},
-      {regions:['hip_flexors'],label:'Hüftbeuger'},
-      {regions:['hams'],label:'Beinrückseite'},
-      {regions:['chest','shoulders','lats'],label:'Brust & Schultern'},
-      {regions:['calves','quads'],label:'Beine'}
-    ]},
-  evening:{icon:'🌙',label:'Abendroutine',defaultName:'Runterfahren',entryFlag:'evening',
-    // Wind down: from standing to the floor, ending lying down
-    flow:'down',holdBoost:10,slots:[
-      {regions:['upper_back','shoulders'],label:'Nacken & Schultern'},
-      {regions:['chest','lats'],label:'Brust'},
-      {regions:['hip_flexors','quads'],label:'Hüfte'},
-      {regions:['glutes'],label:'Gesäß'},
-      {regions:['inner_thighs'],label:'Innenseite'},
-      {regions:['lower_back','obliques'],label:'Unterer Rücken'}
-    ]}
+  morning:{icon:'🌅',label:'Morgenroutine',defaultName:'Mobilisieren',entryFlag:'morning',
+    // Kürzere Haltezeiten, Schwerpunkt Mobilisation — bereitet auf den Tag vor,
+    // ohne die Muskulatur durch lange statische Halten kurzzeitig zu dämpfen.
+    flow:'down',hold:25,phaseCounts:{warmup:2,upper:2,trunk:1,hip:2,legs:1}},
+  evening:{icon:'🌙',label:'Abendroutine',defaultName:'Beweglichkeit',entryFlag:'evening',
+    // Lange statische Halten — hier entsteht der eigentliche Beweglichkeitszuwachs.
+    flow:'down',hold:45,phaseCounts:{warmup:1,upper:1,trunk:1,hip:2,legs:2}}
 };
 function loadRoutines(){
   const p=loadProfile()||{};
@@ -2887,22 +2905,69 @@ function saveRoutines(r){
 // Build one variation: for each slot pick a stretch covering that region,
 // preferring ones not used recently, then order everything by body position
 // so you don't get up and lie down again between holds.
-function _buildRoutineVariation(kind,avoid){
+function _routineFlow(kind){
+  const stored=loadRoutines()[kind]?.flow;
+  return stored||ROUTINE_KINDS[kind]?.flow||'down';
+}
+function _buildRoutineVariation(kind,avoid,flowOverride){
   const k=ROUTINE_KINDS[kind];if(!k)return null;
   const recent=new Set(avoid||[]);
-  const picked=[],usedNames=new Set();
-  for(const slot of k.slots){
-    const cands=STRETCH_LIB.filter(e=>!usedNames.has(e.name)&&(e.muscles||[]).some(m=>slot.regions.includes(m)));
-    if(!cands.length)continue;
-    const fresh=cands.filter(e=>!recent.has(e.name));
-    const pool=fresh.length?fresh:cands;
-    const pick=pool[Math.floor(Math.random()*pool.length)];
-    usedNames.add(pick.name);picked.push(pick);
+  const dir=flowOverride||_routineFlow(kind);
+  const flow=dir==='up'?POS_FLOW_UP:POS_FLOW_DOWN;
+  const usedNames=new Set();
+  const out=[];
+  let lastPos=0;
+  for(const phase of STRETCH_PHASES){
+    const want=(k.phaseCounts||{})[phase.id]??phase.n??1;
+    if(want<1)continue;
+    const picks=[];
+    for(let s=0;s<want;s++){
+      const tiers=(PHASE_TIERS[dir]||PHASE_TIERS.down)[phase.id]||[0,1,2];
+      let cands=STRETCH_LIB.filter(e=>
+        !usedNames.has(e.name)&&
+        (!!e.dyn===!!phase.dyn)&&
+        tiers.includes(POS_TIER[e.pos||'quad'])&&
+        (e.muscles||[]).some(m=>phase.regions.includes(m)));
+      // Never leave a phase empty just because of the position band
+      if(!cands.length)cands=STRETCH_LIB.filter(e=>
+        !usedNames.has(e.name)&&(!!e.dyn===!!phase.dyn)&&
+        (e.muscles||[]).some(m=>phase.regions.includes(m)));
+      if(!cands.length)break;
+      // Prefer regions not yet covered inside this phase, then unseen exercises
+      const coveredHere=new Set(picks.flatMap(p=>p.muscles||[]));
+      const widens=e=>(e.muscles||[]).some(m=>phase.regions.includes(m)&&!coveredHere.has(m));
+      const tierOf=e=>dir==='up'?2-POS_TIER[e.pos||'quad']:POS_TIER[e.pos||'quad'];
+      const forward=e=>tierOf(e)>=lastPos;
+      const fresh=e=>!recent.has(e.name);
+      // Cascade: best case satisfies everything, then drop criteria by importance.
+      // Staying in the current body position outranks covering a new region,
+      // because getting up and down mid-routine is the bigger annoyance.
+      const cascade=[
+        c=>c.filter(e=>forward(e)&&widens(e)&&fresh(e)),
+        c=>c.filter(e=>forward(e)&&widens(e)),
+        c=>c.filter(e=>forward(e)&&fresh(e)),
+        c=>c.filter(e=>forward(e)),
+        c=>c.filter(e=>widens(e)&&fresh(e)),
+        c=>c.filter(e=>fresh(e)),
+        c=>c
+      ];
+      let pool=[];
+      for(const step of cascade){pool=step(cands);if(pool.length)break;}
+      const pick=pool[Math.floor(Math.random()*pool.length)];
+      usedNames.add(pick.name);picks.push(pick);
+    }
+    picks.sort((a,b)=>(posIdx(a,flow)-posIdx(b,flow))||
+      (Math.min(...(a.muscles||[]).map(m=>BODY_POS[m]??5),99)-Math.min(...(b.muscles||[]).map(m=>BODY_POS[m]??5),99)));
+    if(picks.length)lastPos=Math.max(lastPos,...picks.map(e=>dir==='up'?2-POS_TIER[e.pos||'quad']:POS_TIER[e.pos||'quad']));
+    picks.forEach(p=>out.push({...p,phase:phase.id,phaseLabel:phase.label}));
   }
-  if(!picked.length)return null;
-  const flow=k.flow==='up'?POS_FLOW_UP:POS_FLOW_DOWN;
-  picked.sort((a,b)=>posIdx(a,flow)-posIdx(b,flow));
-  return picked.map(e=>({...e,type:'hold',duration:(e.hold||40)+k.holdBoost,rest:8,sets:1,icon:'🧘'}));
+  if(!out.length)return null;
+  return out.map(e=>({
+    ...e,type:'hold',
+    // Dynamic prep stays short regardless of the routine's hold length
+    duration:e.dyn?(e.hold||30):(k.hold||40),
+    rest:e.dyn?5:8,sets:1,icon:e.dyn?'🔄':'🧘'
+  }));
 }
 // Exercise names from the last 2 sessions of this routine kind
 function _recentRoutineNames(kind){
@@ -2910,7 +2975,7 @@ function _recentRoutineNames(kind){
   const sessions=log.filter(w=>w.stretch&&w[flag]).slice(-2);
   return sessions.flatMap(w=>(w.exercises||[]).map(e=>e.name).filter(Boolean));
 }
-function _buildRoutineDefault(kind){return _buildRoutineVariation(kind,_recentRoutineNames(kind));}
+function _buildRoutineDefault(kind){return _buildRoutineVariation(kind,_recentRoutineNames(kind),_routineFlow(kind));}
 function _routineMinutes(r){
   const sec=(r.exercises||[]).reduce((s,e)=>s+((e.duration||40)+(e.rest||8))*(e.bilateral?2:1),0);
   return Math.max(3,Math.round(sec/60));
@@ -2960,7 +3025,7 @@ function startRoutine(kind){
   let exs;
   if(r.mode==='auto'){
     // Fresh variation every time, avoiding what you did the last two times
-    exs=_buildRoutineVariation(kind,_recentRoutineNames(kind));
+    exs=_buildRoutineVariation(kind,_recentRoutineNames(kind),_routineFlow(kind));
     if(!exs){showErr('Konnte keine Variation bauen.');return;}
   }else{
     if(!r.exercises?.length){openRoutineSetup(kind);return;}
@@ -2987,12 +3052,30 @@ function openRoutineSetup(kind){
     html+=`<button onclick="removeRoutine()" style="width:100%;padding:10px;border-radius:10px;background:rgba(var(--hotRGB),.09);border:1px solid rgba(var(--hotRGB),.25);color:var(--hot);font-size:12px;font-weight:600;font-family:var(--f);margin-bottom:14px">Routine entfernen</button>`;
     html+=`<div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px">Ersetzen durch</div>`;
   }
-  const sample=_buildRoutineVariation(kind,[]);
-  const flowTxt=k.flow==='up'?'von liegend nach stehend — weckt dich auf':'von stehend nach liegend — fährt dich runter';
+  const dir=_routineFlow(kind);
+  const sample=_buildRoutineVariation(kind,[],dir);
+  const flowTxt=dir==='up'?'von liegend nach stehend':'von stehend nach liegend';
+  const holdTxt=k.hold+'s';
+  html+=`<div class="card" style="margin-bottom:12px;background:var(--up)">
+    <div style="font-size:11px;font-weight:700;color:var(--tx);margin-bottom:7px">Das Konzept</div>
+    <div style="font-size:11px;color:var(--mu);line-height:1.6">
+      <b style="color:var(--su)">1. Mobilisieren</b> — kurze dynamische Bewegungen zuerst. Statisch auf kalte Muskulatur zu dehnen bringt weniger.<br>
+      <b style="color:var(--su)">2. Kopf bis Fuß</b> — obere Kette → Rumpf → Hüfte → Beine, große Gelenke vor kleinen.<br>
+      <b style="color:var(--su)">3. Dosis</b> — ${holdTxt} pro Seite. Für echten Zuwachs zählt die Wochensumme: ~5 min pro Muskelgruppe, also täglich dranbleiben.<br>
+      <b style="color:var(--su)">4. ${kind==='evening'?'Abends lang & statisch':'Morgens kurz & mobilisierend'}</b> — ${kind==='evening'?'hier entsteht der Beweglichkeitszuwachs.':'lange statische Halten dämpfen kurzfristig die Kraft, das willst du morgens nicht.'}<br>
+      <b style="color:var(--su)">5. Intensität</b> — deutliches Ziehen, kein Schmerz. Ruhig weiteratmen.
+    </div>
+  </div>`;
+  html+=`<div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px">Reihenfolge</div>
+  <div style="display:flex;gap:7px;margin-bottom:6px">
+    <button onclick="setRoutineFlow('down')" class="chip" style="flex:1;justify-content:center;${dir==='down'?'border-color:var(--ac);color:var(--ac);background:rgba(var(--acRGB),.1)':''}">🧍 → 🛌 endet am Boden</button>
+    <button onclick="setRoutineFlow('up')" class="chip" style="flex:1;justify-content:center;${dir==='up'?'border-color:var(--ac);color:var(--ac);background:rgba(var(--acRGB),.1)':''}">🛌 → 🧍 endet im Stehen</button>
+  </div>
+  <div style="font-size:11px;color:var(--mu);line-height:1.5;margin-bottom:14px">Die Kopf-bis-Fuß-Reihenfolge bleibt gleich — nur die Übungsvarianten wechseln, damit du ${dir==='down'?'im Stehen anfängst und unten ankommst':'am Boden anfängst und aufrecht endest'}. Du wechselst die Position höchstens zweimal.</div>`;
   html+=`<div class="card" style="margin-bottom:10px;border-color:rgba(var(--coRGB),.3)">
     <div style="font-size:12px;font-weight:700;color:var(--co);margin-bottom:5px">🔀 Wechselnde Routine (empfohlen)</div>
-    <div style="font-size:11px;color:var(--mu);line-height:1.5;margin-bottom:9px">Jedes Mal andere Übungen aus deiner Dehn-Bibliothek — je eine pro Körperbereich, sortiert ${flowTxt}. Was du die letzten zwei Male gemacht hast, wird übersprungen.</div>
-    ${sample?`<div style="font-size:11px;color:var(--su);margin-bottom:9px">Beispiel heute: ${sample.map(e=>e.name).join(' → ')}</div>`:''}
+    <div style="font-size:11px;color:var(--mu);line-height:1.5;margin-bottom:9px">Jedes Mal andere Übungen aus deiner Dehn-Bibliothek — je eine pro Körperbereich, sortiert ${flowTxt}, ohne ständiges Aufstehen. Was du die letzten zwei Male gemacht hast, wird übersprungen.</div>
+    ${sample?`<div style="font-size:11px;color:var(--su);margin-bottom:9px;line-height:1.6">Beispiel heute:<br>${STRETCH_PHASES.map(p=>{const inP=sample.filter(e=>e.phase===p.id);return inP.length?`<b style="color:var(--ac)">${p.label}:</b> ${inP.map(e=>e.name).join(', ')}`:'';}).filter(Boolean).join('<br>')}</div>`:''}
     <button onclick="setRoutineAuto()" class="btn btn-co" style="padding:12px;font-size:13px;text-transform:none">Wechselnde Routine aktivieren</button>
   </div>`;
   html+=`<div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin:12px 0 8px">Oder feste Routine</div>`;
@@ -3007,10 +3090,16 @@ function openRoutineSetup(kind){
   document.getElementById('morning-setup-body').innerHTML=html;
   document.getElementById('modal-morning').classList.add('open');
 }
+function setRoutineFlow(dir){
+  const r=loadRoutines();
+  r[_routineKind]={...(r[_routineKind]||{name:ROUTINE_KINDS[_routineKind].defaultName,mode:'auto'}),flow:dir};
+  saveRoutines(r);
+  openRoutineSetup(_routineKind); // re-render with new sample
+}
 function setRoutineAuto(){
   const k=ROUTINE_KINDS[_routineKind];
   const r=loadRoutines();
-  r[_routineKind]={name:k.defaultName,mode:'auto'};
+  r[_routineKind]={name:k.defaultName,mode:'auto',flow:_routineFlow(_routineKind)};
   saveRoutines(r);closeModal('modal-morning');updateMorningCard();
   showErr('✓ '+k.label+' wechselt ab jetzt täglich.');
 }
@@ -3046,6 +3135,7 @@ function removeMorningRoutine(){_routineKind='morning';return removeRoutine();}
 
 // Position flow: minimise getting up and down. Morning wakes the body up from
 // the floor to standing; evening winds down from standing to the floor.
+const POS_TIER={stand:0,kneel:1,quad:1,seat:2,floor:2}; // aufrecht / auf den Knien / am Boden
 const POS_FLOW_DOWN=['stand','kneel','quad','seat','floor']; // standing → lying
 const POS_FLOW_UP=['floor','seat','quad','kneel','stand'];   // lying → standing
 const posIdx=(ex,flow)=>{const i=flow.indexOf(ex.pos||'quad');return i<0?flow.length:i;};
@@ -3326,7 +3416,10 @@ function renderExList(){
     const nextG=(!isWU&&i<exList.length-1)?(exList[i+1].group||null):null;
     const inG=!!g, gStart=inG&&g!==prevG, gEnd=inG&&g!==nextG;
     const gBorder=inG?`border-left:3px solid var(--am);background:rgba(var(--amRGB),.06);${gStart?'border-top-left-radius:8px;border-top-right-radius:8px;':''}${gEnd?'border-bottom-left-radius:8px;border-bottom-right-radius:8px;':''}`:'';
-    const head=gStart?`<div style="font-size:9px;color:var(--am);font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 0 3px 10px">🔗 Supersatz</div>`:'';
+    let head=gStart?`<div style="font-size:9px;color:var(--am);font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 0 3px 10px">🔗 Supersatz</div>`:'';
+    // Phase headings make the concept visible while training
+    if(!isWU&&e.phaseLabel&&(i===0||exList[i-1].phaseLabel!==e.phaseLabel))
+      head=`<div style="font-size:9px;color:var(--ac);font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:${i===0?'0':'9px'} 0 4px 10px">${e.phaseLabel}</div>`+head;
     return head+`<div id="erow-${i}" onclick="peekExercise(${i})" style="display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:8px;transition:all .25s;cursor:pointer;${gBorder}">
       <div id="edot-${i}" style="width:18px;height:18px;border-radius:50%;flex-shrink:0;border:1.5px solid var(--br);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:var(--mu)">${i+1}</div>
       <div style="font-size:12px;font-weight:500;flex:1;color:${e.warmup?'var(--am)':'var(--mu)'}">${e.name}${e.bilateral?' ↔':''}</div>
