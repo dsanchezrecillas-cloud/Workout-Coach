@@ -1540,33 +1540,33 @@ const STUDIO_LIB=[
 // die Kraftleistung). Dynamisch gehört ins Warmup, nicht hierher.
 const STRETCH_LIB=[
   // Oben nach unten
-  {name:'Nacken-Seitneige',muscles:['upper_back','shoulders'],stretch:true,bilateral:true,hold:30,tip:'Schulter unten lassen',details:'Kopf zur Seite neigen, Gegenschulter bewusst nach unten ziehen.',mistakes:'Schulter hochziehen'},
-  {name:'Brustdehnung an der Wand',muscles:['chest','shoulders'],stretch:true,bilateral:true,hold:30,tip:'Ellenbogen auf Schulterhöhe',details:'Unterarm an Wand/Türrahmen, Oberkörper langsam wegdrehen.',mistakes:'Zu weit drehen, Schulter schmerzt'},
-  {name:'Schulterdehnung über Kreuz',muscles:['rear_shoulders','upper_back'],stretch:true,bilateral:true,hold:30,tip:'Arm gestreckt',details:'Arm quer vor die Brust ziehen, mit dem anderen Arm halten.',mistakes:'Schulter mit hochziehen'},
-  {name:'Trizepsdehnung über Kopf',muscles:['triceps','lats'],stretch:true,bilateral:true,hold:30,tip:'Ellenbogen zeigt nach oben',details:'Hand hinter den Nacken, Ellenbogen sanft nach hinten drücken.',mistakes:'Kopf nach vorne schieben'},
-  {name:'Lat-Dehnung seitlich',muscles:['lats','upper_back'],stretch:true,bilateral:true,hold:30,tip:'Zur Seite lang machen',details:'Arm über Kopf, Oberkörper zur Gegenseite neigen.',mistakes:'Nach vorne kippen'},
-  {name:'Katze-Kuh',muscles:['back','lower_back','core'],stretch:true,hold:45,tip:'Mit der Atmung',details:'Vierfüßlerstand, Wirbelsäule abwechselnd runden und strecken.',mistakes:'Zu schnell, nur aus dem Nacken'},
-  {name:'Kindeshaltung',muscles:['lower_back','lats','upper_back'],stretch:true,hold:45,tip:'Tief atmen',details:'Fersensitz, Oberkörper nach vorne ablegen, Arme lang.',mistakes:'Schultern verspannt lassen'},
-  {name:'Kobra / Sphinx',muscles:['core','lower_back','chest'],stretch:true,hold:30,tip:'Schultern tief',details:'Bauchlage, Oberkörper aufrichten, Becken bleibt am Boden.',mistakes:'Nacken überstrecken'},
-  {name:'Wirbelsäulendrehung liegend',muscles:['lower_back','obliques','glutes'],stretch:true,bilateral:true,hold:40,tip:'Schultern am Boden',details:'Rückenlage, Knie zur Seite fallen lassen, Kopf zur Gegenseite.',mistakes:'Schulter hebt ab'},
-  {name:'Hüftbeuger-Dehnung (Ausfallschritt)',muscles:['hip_flexors','quads'],stretch:true,bilateral:true,hold:40,tip:'Becken aufrichten',details:'Tiefer Ausfallschritt, hinteres Knie am Boden, Becken nach vorne schieben.',mistakes:'Hohlkreuz statt Beckenaufrichtung'},
-  {name:'Taubenhaltung (Gesäß)',muscles:['glutes','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Ruhig atmen',details:'Vorderes Bein angewinkelt, hinteres lang. Oberkörper aufrecht oder abgelegt.',mistakes:'Becken verkippen'},
-  {name:'Gesäßdehnung im Sitzen (Figure 4)',muscles:['glutes'],stretch:true,bilateral:true,hold:40,tip:'Rücken gerade',details:'Knöchel aufs andere Knie legen, Oberkörper nach vorne neigen.',mistakes:'Runder Rücken'},
-  {name:'IT-Band-Dehnung im Stehen',muscles:['glutes','quads','inner_thighs'],stretch:true,bilateral:true,hold:40,tip:'Hüfte seitlich schieben',details:'Beine kreuzen, Hüfte zur Seite schieben, Oberkörper zur Gegenseite neigen.',mistakes:'Nach vorne beugen statt seitlich'},
-  {name:'Hamstring-Dehnung im Sitzen',muscles:['hams','calves'],stretch:true,bilateral:true,hold:40,tip:'Aus der Hüfte beugen',details:'Bein gestreckt, aus der Hüfte nach vorne neigen, Rücken lang.',mistakes:'Runder Rücken, Knie überstrecken'},
-  {name:'Quadrizeps-Dehnung im Stehen',muscles:['quads','hip_flexors'],stretch:true,bilateral:true,hold:35,tip:'Knie nach unten',details:'Fuß zum Gesäß ziehen, Knie zeigt nach unten, Becken aufgerichtet.',mistakes:'Hohlkreuz, Knie nach außen'},
-  {name:'Adduktoren-Dehnung (Schmetterling)',muscles:['inner_thighs'],stretch:true,hold:45,tip:'Knie sinken lassen',details:'Fußsohlen zusammen, Knie Richtung Boden, Rücken gerade.',mistakes:'Knie runterdrücken'},
-  {name:'Wadendehnung an der Wand',muscles:['calves'],stretch:true,bilateral:true,hold:35,tip:'Ferse am Boden',details:'Bein nach hinten strecken, Ferse gedrückt halten, Hüfte nach vorne.',mistakes:'Ferse abheben'},
-  {name:'Herabschauender Hund',muscles:['hams','calves','lats'],stretch:true,hold:45,tip:'Sitzbeinhöcker hoch',details:'Umgekehrtes V, Fersen Richtung Boden, Rücken lang.',mistakes:'Rücken runden, um die Fersen zu erreichen'},
-  {name:'Tiefe Hocke (Malasana)',muscles:['glutes','hip_flexors','calves'],stretch:true,hold:45,tip:'Fersen am Boden',details:'Tief in die Hocke, Ellenbogen drücken die Knie nach außen.',mistakes:'Fersen heben, Rücken kollabiert'},
-  {name:'Liegende Hamstring-Dehnung',muscles:['hams'],stretch:true,bilateral:true,hold:40,tip:'Unterer Rücken am Boden',details:'Rückenlage, Bein gestreckt hochziehen, ggf. mit Handtuch.',mistakes:'Becken kippt mit'},
-  {name:'90/90 Hüftrotation',muscles:['glutes','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Beide Sitzbeinhöcker am Boden',details:'Sitzend beide Beine im 90°-Winkel ablegen (vorderes Bein Außenrotation, hinteres Innenrotation). Oberkörper aufrecht über das vordere Schienbein neigen.',mistakes:'Hinteres Gesäß hebt ab, Rücken rundet'},
-  {name:'Couch Stretch',muscles:['quads','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Gesäß anspannen, Becken aufrichten',details:'Hinterer Fuß an Wand oder Sofa hoch, Knie am Boden nahe der Wand, vorderes Bein aufgestellt. Oberkörper langsam aufrichten.',mistakes:'Ins Hohlkreuz ausweichen'},
-  {name:'Halber Spagat (Half Split)',muscles:['hams','calves'],stretch:true,bilateral:true,hold:40,tip:'Aus der Hüfte kippen, Rücken lang',details:'Kniestand, vorderes Bein gestreckt nach vorn, Zehen angezogen. Hüfte über dem hinteren Knie halten und Oberkörper mit geradem Rücken nach vorne neigen.',mistakes:'Rücken runden, Hüfte nach hinten schieben'},
-  {name:'Frosch-Dehnung',muscles:['inner_thighs','hip_flexors'],stretch:true,hold:50,tip:'Langsam reingehen, ruhig atmen',details:'Vierfüßler, Knie weit auseinander, Füße nach außen, Unterschenkel parallel. Hüfte langsam nach hinten Richtung Fersen schieben.',mistakes:'Zu schnell zu tief, Hohlkreuz'},
-  {name:'Thread the Needle',muscles:['upper_back','shoulders','obliques'],stretch:true,bilateral:true,hold:40,tip:'Schulter zum Boden sinken lassen',details:'Vierfüßlerstand, einen Arm unter dem Körper durchfädeln, Schulter und Ohr Richtung Boden ablegen.',mistakes:'Aus dem Arm statt aus der Brustwirbelsäule drehen'},
-  {name:'BWS-Rotation im Vierfüßler',muscles:['upper_back','obliques'],stretch:true,bilateral:true,hold:35,tip:'Hüfte bleibt stabil',details:'Vierfüßlerstand, eine Hand an den Hinterkopf, Ellenbogen zur Decke aufdrehen und dem Ellenbogen mit dem Blick folgen.',mistakes:'Aus der Lendenwirbelsäule statt der Brustwirbelsäule drehen'},
-  {name:'World\u2019s Greatest Stretch',muscles:['hip_flexors','hams','upper_back'],stretch:true,bilateral:true,hold:40,tip:'Groß machen beim Aufdrehen',details:'Tiefer Ausfallschritt, beide Hände innen neben den vorderen Fuß. Dann den inneren Arm zur Decke aufdrehen, Blick folgt der Hand.',mistakes:'Hinteres Bein durchhängen lassen'}
+  {name:'Nacken-Seitneige',pos:'stand',muscles:['upper_back','shoulders'],stretch:true,bilateral:true,hold:30,tip:'Schulter unten lassen',details:'Kopf zur Seite neigen, Gegenschulter bewusst nach unten ziehen.',mistakes:'Schulter hochziehen'},
+  {name:'Brustdehnung an der Wand',pos:'stand',muscles:['chest','shoulders'],stretch:true,bilateral:true,hold:30,tip:'Ellenbogen auf Schulterhöhe',details:'Unterarm an Wand/Türrahmen, Oberkörper langsam wegdrehen.',mistakes:'Zu weit drehen, Schulter schmerzt'},
+  {name:'Schulterdehnung über Kreuz',pos:'stand',muscles:['rear_shoulders','upper_back'],stretch:true,bilateral:true,hold:30,tip:'Arm gestreckt',details:'Arm quer vor die Brust ziehen, mit dem anderen Arm halten.',mistakes:'Schulter mit hochziehen'},
+  {name:'Trizepsdehnung über Kopf',pos:'stand',muscles:['triceps','lats'],stretch:true,bilateral:true,hold:30,tip:'Ellenbogen zeigt nach oben',details:'Hand hinter den Nacken, Ellenbogen sanft nach hinten drücken.',mistakes:'Kopf nach vorne schieben'},
+  {name:'Lat-Dehnung seitlich',pos:'stand',muscles:['lats','upper_back'],stretch:true,bilateral:true,hold:30,tip:'Zur Seite lang machen',details:'Arm über Kopf, Oberkörper zur Gegenseite neigen.',mistakes:'Nach vorne kippen'},
+  {name:'Katze-Kuh',pos:'quad',muscles:['back','lower_back','core'],stretch:true,hold:45,tip:'Mit der Atmung',details:'Vierfüßlerstand, Wirbelsäule abwechselnd runden und strecken.',mistakes:'Zu schnell, nur aus dem Nacken'},
+  {name:'Kindeshaltung',pos:'quad',muscles:['lower_back','lats','upper_back'],stretch:true,hold:45,tip:'Tief atmen',details:'Fersensitz, Oberkörper nach vorne ablegen, Arme lang.',mistakes:'Schultern verspannt lassen'},
+  {name:'Kobra / Sphinx',pos:'floor',muscles:['core','lower_back','chest'],stretch:true,hold:30,tip:'Schultern tief',details:'Bauchlage, Oberkörper aufrichten, Becken bleibt am Boden.',mistakes:'Nacken überstrecken'},
+  {name:'Wirbelsäulendrehung liegend',pos:'floor',muscles:['lower_back','obliques','glutes'],stretch:true,bilateral:true,hold:40,tip:'Schultern am Boden',details:'Rückenlage, Knie zur Seite fallen lassen, Kopf zur Gegenseite.',mistakes:'Schulter hebt ab'},
+  {name:'Hüftbeuger-Dehnung (Ausfallschritt)',pos:'kneel',muscles:['hip_flexors','quads'],stretch:true,bilateral:true,hold:40,tip:'Becken aufrichten',details:'Tiefer Ausfallschritt, hinteres Knie am Boden, Becken nach vorne schieben.',mistakes:'Hohlkreuz statt Beckenaufrichtung'},
+  {name:'Taubenhaltung (Gesäß)',pos:'quad',muscles:['glutes','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Ruhig atmen',details:'Vorderes Bein angewinkelt, hinteres lang. Oberkörper aufrecht oder abgelegt.',mistakes:'Becken verkippen'},
+  {name:'Gesäßdehnung im Sitzen (Figure 4)',pos:'seat',muscles:['glutes'],stretch:true,bilateral:true,hold:40,tip:'Rücken gerade',details:'Knöchel aufs andere Knie legen, Oberkörper nach vorne neigen.',mistakes:'Runder Rücken'},
+  {name:'IT-Band-Dehnung im Stehen',pos:'stand',muscles:['glutes','quads','inner_thighs'],stretch:true,bilateral:true,hold:40,tip:'Hüfte seitlich schieben',details:'Beine kreuzen, Hüfte zur Seite schieben, Oberkörper zur Gegenseite neigen.',mistakes:'Nach vorne beugen statt seitlich'},
+  {name:'Hamstring-Dehnung im Sitzen',pos:'seat',muscles:['hams','calves'],stretch:true,bilateral:true,hold:40,tip:'Aus der Hüfte beugen',details:'Bein gestreckt, aus der Hüfte nach vorne neigen, Rücken lang.',mistakes:'Runder Rücken, Knie überstrecken'},
+  {name:'Quadrizeps-Dehnung im Stehen',pos:'stand',muscles:['quads','hip_flexors'],stretch:true,bilateral:true,hold:35,tip:'Knie nach unten',details:'Fuß zum Gesäß ziehen, Knie zeigt nach unten, Becken aufgerichtet.',mistakes:'Hohlkreuz, Knie nach außen'},
+  {name:'Adduktoren-Dehnung (Schmetterling)',pos:'seat',muscles:['inner_thighs'],stretch:true,hold:45,tip:'Knie sinken lassen',details:'Fußsohlen zusammen, Knie Richtung Boden, Rücken gerade.',mistakes:'Knie runterdrücken'},
+  {name:'Wadendehnung an der Wand',pos:'stand',muscles:['calves'],stretch:true,bilateral:true,hold:35,tip:'Ferse am Boden',details:'Bein nach hinten strecken, Ferse gedrückt halten, Hüfte nach vorne.',mistakes:'Ferse abheben'},
+  {name:'Herabschauender Hund',pos:'quad',muscles:['hams','calves','lats'],stretch:true,hold:45,tip:'Sitzbeinhöcker hoch',details:'Umgekehrtes V, Fersen Richtung Boden, Rücken lang.',mistakes:'Rücken runden, um die Fersen zu erreichen'},
+  {name:'Tiefe Hocke (Malasana)',pos:'stand',muscles:['glutes','hip_flexors','calves'],stretch:true,hold:45,tip:'Fersen am Boden',details:'Tief in die Hocke, Ellenbogen drücken die Knie nach außen.',mistakes:'Fersen heben, Rücken kollabiert'},
+  {name:'Liegende Hamstring-Dehnung',pos:'floor',muscles:['hams'],stretch:true,bilateral:true,hold:40,tip:'Unterer Rücken am Boden',details:'Rückenlage, Bein gestreckt hochziehen, ggf. mit Handtuch.',mistakes:'Becken kippt mit'},
+  {name:'90/90 Hüftrotation',pos:'seat',muscles:['glutes','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Beide Sitzbeinhöcker am Boden',details:'Sitzend beide Beine im 90°-Winkel ablegen (vorderes Bein Außenrotation, hinteres Innenrotation). Oberkörper aufrecht über das vordere Schienbein neigen.',mistakes:'Hinteres Gesäß hebt ab, Rücken rundet'},
+  {name:'Couch Stretch',pos:'kneel',muscles:['quads','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Gesäß anspannen, Becken aufrichten',details:'Hinterer Fuß an Wand oder Sofa hoch, Knie am Boden nahe der Wand, vorderes Bein aufgestellt. Oberkörper langsam aufrichten.',mistakes:'Ins Hohlkreuz ausweichen'},
+  {name:'Halber Spagat (Half Split)',pos:'kneel',muscles:['hams','calves'],stretch:true,bilateral:true,hold:40,tip:'Aus der Hüfte kippen, Rücken lang',details:'Kniestand, vorderes Bein gestreckt nach vorn, Zehen angezogen. Hüfte über dem hinteren Knie halten und Oberkörper mit geradem Rücken nach vorne neigen.',mistakes:'Rücken runden, Hüfte nach hinten schieben'},
+  {name:'Frosch-Dehnung',pos:'quad',muscles:['inner_thighs','hip_flexors'],stretch:true,hold:50,tip:'Langsam reingehen, ruhig atmen',details:'Vierfüßler, Knie weit auseinander, Füße nach außen, Unterschenkel parallel. Hüfte langsam nach hinten Richtung Fersen schieben.',mistakes:'Zu schnell zu tief, Hohlkreuz'},
+  {name:'Thread the Needle',pos:'quad',muscles:['upper_back','shoulders','obliques'],stretch:true,bilateral:true,hold:40,tip:'Schulter zum Boden sinken lassen',details:'Vierfüßlerstand, einen Arm unter dem Körper durchfädeln, Schulter und Ohr Richtung Boden ablegen.',mistakes:'Aus dem Arm statt aus der Brustwirbelsäule drehen'},
+  {name:'BWS-Rotation im Vierfüßler',pos:'quad',muscles:['upper_back','obliques'],stretch:true,bilateral:true,hold:35,tip:'Hüfte bleibt stabil',details:'Vierfüßlerstand, eine Hand an den Hinterkopf, Ellenbogen zur Decke aufdrehen und dem Ellenbogen mit dem Blick folgen.',mistakes:'Aus der Lendenwirbelsäule statt der Brustwirbelsäule drehen'},
+  {name:'World\u2019s Greatest Stretch',pos:'quad',muscles:['hip_flexors','hams','upper_back'],stretch:true,bilateral:true,hold:40,tip:'Groß machen beim Aufdrehen',details:'Tiefer Ausfallschritt, beide Hände innen neben den vorderen Fuß. Dann den inneren Arm zur Decke aufdrehen, Blick folgt der Hand.',mistakes:'Hinteres Bein durchhängen lassen'}
 ];
 
 const DEFAULT_LIB=[
@@ -2850,10 +2850,27 @@ function applyProgression(i){
 // ─── Daily routines (morning / evening) ──────────────────────────────────────
 // Stored in profile.routines={morning:{name,exercises},evening:{...}}.
 const ROUTINE_KINDS={
-  morning:{icon:'🌅',label:'Morgenroutine',defaultName:'Kopf bis Fuß',entryFlag:'morning',
-    defaults:['Nacken-Seitneige','Brustdehnung an der Wand','Katze-Kuh','Kindeshaltung','Hüftbeuger-Dehnung (Ausfallschritt)','Hamstring-Dehnung im Sitzen','Herabschauender Hund']},
+  morning:{icon:'🌅',label:'Morgenroutine',defaultName:'Aufwachen',entryFlag:'morning',
+    // Wake up: from the floor upward, ending standing and ready for the day
+    flow:'up',holdBoost:0,slots:[
+      {regions:['lower_back','back','core'],label:'Rücken'},
+      {regions:['upper_back','obliques'],label:'Brustwirbelsäule'},
+      {regions:['glutes'],label:'Gesäß'},
+      {regions:['hip_flexors'],label:'Hüftbeuger'},
+      {regions:['hams'],label:'Beinrückseite'},
+      {regions:['chest','shoulders','lats'],label:'Brust & Schultern'},
+      {regions:['calves','quads'],label:'Beine'}
+    ]},
   evening:{icon:'🌙',label:'Abendroutine',defaultName:'Runterfahren',entryFlag:'evening',
-    defaults:['Nacken-Seitneige','Kindeshaltung','Wirbelsäulendrehung liegend','Taubenhaltung (Gesäß)','Adduktoren-Dehnung (Schmetterling)','Liegende Hamstring-Dehnung']}
+    // Wind down: from standing to the floor, ending lying down
+    flow:'down',holdBoost:10,slots:[
+      {regions:['upper_back','shoulders'],label:'Nacken & Schultern'},
+      {regions:['chest','lats'],label:'Brust'},
+      {regions:['hip_flexors','quads'],label:'Hüfte'},
+      {regions:['glutes'],label:'Gesäß'},
+      {regions:['inner_thighs'],label:'Innenseite'},
+      {regions:['lower_back','obliques'],label:'Unterer Rücken'}
+    ]}
 };
 function loadRoutines(){
   const p=loadProfile()||{};
@@ -2867,13 +2884,33 @@ function saveRoutines(r){
   p.routines=r;delete p.morningRoutine;
   saveProfile(p);
 }
-function _buildRoutineDefault(kind){
-  const k=ROUTINE_KINDS[kind];
-  const holdBoost=kind==='evening'?10:0; // evening: longer, calmer holds
-  return k.defaults
-    .map(n=>STRETCH_LIB.find(e=>e.name===n)).filter(Boolean)
-    .map(e=>({...e,type:'hold',duration:(e.hold||40)+holdBoost,rest:8,sets:1,icon:'🧘'}));
+// Build one variation: for each slot pick a stretch covering that region,
+// preferring ones not used recently, then order everything by body position
+// so you don't get up and lie down again between holds.
+function _buildRoutineVariation(kind,avoid){
+  const k=ROUTINE_KINDS[kind];if(!k)return null;
+  const recent=new Set(avoid||[]);
+  const picked=[],usedNames=new Set();
+  for(const slot of k.slots){
+    const cands=STRETCH_LIB.filter(e=>!usedNames.has(e.name)&&(e.muscles||[]).some(m=>slot.regions.includes(m)));
+    if(!cands.length)continue;
+    const fresh=cands.filter(e=>!recent.has(e.name));
+    const pool=fresh.length?fresh:cands;
+    const pick=pool[Math.floor(Math.random()*pool.length)];
+    usedNames.add(pick.name);picked.push(pick);
+  }
+  if(!picked.length)return null;
+  const flow=k.flow==='up'?POS_FLOW_UP:POS_FLOW_DOWN;
+  picked.sort((a,b)=>posIdx(a,flow)-posIdx(b,flow));
+  return picked.map(e=>({...e,type:'hold',duration:(e.hold||40)+k.holdBoost,rest:8,sets:1,icon:'🧘'}));
 }
+// Exercise names from the last 2 sessions of this routine kind
+function _recentRoutineNames(kind){
+  const flag=ROUTINE_KINDS[kind]?.entryFlag;if(!flag)return [];
+  const sessions=log.filter(w=>w.stretch&&w[flag]).slice(-2);
+  return sessions.flatMap(w=>(w.exercises||[]).map(e=>e.name).filter(Boolean));
+}
+function _buildRoutineDefault(kind){return _buildRoutineVariation(kind,_recentRoutineNames(kind));}
 function _routineMinutes(r){
   const sec=(r.exercises||[]).reduce((s,e)=>s+((e.duration||40)+(e.rest||8))*(e.bilateral?2:1),0);
   return Math.max(3,Math.round(sec/60));
@@ -2892,8 +2929,14 @@ function updateMorningCard(){
   rows.innerHTML=kinds.map(kind=>{
     const k=ROUTINE_KINDS[kind],r=routines[kind];
     let sub,cta;
-    if(r?.exercises?.length){
+    const isAuto=r?.mode==='auto';
+    if(isAuto||r?.exercises?.length){
       if(_routineDoneToday(kind)){sub='✓ Heute schon gemacht — stark.';cta='';}
+      else if(isAuto){
+        const prev=_buildRoutineVariation(kind,[]);
+        sub='🔀 '+(prev?prev.length:k.slots.length)+' Dehnungen · wechselt täglich';
+        cta=`<button onclick="startRoutine('${kind}')" style="flex-shrink:0;padding:10px 16px;border-radius:11px;background:linear-gradient(135deg,#059669,#34d399);border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--f);box-shadow:0 3px 12px rgba(var(--coRGB),.3)">▶ Start</button>`;
+      }
       else{sub=r.exercises.length+' Dehnungen · ~'+_routineMinutes(r)+' min';
         cta=`<button onclick="startRoutine('${kind}')" style="flex-shrink:0;padding:10px 16px;border-radius:11px;background:linear-gradient(135deg,#059669,#34d399);border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--f);box-shadow:0 3px 12px rgba(var(--coRGB),.3)">▶ Start</button>`;}
     }else{
@@ -2913,9 +2956,18 @@ function updateMorningCard(){
 }
 function startRoutine(kind){
   const r=loadRoutines()[kind];
-  if(!r?.exercises?.length){openRoutineSetup(kind);return;}
-  curExercises=r.exercises.map(e=>({...e}));wuExercises=[];
-  curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:_routineMinutes(r),stretch:true,routine:kind};
+  if(!r){openRoutineSetup(kind);return;}
+  let exs;
+  if(r.mode==='auto'){
+    // Fresh variation every time, avoiding what you did the last two times
+    exs=_buildRoutineVariation(kind,_recentRoutineNames(kind));
+    if(!exs){showErr('Konnte keine Variation bauen.');return;}
+  }else{
+    if(!r.exercises?.length){openRoutineSetup(kind);return;}
+    exs=r.exercises;
+  }
+  curExercises=exs.map(e=>({...e}));wuExercises=[];
+  curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:_routineMinutes({exercises:curExercises}),stretch:true,routine:kind};
   startWorkout();
 }
 let _routineKind='morning';
@@ -2926,13 +2978,25 @@ function openRoutineSetup(kind){
   const r=loadRoutines()[kind];
   const templates=loadTemplates();
   let html='';
-  if(r?.exercises?.length){
+  if(r?.mode==='auto'){
+    html+=`<div class="card" style="margin-bottom:12px;border-color:rgba(var(--coRGB),.3)"><div style="font-size:12px;font-weight:700;color:var(--co);margin-bottom:4px">🔀 Wechselnde Routine aktiv</div><div style="font-size:11px;color:var(--mu);line-height:1.5">Bei jedem Start werden neue Übungen gewählt.</div></div>`;
+    html+=`<button onclick="removeRoutine()" style="width:100%;padding:10px;border-radius:10px;background:rgba(var(--hotRGB),.09);border:1px solid rgba(var(--hotRGB),.25);color:var(--hot);font-size:12px;font-weight:600;font-family:var(--f);margin-bottom:14px">Routine entfernen</button>`;
+    html+=`<div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px">Ersetzen durch</div>`;
+  }else if(r?.exercises?.length){
     html+=`<div class="card" style="margin-bottom:12px"><div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px">Aktuelle Routine · ~${_routineMinutes(r)} min</div>${r.exercises.map(e=>`<div style="font-size:12px;color:var(--su);padding:3px 0">🧘 ${e.name}${e.bilateral?' ↔':''} · ${e.bilateral?'2×'+(e.duration||40)+'s':(e.duration||40)+'s'}</div>`).join('')}</div>`;
     html+=`<button onclick="removeRoutine()" style="width:100%;padding:10px;border-radius:10px;background:rgba(var(--hotRGB),.09);border:1px solid rgba(var(--hotRGB),.25);color:var(--hot);font-size:12px;font-weight:600;font-family:var(--f);margin-bottom:14px">Routine entfernen</button>`;
     html+=`<div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px">Ersetzen durch</div>`;
   }
-  const defDesc=kind==='evening'?'Standard: Runterfahren (~8 min, ruhig & bodennah)':'Standard: Kopf bis Fuß (~8 min)';
-  html+=`<button onclick="setRoutineDefault()" class="btn btn-co" style="padding:13px;font-size:13px;text-transform:none;margin-bottom:8px">${defDesc}</button>`;
+  const sample=_buildRoutineVariation(kind,[]);
+  const flowTxt=k.flow==='up'?'von liegend nach stehend — weckt dich auf':'von stehend nach liegend — fährt dich runter';
+  html+=`<div class="card" style="margin-bottom:10px;border-color:rgba(var(--coRGB),.3)">
+    <div style="font-size:12px;font-weight:700;color:var(--co);margin-bottom:5px">🔀 Wechselnde Routine (empfohlen)</div>
+    <div style="font-size:11px;color:var(--mu);line-height:1.5;margin-bottom:9px">Jedes Mal andere Übungen aus deiner Dehn-Bibliothek — je eine pro Körperbereich, sortiert ${flowTxt}. Was du die letzten zwei Male gemacht hast, wird übersprungen.</div>
+    ${sample?`<div style="font-size:11px;color:var(--su);margin-bottom:9px">Beispiel heute: ${sample.map(e=>e.name).join(' → ')}</div>`:''}
+    <button onclick="setRoutineAuto()" class="btn btn-co" style="padding:12px;font-size:13px;text-transform:none">Wechselnde Routine aktivieren</button>
+  </div>`;
+  html+=`<div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin:12px 0 8px">Oder feste Routine</div>`;
+  html+=`<button onclick="setRoutineDefault()" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--br);background:var(--card);color:var(--tx);font-size:12px;font-weight:600;font-family:var(--f);margin-bottom:8px">Eine Variation festschreiben (bleibt gleich)</button>`;
   if(templates.length){
     html+=`<div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin:12px 0 8px">Oder aus Vorlage</div>`;
     templates.forEach((t,i)=>{
@@ -2943,10 +3007,19 @@ function openRoutineSetup(kind){
   document.getElementById('morning-setup-body').innerHTML=html;
   document.getElementById('modal-morning').classList.add('open');
 }
-function setRoutineDefault(){
+function setRoutineAuto(){
   const k=ROUTINE_KINDS[_routineKind];
   const r=loadRoutines();
-  r[_routineKind]={name:k.defaultName,exercises:_buildRoutineDefault(_routineKind)};
+  r[_routineKind]={name:k.defaultName,mode:'auto'};
+  saveRoutines(r);closeModal('modal-morning');updateMorningCard();
+  showErr('✓ '+k.label+' wechselt ab jetzt täglich.');
+}
+function setRoutineDefault(){
+  const k=ROUTINE_KINDS[_routineKind];
+  const exs=_buildRoutineDefault(_routineKind);
+  if(!exs){showErr('Konnte keine Routine bauen.');return;}
+  const r=loadRoutines();
+  r[_routineKind]={name:k.defaultName,exercises:exs};
   saveRoutines(r);closeModal('modal-morning');updateMorningCard();
   showErr('✓ '+k.label+' angelegt — ab jetzt 1 Tap.');
 }
@@ -2971,6 +3044,12 @@ function setMorningDefault(){_routineKind='morning';setRoutineDefault();}
 function setMorningFromTemplate(i){_routineKind='morning';setRoutineFromTemplate(i);}
 function removeMorningRoutine(){_routineKind='morning';return removeRoutine();}
 
+// Position flow: minimise getting up and down. Morning wakes the body up from
+// the floor to standing; evening winds down from standing to the floor.
+const POS_FLOW_DOWN=['stand','kneel','quad','seat','floor']; // standing → lying
+const POS_FLOW_UP=['floor','seat','quad','kneel','stand'];   // lying → standing
+const posIdx=(ex,flow)=>{const i=flow.indexOf(ex.pos||'quad');return i<0?flow.length:i;};
+
 function smartSortExercises(){
   if(curExercises.length<2)return;
   const allStretch=curExercises.every(e=>e.stretch);
@@ -2981,13 +3060,20 @@ function smartSortExercises(){
     if(g){const b=[curExercises[i]];let j=i+1;while(j<curExercises.length&&curExercises[j].group===g){b.push(curExercises[j]);j++;}blocks.push(b);i=j;}
     else{blocks.push([curExercises[i]]);i++;}
   }
-  const key=b=>Math.min(...b.map(e=>allStretch
-    ?Math.min(...(e.muscles||[]).map(m=>BODY_POS[m]??5),99)
-    :Math.min(...(e.muscles||[]).map(m=>COMPOUND_PRIO[m]??3),99)));
-  blocks.sort((a,b)=>key(a)-key(b));
+  if(allStretch){
+    // Primary: body position (no jumping between standing and lying).
+    // Secondary: head → toe within the same position.
+    const flow=POS_FLOW_DOWN;
+    const key=b=>Math.min(...b.map(e=>posIdx(e,flow)));
+    const key2=b=>Math.min(...b.map(e=>Math.min(...(e.muscles||[]).map(m=>BODY_POS[m]??5),99)));
+    blocks.sort((a,b)=>(key(a)-key(b))||(key2(a)-key2(b)));
+  }else{
+    const key=b=>Math.min(...b.map(e=>Math.min(...(e.muscles||[]).map(m=>COMPOUND_PRIO[m]??3),99)));
+    blocks.sort((a,b)=>key(a)-key(b));
+  }
   curExercises.length=0;blocks.forEach(b=>curExercises.push(...b));
   showReview();
-  showErr(allStretch?'✓ Sortiert: von oben nach unten durch den Körper.':'✓ Sortiert: große Übungen zuerst, Core und Isolation ans Ende.');
+  showErr(allStretch?'✓ Sortiert: von stehend nach liegend, ohne ständiges Aufstehen.':'✓ Sortiert: große Übungen zuerst, Core und Isolation ans Ende.');
 }
 
 // ─── Drag to reorder (review list) ───────────────────────────────────────────
