@@ -150,6 +150,18 @@ button:active:not(:disabled){transform:scale(.96)}
     <button onclick="openDiaryFromCheckin()" style="width:100%;margin-top:9px;font-size:11px;color:var(--mu);background:none;border:none;text-decoration:underline">oder frei schreiben</button>
   </div>
 
+  <!-- Chronic soreness advice -->
+  <div id="soreness-card" class="card" style="display:none;margin-bottom:12px;border-color:rgba(var(--amRGB),.35);background:linear-gradient(135deg,rgba(var(--amRGB),.07),var(--card))">
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <div style="font-size:20px;flex-shrink:0">💪</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;letter-spacing:.08em;color:var(--am);text-transform:uppercase;font-weight:700">Muskelkater</div>
+        <div id="soreness-sub" style="font-size:12px;color:var(--su);margin-top:2px;line-height:1.4"></div>
+      </div>
+    </div>
+    <button onclick="openSorenessAdvice()" style="width:100%;margin-top:11px;padding:11px;border-radius:11px;background:rgba(var(--acRGB),.14);border:1px solid rgba(var(--acRGB),.3);color:var(--ac);font-size:13px;font-weight:700;font-family:var(--f)">Was tun? →</button>
+  </div>
+
   <!-- Missed sessions -->
   <div id="missed-card" class="card" style="display:none;margin-bottom:12px;border-color:rgba(var(--hotRGB),.35);background:linear-gradient(135deg,rgba(var(--hotRGB),.07),var(--card))">
     <div style="display:flex;align-items:flex-start;gap:10px">
@@ -349,6 +361,7 @@ button:active:not(:disabled){transform:scale(.96)}
           </div>
           <div id="ex-tip" style="font-size:12px;color:var(--mu);line-height:1.5"></div>
           <div id="ex-last" style="display:none;font-size:11px;font-weight:600;color:var(--am);margin-top:5px">—</div>
+          <div id="ex-reserve" style="display:none;font-size:11px;font-weight:600;color:var(--co);margin-top:5px">🎯 2–3 Wdh in Reserve lassen</div>
         </div>
       </div>
       <div id="rep-counter" style="display:none;border-top:1px solid var(--br);padding-top:12px;margin-top:6px">
@@ -391,7 +404,10 @@ button:active:not(:disabled){transform:scale(.96)}
     </div>
   </div>
   <div id="ex-list" style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px"></div>
-  <button id="add-ex-live" onclick="addExerciseDuringWorkout()" style="width:100%;padding:10px;border-radius:10px;background:var(--up);border:1px dashed var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f);margin-bottom:12px">＋ Übung hinzufügen</button>
+  <div style="display:flex;gap:8px;margin-bottom:12px">
+    <button id="add-ex-live" onclick="addExerciseDuringWorkout()" style="flex:1;padding:10px;border-radius:10px;background:var(--up);border:1px dashed var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">＋ Übung</button>
+    <button id="ease-live" onclick="toggleLiveEase()" style="flex:1;padding:10px;border-radius:10px;background:var(--up);border:1px dashed var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">🎯 Leichter</button>
+  </div>
   <div style="display:flex;gap:8px;margin-bottom:7px">
     <button id="main-btn" class="btn btn-ac" style="flex:1">Start</button>
 
@@ -897,6 +913,17 @@ button:active:not(:disabled){transform:scale(.96)}
       <div style="flex:1"><div style="font-size:10px;color:var(--mu);letter-spacing:.08em;font-weight:600;text-transform:uppercase;margin-bottom:5px">Deadline</div><input id="ch-deadline" type="date" class="inp"/></div>
     </div>
     <button onclick="saveNewChallenge()" class="btn btn-ac">Challenge starten</button>
+  </div>
+</div>
+
+<!-- MODAL: Soreness advice -->
+<div class="modal-ov" id="modal-soreness">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:700">💪 Anhaltender Muskelkater</div>
+      <button aria-label="Schließen" onclick="closeModal('modal-soreness')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div id="soreness-body"></div>
   </div>
 </div>
 
@@ -1591,6 +1618,16 @@ const STRETCH_LIB=[
   {name:'Hüftkreisen',pos:'stand',dyn:true,muscles:['hip_flexors','glutes','lower_back'],stretch:true,hold:30,tip:'Große, runde Kreise',details:'Hände in die Hüfte, Becken in großen Kreisen bewegen, Richtung nach der Hälfte wechseln.',mistakes:'Nur mit den Knien wackeln'},
   {name:'Wadendehnung im Sitzen (Handtuch)',pos:'floor',bilateral:true,muscles:['calves','hams'],stretch:true,hold:40,tip:'Bein gestreckt lassen',details:'Langsitz, Handtuch oder Gurt um den Fußballen, Fußspitze sanft zum Körper ziehen.',mistakes:'Knie beugen, um weiter zu kommen'},
   {name:'Liegende Hamstring-Dehnung',pos:'floor',muscles:['hams'],stretch:true,bilateral:true,hold:40,tip:'Unterer Rücken am Boden',details:'Rückenlage, Bein gestreckt hochziehen, ggf. mit Handtuch.',mistakes:'Becken kippt mit'},
+  // ── Ergänzungen aus dem Dehnkatalog: bisher nicht abgedeckte Regionen ──
+  {name:'Unterarm-Dehnung',pos:'stand',muscles:['forearms'],stretch:true,bilateral:true,hold:30,tip:'Arm gestreckt lassen',details:'Ein Arm nach vorne gestreckt, Hand hängt locker. Mit der Gegenhand die Finger sanft zum Körper ziehen — einmal bei nach unten, einmal bei nach oben geklapptem Handgelenk.',mistakes:'Ellenbogen beugen, um weiter zu kommen'},
+  {name:'Bizeps-Dehnung im Stehen',pos:'stand',muscles:['biceps'],stretch:true,hold:30,tip:'Brust offen, Schultern zurück',details:'Aufrechter Stand, Hände hinter dem Rücken falten (Handflächen nach innen). Arme durchstrecken und leicht vom Rücken lösen.',mistakes:'Ins Hohlkreuz gehen, Schultern hochziehen'},
+  {name:'Seitliche Rumpfdehnung',pos:'stand',muscles:['obliques','lats'],stretch:true,bilateral:true,hold:30,tip:'Becken bleibt stabil',details:'Aufrechter Stand, ein Arm über den Kopf leicht angewinkelt, der andere stützt in der Hüfte. Oberkörper langsam zur Seite neigen.',mistakes:'Nach vorne oder hinten ausweichen'},
+  {name:'Bauchdehnung im Ausfallschritt',pos:'kneel',muscles:['core','hip_flexors'],stretch:true,hold:30,tip:'Bewegung aus den Armen',details:'Tiefer Ausfallschritt, hinteres Knie am Boden. Arme nach oben strecken, Brust aufrichten und leicht nach hinten beugen.',mistakes:'Nur im unteren Rücken einknicken statt lang machen'},
+  {name:'Abduktoren-Dehnung (Seitenlage)',pos:'floor',muscles:['glutes','hip_flexors'],stretch:true,bilateral:true,hold:35,tip:'Hüfte nach vorne offen',details:'Seitenlage, Oberkörper aufgestützt. Oberes Bein anwinkeln, Fuß vor das Knie des unteren, gestreckten Beins setzen. Stützarm nachdrücken, Hüfte heben.',mistakes:'Becken nach hinten kippen'},
+  {name:'Gesäßdehnung im Liegen',pos:'floor',muscles:['glutes'],stretch:true,bilateral:true,hold:40,tip:'Gegenschulter am Boden',details:'Rückenlage, ein Bein angewinkelt aufgestellt. Knie nach innen kippen und mit der Gegenhand Richtung Schulter ziehen, andere Schulter bleibt am Boden.',mistakes:'Schulter hebt ab, anderes Bein zieht mit'},
+  {name:'Schienbein-Dehnung',pos:'seat',muscles:['calves'],stretch:true,bilateral:true,hold:30,tip:'Fußoberseite zum Boden',details:'Aufrecht auf Stuhl oder im Kniestand, Fußoberseite/Rist auf den Boden. Fuß sanft in den Boden drücken, bis das Schienbein zieht.',mistakes:'Zu viel Druck, Knie schmerzt'},
+  {name:'Fuß- & Zehendehnung',pos:'seat',muscles:['calves'],stretch:true,bilateral:true,hold:30,tip:'Ruhig und kontrolliert',details:'Im Langsitz mit einem Handtuch um den Fußballen die Zehen bei gestrecktem Bein zum Körper ziehen — oder Fuß im Sitzen überstrecken/anziehen.',mistakes:'Ruckartig ziehen'},
+  {name:'Frozen-Shoulder-Mobilisation',pos:'stand',dyn:true,muscles:['shoulders'],stretch:true,bilateral:true,hold:30,tip:'Nur aus der Schulter',details:'Hand flach auf einem Tisch fixieren, Arm gestreckt. Oberkörper langsam in verschiedene Richtungen beugen, die Bewegung kommt ausschließlich aus der Schulter.',mistakes:'Aus dem Ellenbogen oder Rumpf ausweichen'},
   {name:'90/90 Hüftrotation',pos:'seat',muscles:['glutes','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Beide Sitzbeinhöcker am Boden',details:'Sitzend beide Beine im 90°-Winkel ablegen (vorderes Bein Außenrotation, hinteres Innenrotation). Oberkörper aufrecht über das vordere Schienbein neigen.',mistakes:'Hinteres Gesäß hebt ab, Rücken rundet'},
   {name:'Couch Stretch',pos:'kneel',muscles:['quads','hip_flexors'],stretch:true,bilateral:true,hold:45,tip:'Gesäß anspannen, Becken aufrichten',details:'Hinterer Fuß an Wand oder Sofa hoch, Knie am Boden nahe der Wand, vorderes Bein aufgestellt. Oberkörper langsam aufrichten.',mistakes:'Ins Hohlkreuz ausweichen'},
   {name:'Halber Spagat (Half Split)',pos:'kneel',muscles:['hams','calves'],stretch:true,bilateral:true,hold:40,tip:'Aus der Hüfte kippen, Rücken lang',details:'Kniestand, vorderes Bein gestreckt nach vorn, Zehen angezogen. Hüfte über dem hinteren Knie halten und Oberkörper mit geradem Rücken nach vorne neigen.',mistakes:'Rücken runden, Hüfte nach hinten schieben'},
@@ -1724,6 +1761,7 @@ function updateWeekRing(){
 }
 
 function updateHome(){
+  try{updateSorenessCard();}catch(e){}
   try{updateMissedCard();}catch(e){}
   try{updateWeekRing();}catch(e){}
   try{updateResumeCard();}catch(e){}
@@ -2305,7 +2343,25 @@ function mainMuscles(list,max){
 
 // Session titles should always be human. Older/auto sessions sometimes stored
 // raw muscle keys ("neck & pectoralis_major & …") or a half-translated list
-// with a "Sonstige" fallback in it. Normalise both for display.
+// with a "Sonstige" fallback in it. Normalise both for display, and give
+// full-body sessions a focus so several per week stay distinguishable.
+const _FOCUS_REGION={ // major group → coarse body region for focus detection
+  Brust:'Oberkörper',Rücken:'Oberkörper',Schultern:'Oberkörper',Arme:'Oberkörper',
+  Core:'Core',Gesäß:'Unterkörper',Beine:'Unterkörper',Waden:'Unterkörper',Hüfte:'Unterkörper'};
+function _deriveFocus(named){
+  // named = ordered list of major groups (first = most emphasised)
+  const counts={};named.forEach(g=>{const r=_FOCUS_REGION[g];if(r)counts[r]=(counts[r]||0)+1;});
+  const regions=Object.keys(counts);
+  if(!regions.length)return null;
+  // A clear lean toward one region → that's the focus
+  regions.sort((a,b)=>counts[b]-counts[a]);
+  const top=regions[0];
+  if(regions.length===1)return top;
+  if(counts[top]>counts[regions[1]])return top; // strict majority
+  // Balanced upper/lower with the first-named group deciding the accent
+  const firstRegion=_FOCUS_REGION[named[0]];
+  return firstRegion||null;
+}
 function focusLabel(focus){
   const f=String(focus||'').trim();
   if(!f)return 'Workout';
@@ -2313,11 +2369,12 @@ function focusLabel(focus){
   const rawish=/[a-z]_[a-z]|_/.test(f)||/\bSonstige\b/.test(f);
   if(hasSep&&(rawish||f.split(/\s*[&,]\s*/).length>=4)){
     const parts=f.split(/\s*[&,]\s*/).map(p=>p.trim()).filter(Boolean);
-    // Translate + dedupe to major groups, drop the "Sonstige" noise
     const named=mainMuscles(parts,6).filter(x=>x&&x!=='Sonstige');
     if(!named.length)return f;
-    // Hitting many groups (or a long raw chain) is effectively full-body
-    if(named.length>=4||parts.length>=6)return 'Ganzkörper';
+    if(named.length>=4||parts.length>=6){
+      const focusReg=_deriveFocus(named);
+      return focusReg?'Ganzkörper · Fokus '+focusReg:'Ganzkörper';
+    }
     return named.slice(0,3).join(', ');
   }
   return f;
@@ -2748,6 +2805,8 @@ WANN Supersatz: antagonistische Paare (Drücken+Ziehen, Quads+Hamstrings) — sp
     curExercises=exArr.filter(e=>!e.warmup);wuExercises=exArr.filter(e=>e.warmup);
     if(!curExercises.length)throw new Error('Keine Hauptübungen');
     curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:Math.round((wuExercises.length*35+curExercises.length*60)/60)};
+    // Reserve hint carries over when the summary flagged an easy/deload session
+    if(/intensität:\s*leicht|deload/i.test(summary))curSetup.reserve=true;
     showReview();
   }catch(e){
     showErr('Fehler: '+e.message);show('s-chat');
@@ -3009,8 +3068,9 @@ function _buildRoutineVariation(kind,avoid,flowOverride){
       const pick=pool[Math.floor(Math.random()*pool.length)];
       usedNames.add(pick.name);picks.push(pick);
     }
-    picks.sort((a,b)=>(posIdx(a,flow)-posIdx(b,flow))||
-      (Math.min(...(a.muscles||[]).map(m=>BODY_POS[m]??5),99)-Math.min(...(b.muscles||[]).map(m=>BODY_POS[m]??5),99)));
+    // Position-flow leads (no getting up and down mid-phase); anatomy breaks ties.
+    const anat=e=>Math.min(...(e.muscles||[]).map(m=>BODY_POS[m]??5),99);
+    picks.sort((a,b)=>(posIdx(a,flow)-posIdx(b,flow))||(anat(a)-anat(b)));
     if(picks.length)lastPos=Math.max(lastPos,...picks.map(e=>dir==='up'?2-POS_TIER[e.pos||'quad']:POS_TIER[e.pos||'quad']));
     picks.forEach(p=>out.push({...p,phase:phase.id,phaseLabel:phase.label}));
   }
@@ -3038,6 +3098,93 @@ function _routineDoneToday(kind){
   return log.some(w=>w.stretch&&w[flag]&&w.date.slice(0,10)===todayIso());
 }
 // ─── Missed sessions & rescheduling ──────────────────────────────────────────
+// ─── Chronic-soreness detection ──────────────────────────────────────────────
+// If the user keeps reporting whole-body/persistent soreness across several
+// days, the per-session load is too high for their current state. We surface a
+// recommendation (frequency over intensity) rather than changing anything.
+const _SORE_RX=/muskelkater|sore|zwiebel|kaputt|platt|erschöpft|übersäuert|ganzkörper|überall|alle muskel|immer noch|schwer in den|zerstört|wie gerädert/i;
+const _PAIN_RX=/stechen|gelenk|scharf|akut|verletz|ziept stark|sticht/i;
+function detectChronicSoreness(){
+  const j=loadJournal();
+  if(j.length<2)return null;
+  const today=new Date(todayIso()+'T12:00:00');
+  const within=d=>{const dd=new Date(d+'T12:00:00');return (today-dd)/86400000<=10;};
+  const recent=j.filter(e=>within(e.date));
+  const soreDays=new Set();
+  let persistent=false,painFlag=false;
+  recent.forEach(e=>{
+    const txt=String(e.text||'');
+    if(_PAIN_RX.test(txt))painFlag=true;
+    if(_SORE_RX.test(txt)){
+      soreDays.add(e.date);
+      if(/immer noch|weiterhin|anhaltend|seit tagen|nicht besser|jede woche|noch (kater|muskelkater)/i.test(txt))persistent=true;
+    }
+  });
+  // Also weight high recent RPE on strength sessions as corroboration
+  const hardCount=log.filter(w=>!w.stretch&&within(w.date.slice(0,10))&&(w.rpe||0)>=8).length;
+  const distinctSoreDays=soreDays.size;
+  // Trigger: soreness on 2+ distinct days in the window, or one explicit
+  // "still sore / every week" mention. Pain reports are handled elsewhere.
+  if(painFlag&&distinctSoreDays<2)return null;
+  if(distinctSoreDays>=2||persistent){
+    return {days:distinctSoreDays,persistent,hardCount};
+  }
+  return null;
+}
+function updateSorenessCard(){
+  const card=document.getElementById('soreness-card');if(!card)return;
+  const s=detectChronicSoreness();
+  // Don't nag: once dismissed today, stay quiet
+  const dismissed=(()=>{try{return localStorage.getItem('coach_sore_dismiss')===todayIso();}catch{return false;}})();
+  if(!s||dismissed){card.style.display='none';return;}
+  card.style.display='block';
+  document.getElementById('soreness-sub').textContent=
+    s.persistent
+      ?'Du meldest seit mehreren Tagen anhaltenden Muskelkater.'
+      :'Muskelkater an '+s.days+' der letzten Tage.';
+}
+function openSorenessAdvice(){
+  const hasStrength=log.some(w=>!w.stretch);
+  const body=document.getElementById('soreness-body');
+  body.innerHTML=
+    '<div style="font-size:13px;color:var(--su);line-height:1.6;margin-bottom:14px">Anhaltender Muskelkater heißt fast immer: <b style="color:var(--tx)">die einzelne Einheit ist zu intensiv für deinen aktuellen Stand</b> — nicht, dass du zu oft trainierst.</div>'+
+    '<div class="card" style="margin-bottom:10px;background:var(--up)">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--tx);margin-bottom:7px">Was die Sportwissenschaft sagt</div>'+
+      '<div style="font-size:12px;color:var(--mu);line-height:1.6">'+
+        '<b style="color:var(--su)">Häufiger schlägt härter.</b> Bei gleichem Wochenvolumen bringt 2–3× moderat mehr Muskelaufbau als 1× bis zum Anschlag. Der Muskel baut ~48 h nach dem Reiz auf — zweimal die Woche hält den Aufbau oben.<br>'+
+        '<b style="color:var(--su)">Starker Kater ≠ mehr Wachstum.</b> Er ist ein Zeichen ungewohnter Belastung, blockiert dich tagelang und senkt die nächste Leistung.<br>'+
+        '<b style="color:var(--su)">2–3 Wiederholungen vor dem Versagen aufhören.</b> Das setzt fast den vollen Reiz, ohne dich flachzulegen.<br>'+
+        '<b style="color:var(--su)">Der Kater vergeht.</b> Nach 2–3 Wochen gewöhnt sich der Muskel an die Bewegung (Repeated-Bout-Effekt).'+
+      '</div>'+
+    '</div>'+
+    '<div style="font-size:12px;color:var(--su);line-height:1.6;margin-bottom:14px">Für dich gerade: <b style="color:var(--tx)">Frequenz halten, Intensität runter.</b> Lieber alle geplanten Einheiten machen, aber jede 1–2 Stufen leichter, als seltener und brutal.</div>'+
+    '<button onclick="applySorenessEase()" class="btn btn-co" style="padding:13px;font-size:13px;text-transform:none;margin-bottom:8px;width:100%">Kommende Sessions eine Stufe leichter</button>'+
+    '<button onclick="dismissSoreness()" style="width:100%;padding:11px;border-radius:11px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">Verstanden, nichts ändern</button>';
+  document.getElementById('modal-soreness').classList.add('open');
+}
+function applySorenessEase(){
+  if(!plan?.weeks?.length){dismissSoreness();return;}
+  const order=['easy','medium','hard'];
+  const today=new Date(todayIso()+'T12:00:00');
+  let changed=0;
+  plan.weeks.forEach((wk,wi)=>wk.sessions.forEach(s=>{
+    if(s.done||s.skipped)return;
+    const d=sessionDate(wi,s);if(d<today)return;
+    const cur=order.indexOf(s.intensity||'medium');
+    if(cur>0){s.intensity=order[cur-1];delete s.savedWorkout;delete s.exerciseCount;changed++;}
+  }));
+  savePlan();
+  try{localStorage.setItem('coach_sore_dismiss',todayIso());}catch{}
+  closeModal('modal-soreness');
+  updateSorenessCard();updateHome();
+  if(document.getElementById('s-plan').classList.contains('active'))renderPlanView(getCurrentWeekIdx());
+  showErr(changed?'✓ '+changed+' kommende Session'+(changed>1?'s':'')+' eine Stufe leichter.':'Alle Sessions sind schon auf der leichtesten Stufe.');
+}
+function dismissSoreness(){
+  try{localStorage.setItem('coach_sore_dismiss',todayIso());}catch{}
+  closeModal('modal-soreness');updateSorenessCard();
+}
+
 function updateMissedCard(){
   const card=document.getElementById('missed-card');if(!card)return;
   const missed=missedSessions();
@@ -3260,10 +3407,10 @@ function updateMorningCard(){
       else if(isAuto){
         const prev=_buildRoutineVariation(kind,[]);
         sub='🔀 '+(prev?prev.length:k.slots.length)+' Dehnungen · wechselt täglich';
-        cta=`<button onclick="startRoutine('${kind}')" style="flex-shrink:0;padding:10px 16px;border-radius:11px;background:linear-gradient(135deg,#059669,#34d399);border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--f);box-shadow:0 3px 12px rgba(var(--coRGB),.3)">▶ Start</button>`;
+        cta=`<button onclick="startRoutine('${kind}',true)" aria-label="Vorschau & anpassen" style="flex-shrink:0;width:38px;height:38px;border-radius:11px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:15px;display:flex;align-items:center;justify-content:center">📋</button><button onclick="startRoutine('${kind}')" style="flex-shrink:0;padding:10px 16px;border-radius:11px;background:linear-gradient(135deg,#059669,#34d399);border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--f);box-shadow:0 3px 12px rgba(var(--coRGB),.3)">▶ Start</button>`;
       }
       else{sub=r.exercises.length+' Dehnungen · ~'+_routineMinutes(r)+' min';
-        cta=`<button onclick="startRoutine('${kind}')" style="flex-shrink:0;padding:10px 16px;border-radius:11px;background:linear-gradient(135deg,#059669,#34d399);border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--f);box-shadow:0 3px 12px rgba(var(--coRGB),.3)">▶ Start</button>`;}
+        cta=`<button onclick="startRoutine('${kind}',true)" aria-label="Vorschau & anpassen" style="flex-shrink:0;width:38px;height:38px;border-radius:11px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:15px;display:flex;align-items:center;justify-content:center">📋</button><button onclick="startRoutine('${kind}')" style="flex-shrink:0;padding:10px 16px;border-radius:11px;background:linear-gradient(135deg,#059669,#34d399);border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--f);box-shadow:0 3px 12px rgba(var(--coRGB),.3)">▶ Start</button>`;}
     }else{
       sub='1× anlegen, dann täglich 1 Tap.';
       cta=`<button onclick="openRoutineSetup('${kind}')" style="flex-shrink:0;padding:10px 16px;border-radius:11px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">Anlegen</button>`;
@@ -3279,12 +3426,11 @@ function updateMorningCard(){
     </div>`;
   }).join('<div style="height:1px;background:var(--br)"></div>');
 }
-function startRoutine(kind){
+function startRoutine(kind,preview){
   const r=loadRoutines()[kind];
   if(!r){openRoutineSetup(kind);return;}
   let exs;
   if(r.mode==='auto'){
-    // Fresh variation every time, avoiding what you did the last two times
     exs=_buildRoutineVariation(kind,_recentRoutineNames(kind),_routineFlow(kind));
     if(!exs){showErr('Konnte keine Variation bauen.');return;}
   }else{
@@ -3293,7 +3439,8 @@ function startRoutine(kind){
   }
   curExercises=exs.map(e=>({...e}));wuExercises=[];
   curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:_routineMinutes({exercises:curExercises}),stretch:true,routine:kind};
-  startWorkout();
+  if(preview){showReview();}   // land in the editor: reorder, remove, add, sort
+  else startWorkout();
 }
 let _routineKind='morning';
 function openRoutineSetup(kind){
@@ -3578,7 +3725,7 @@ async function getAISwap(){if(!loadKey()){showErr('API Key fehlt');return;}const
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
 const RREST=60;let isWU=false;
-function initTimer(){clearActive();window._holdSide=1;tStatus='idle';tRound=1;tIdx=0;tSet=1;tRun=false;tReps={};isWU=(wuVisible!==false)&&wuExercises.length>0;clearInterval(tIv);const f=isWU?wuExercises[0]:curExercises[0];tLeft=f?.duration||40;renderBars();renderExList();updateTimer();document.getElementById('reps-done-btn').style.display='none';}
+function initTimer(){clearActive();window._holdSide=1;curSetup.reserve=false;const _eb=document.getElementById('ease-live');if(_eb){_eb.style.background='var(--up)';_eb.style.borderColor='var(--br)';_eb.style.color='var(--mu)';_eb.style.borderStyle='dashed';_eb.textContent='🎯 Leichter';}tStatus='idle';tRound=1;tIdx=0;tSet=1;tRun=false;tReps={};isWU=(wuVisible!==false)&&wuExercises.length>0;clearInterval(tIv);const f=isWU?wuExercises[0]:curExercises[0];tLeft=f?.duration||40;renderBars();renderExList();updateTimer();document.getElementById('reps-done-btn').style.display='none';}
 function renderBars(){
   const w=document.getElementById('prog-bars');w.innerHTML='';
   const isCircuit=curSetup.trainingMode==='circuit';
@@ -3626,6 +3773,25 @@ function toggleBilateralLive(){
 // into it. The timer pauses while you read; jumping is an explicit choice.
 // Add an exercise mid-workout. Pauses the clock, appends to the end of the
 // current list so the running set isn't disturbed.
+function toggleLiveEase(){
+  curSetup.reserve=!curSetup.reserve;
+  const btn=document.getElementById('ease-live');
+  if(curSetup.reserve){
+    const list=isWU?wuExercises:curExercises;
+    let trimmed=0;
+    list.forEach((ex,i)=>{
+      if(i<=tIdx)return; // current + past untouched
+      if((ex.sets||1)>1){ex.sets=ex.sets-1;trimmed++;}
+    });
+    if(btn){btn.style.background='rgba(var(--coRGB),.14)';btn.style.borderColor='var(--co)';btn.style.color='var(--co)';btn.style.borderStyle='solid';btn.textContent='🎯 Leichter an';}
+    showErr(trimmed?'✓ Leichter: '+trimmed+'× ein Satz weniger + 2–3 Wdh Reserve.':'✓ 2–3 Wdh in Reserve lassen — Sätze bleiben.');
+  }else{
+    if(btn){btn.style.background='var(--up)';btn.style.borderColor='var(--br)';btn.style.color='var(--mu)';btn.style.borderStyle='dashed';btn.textContent='🎯 Leichter';}
+    showErr('Normalmodus.');
+  }
+  renderExList();updateTimer();
+}
+
 function addExerciseDuringWorkout(){
   if(tRun){window._resumeAfterInfo=true;pauseTimer();}
   window._addingLive=true;
@@ -3804,6 +3970,11 @@ function updateTimer(){
     document.getElementById('ex-name').textContent=name;document.getElementById('ex-tip').textContent=tip;
     // "Last time" reference for the current exercise (Strong/Hevy pattern)
     const lastEl=document.getElementById('ex-last');
+    const resEl=document.getElementById('ex-reserve');
+    if(resEl){
+      const easeMode=curSetup.deload||curSetup.reserve||curSetup.intensity==='easy';
+      resEl.style.display=(easeMode&&!isWU&&tStatus==='work'&&(ex.type==='reps'||ex.type==='amrap'))?'block':'none';
+    }
     if(lastEl){
       lastEl.style.display='none';
       const curEx2=exList[tIdx];
@@ -3848,6 +4019,8 @@ function updateTimer(){
   // Skip: during work phase, hidden in reps mode (use Satz fertig instead), hidden in done
   const liveAdd=document.getElementById('add-ex-live');
   if(liveAdd)liveAdd.style.display=(tStatus!=='done'&&!isWU)?'block':'none';
+  const easeLive=document.getElementById('ease-live');
+  if(easeLive)easeLive.style.display=(tStatus!=='done')?'block':'none';
   if(skipExBtn){
     skipExBtn.style.display=isActive&&tStatus!=='done'?'flex':'none';
     skipExBtn.style.opacity='1';
