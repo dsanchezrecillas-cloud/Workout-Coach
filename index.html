@@ -2277,7 +2277,15 @@ const MUSCLE_MAIN={
 const MUSCLE_FALLBACK={neck:'Nacken',spine:'Rücken',hip:'Hüfte',hips:'Hüfte',adductors:'Beine',abductors:'Gesäß',
   forearms:'Arme',traps:'Schultern',delts:'Schultern',pecs:'Brust',shoulder:'Schultern',chest:'Brust',
   hamstring:'Beine',quadriceps:'Beine',calf:'Beine',glute:'Gesäß',ankles:'Beine',wrists:'Arme',
-  it_band:'Beine',itband:'Beine',psoas:'Hüfte',piriformis:'Gesäß',thoracic:'Rücken',lumbar:'Rücken'};
+  it_band:'Beine',itband:'Beine',psoas:'Hüfte',piriformis:'Gesäß',thoracic:'Rücken',lumbar:'Rücken',
+  // Anatomical names that appear in generated data
+  upper_trapezius:'Nacken',trapezius:'Schultern',pectoralis_major:'Brust',pectoralis:'Brust',
+  anterior_deltoid:'Schultern',posterior_deltoid:'Schultern',lateral_deltoid:'Schultern',deltoid:'Schultern',
+  latissimus_dorsi:'Rücken',latissimus:'Rücken',rhomboids:'Rücken',erector_spinae:'Rücken',
+  rectus_femoris:'Beine',biceps_femoris:'Beine',gastrocnemius:'Waden',soleus:'Waden',
+  gluteus_maximus:'Gesäß',gluteus:'Gesäß',iliopsoas:'Hüfte',adductor:'Beine',
+  serratus:'Rumpf',transverse_abdominis:'Core',thoracic_spine:'Rücken',lumbar_spine:'Rücken',
+  wrist:'Arme',ankle:'Beine',thoracic_rotation:'Rücken'};
 function mainMuscles(list,max){
   const out=[];
   (list||[]).forEach(m=>{
@@ -2295,19 +2303,22 @@ function mainMuscles(list,max){
   return out.slice(0,max||4);
 }
 
-// Some older sessions stored their title as raw muscle keys joined by " & "
-// (e.g. "neck & upper_trapezius & pectoralis_major"). Clean those for display.
+// Session titles should always be human. Older/auto sessions sometimes stored
+// raw muscle keys ("neck & pectoralis_major & …") or a half-translated list
+// with a "Sonstige" fallback in it. Normalise both for display.
 function focusLabel(focus){
   const f=String(focus||'').trim();
   if(!f)return 'Workout';
-  // A raw-key title looks like several snake_case/english tokens joined by &
-  if(/&/.test(f)&&/[a-z]_[a-z]|_/.test(f)){
-    const parts=f.split(/\s*&\s*/).map(p=>p.trim()).filter(Boolean);
-    const looksRaw=parts.filter(p=>/^[a-z][a-z_]*$/.test(p)||/_/.test(p)).length>=Math.ceil(parts.length/2);
-    if(looksRaw){
-      const named=mainMuscles(parts,4);
-      return named.length?named.join(', '):f;
-    }
+  const hasSep=/[&,]/.test(f);
+  const rawish=/[a-z]_[a-z]|_/.test(f)||/\bSonstige\b/.test(f);
+  if(hasSep&&(rawish||f.split(/\s*[&,]\s*/).length>=4)){
+    const parts=f.split(/\s*[&,]\s*/).map(p=>p.trim()).filter(Boolean);
+    // Translate + dedupe to major groups, drop the "Sonstige" noise
+    const named=mainMuscles(parts,6).filter(x=>x&&x!=='Sonstige');
+    if(!named.length)return f;
+    // Hitting many groups (or a long raw chain) is effectively full-body
+    if(named.length>=4||parts.length>=6)return 'Ganzkörper';
+    return named.slice(0,3).join(', ');
   }
   return f;
 }
@@ -3139,9 +3150,11 @@ async function applyReschedule(mode){
     if(!ok)return;
     const ns=plan.weeks[next.wi].sessions[next.si];
     if(!ns.origFocus)ns.origFocus=ns.focus;
-    // Combine focus + widen the muscle set; regenerate exercises on start
+    // Combine focus + widen the muscle set; regenerate exercises on start.
+    // Title stays human: a proper name, not a raw muscle-key chain.
     const merged=[...new Set([...focusMuscleGroups(ns.focus),...focusMuscleGroups(first.s.focus)])];
-    ns.focus='Ganzkörper – '+mainMuscles(merged,3).join(', ');
+    const named=mainMuscles(merged,3);
+    ns.focus=named.length>=3?'Ganzkörper':'Ganzkörper – '+named.join(', ');
     ns.durationMin=Math.min(50,(ns.durationMin||30)+10);
     ns.merged=true;delete ns.savedWorkout;delete ns.exerciseCount;
     missed.forEach(m=>{plan.weeks[m.wi].sessions[m.si].skipped=true;});
@@ -4916,6 +4929,7 @@ function renderPlanCalendar(){
   const sessionMap={};
   plan.weeks.forEach((w,wi)=>{
     w.sessions.forEach((s,si)=>{
+      if(s.skipped)return;
       const d=getSessionDate(wi,s.dow);
       if(d){const sStart=new Date(plan.startDate+'T00:00:00');if(d>=sStart){const key=dateKey(d);sessionMap[key]={wi,si,session:s};}}
     });
@@ -5090,7 +5104,8 @@ async function deleteCalSession(){
 function renderPlanView(wi=0){
   if(!plan?.weeks?.length){show('s-plan-create');return;}
   currentViewWeek=wi;
-  const total=plan.weeks.flatMap(w=>w.sessions).length;const done=plan.weeks.flatMap(w=>w.sessions).filter(s=>s.done).length;const pct=total?Math.round(done/total*100):0;
+  const _live=s=>!s.skipped; // merged/dropped sessions no longer show or count
+  const total=plan.weeks.flatMap(w=>w.sessions).filter(_live).length;const done=plan.weeks.flatMap(w=>w.sessions).filter(s=>_live(s)&&s.done).length;const pct=total?Math.round(done/total*100):0;
   document.getElementById('plan-title').textContent=plan.title||'Trainingsplan';
   const introEl=document.getElementById('plan-intro');if(introEl){if(plan.intro){introEl.textContent=plan.intro;introEl.style.display='block';}else introEl.style.display='none';}
   const durRange=plan.durMin&&plan.durMax?` · ${plan.durMin}-${plan.durMax} min`:(plan.sessionMin?` · ${plan.sessionMin} min`:'');
@@ -5098,13 +5113,13 @@ function renderPlanView(wi=0){
   const startFmt=plan.startDate?new Date(plan.startDate+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
   document.getElementById('plan-subtitle').textContent=(GOALS.find(g=>g.id===plan.goal)||{label:''}).label+(styleLabel?' · '+styleLabel:'')+' · '+plan.weeks.length+' Wochen'+durRange+(startFmt?' · ab '+startFmt:'');
   document.getElementById('plan-prog-lbl').textContent=done+' / '+total+' Sessions';document.getElementById('plan-prog-pct').textContent=pct+'%';document.getElementById('plan-prog-bar').style.width=pct+'%';
-  const tabs=document.getElementById('week-tabs');tabs.innerHTML='';plan.weeks.forEach((w,i)=>{const isDone=w.sessions.every(s=>s.done),isCur=i===wi;const b=document.createElement('button');b.className='chip'+(isCur?' ac':isDone?' co':'');b.style.whiteSpace='nowrap';b.style.flexShrink='0';b.textContent='Wo '+(i+1)+(isDone?' ✓':'');b.onclick=()=>renderPlanView(i);tabs.appendChild(b);});
+  const tabs=document.getElementById('week-tabs');tabs.innerHTML='';plan.weeks.forEach((w,i)=>{const live=w.sessions.filter(s=>!s.skipped);const isDone=live.length&&live.every(s=>s.done),isCur=i===wi;const b=document.createElement('button');b.className='chip'+(isCur?' ac':isDone?' co':'');b.style.whiteSpace='nowrap';b.style.flexShrink='0';b.textContent='Wo '+(i+1)+(isDone?' ✓':'');b.onclick=()=>renderPlanView(i);tabs.appendChild(b);});
   const week=plan.weeks[wi];document.getElementById('plan-week-title').textContent='WOCHE '+(wi+1)+' — '+(week.theme||'');
   // Next upcoming (undone) session across the whole plan
   window._nextSess=null;{const nowD=new Date(todayIso()+'T12:00:00');let best=null;plan.weeks.forEach((pw,pwi)=>pw.sessions.forEach(s=>{if(s.done)return;const d=getSessionDate(pwi,s.dow);if(d&&d>=nowD&&(!best||d<best.d))best={d,pwi,dow:s.dow};}));window._nextSess=best;}
   const wn=document.getElementById('plan-week-note');if(wn){if(week.note){wn.textContent=week.note;wn.style.display='block';}else wn.style.display='none';}
   const todayDow=new Date().getDay();
-  document.getElementById('plan-sessions').innerHTML=week.sessions.map((s,si)=>{const isToday=s.dow===todayDow,isNext=window._nextSess&&window._nextSess.pwi===wi&&window._nextSess.dow===s.dow&&!s.done,ic=INT_COLORS[s.intensity||'medium'];const c=isToday?'rgba(var(--acRGB),.13)':'var(--card)',bc=isToday?'rgba(var(--acRGB),.35)':'var(--br)';
+  document.getElementById('plan-sessions').innerHTML=week.sessions.map((s,si)=>{if(s.skipped)return'';const isToday=s.dow===todayDow,isNext=window._nextSess&&window._nextSess.pwi===wi&&window._nextSess.dow===s.dow&&!s.done,ic=INT_COLORS[s.intensity||'medium'];const c=isToday?'rgba(var(--acRGB),.13)':'var(--card)',bc=isToday?'rgba(var(--acRGB),.35)':'var(--br)';
     return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:44px;height:44px;border-radius:9px;background:${s.done?'rgba(var(--coRGB),.14)':isToday?'rgba(var(--acRGB),.17)':'var(--up)'};border:1px solid ${s.done?'rgba(var(--coRGB),.35)':isToday?'rgba(var(--acRGB),.28)':'var(--br)'};display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
       ${s.done?`<span style="font-size:18px;color:var(--co)">✓</span>`:`<span style="font-size:12px;font-weight:700;color:${isToday?'var(--ac)':'var(--mu)'};line-height:1.1">${DAYS[s.dow]}</span><span style="font-size:10px;color:${isToday?'var(--ac)':'var(--mu)'};line-height:1.2">${_sessDateShort(wi,s.dow)}</span>`}
     </div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${focusLabel(s.focus)}${isNext?' 📍':''}${s.savedWorkout?' 💾':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${(s.savedWorkout?s.savedWorkout.exercises.length:s.exerciseCount)?' · '+(s.savedWorkout?s.savedWorkout.exercises.length:s.exerciseCount)+' Üb.':''}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">⚡</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">💬</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
