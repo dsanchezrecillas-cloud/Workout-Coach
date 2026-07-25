@@ -150,6 +150,18 @@ button:active:not(:disabled){transform:scale(.96)}
     <button onclick="openDiaryFromCheckin()" style="width:100%;margin-top:9px;font-size:11px;color:var(--mu);background:none;border:none;text-decoration:underline">oder frei schreiben</button>
   </div>
 
+  <!-- Missed sessions -->
+  <div id="missed-card" class="card" style="display:none;margin-bottom:12px;border-color:rgba(var(--hotRGB),.35);background:linear-gradient(135deg,rgba(var(--hotRGB),.07),var(--card))">
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <div style="font-size:20px;flex-shrink:0">📅</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;letter-spacing:.08em;color:var(--hot);text-transform:uppercase;font-weight:700">Verpasst</div>
+        <div id="missed-sub" style="font-size:12px;color:var(--su);margin-top:2px;line-height:1.4"></div>
+      </div>
+    </div>
+    <button onclick="openReschedule()" style="width:100%;margin-top:11px;padding:11px;border-radius:11px;background:rgba(var(--acRGB),.14);border:1px solid rgba(var(--acRGB),.3);color:var(--ac);font-size:13px;font-weight:700;font-family:var(--f)">Plan anpassen →</button>
+  </div>
+
   <!-- Resume interrupted workout -->
   <div id="resume-card" class="card" style="display:none;margin-bottom:12px;border-color:rgba(var(--amRGB),.4);background:linear-gradient(135deg,rgba(var(--amRGB),.10),var(--card))">
     <div style="display:flex;align-items:center;gap:10px">
@@ -445,6 +457,7 @@ button:active:not(:disabled){transform:scale(.96)}
     <button onclick="setPlanView('calendar')" id="pv-calendar" style="flex:1;padding:9px;border-radius:7px;font-size:13px;background:none;border:none;color:var(--mu);font-family:var(--f);font-weight:600">📅 Kalender</button>
   </div>
   <!-- Calendar container -->
+  <div id="plan-cal-hint" style="display:none;font-size:11px;color:var(--mu);text-align:center;padding:2px 0 12px;line-height:1.4">Tippe eine Session an, um sie auf einen anderen Tag zu verschieben.</div>
   <div id="plan-calendar" style="display:none"></div>
 
   <!-- Week view container -->
@@ -884,6 +897,17 @@ button:active:not(:disabled){transform:scale(.96)}
       <div style="flex:1"><div style="font-size:10px;color:var(--mu);letter-spacing:.08em;font-weight:600;text-transform:uppercase;margin-bottom:5px">Deadline</div><input id="ch-deadline" type="date" class="inp"/></div>
     </div>
     <button onclick="saveNewChallenge()" class="btn btn-ac">Challenge starten</button>
+  </div>
+</div>
+
+<!-- MODAL: Reschedule missed sessions -->
+<div class="modal-ov" id="modal-reschedule">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700">Plan anpassen</div>
+      <button aria-label="Schließen" onclick="closeModal('modal-reschedule')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div id="reschedule-body"></div>
   </div>
 </div>
 
@@ -1700,6 +1724,7 @@ function updateWeekRing(){
 }
 
 function updateHome(){
+  try{updateMissedCard();}catch(e){}
   try{updateWeekRing();}catch(e){}
   try{updateResumeCard();}catch(e){}
   try{renderWeekReport();}catch(e){}
@@ -2268,6 +2293,23 @@ function mainMuscles(list,max){
     if(!out.includes(label))out.push(label);
   });
   return out.slice(0,max||4);
+}
+
+// Some older sessions stored their title as raw muscle keys joined by " & "
+// (e.g. "neck & upper_trapezius & pectoralis_major"). Clean those for display.
+function focusLabel(focus){
+  const f=String(focus||'').trim();
+  if(!f)return 'Workout';
+  // A raw-key title looks like several snake_case/english tokens joined by &
+  if(/&/.test(f)&&/[a-z]_[a-z]|_/.test(f)){
+    const parts=f.split(/\s*&\s*/).map(p=>p.trim()).filter(Boolean);
+    const looksRaw=parts.filter(p=>/^[a-z][a-z_]*$/.test(p)||/_/.test(p)).length>=Math.ceil(parts.length/2);
+    if(looksRaw){
+      const named=mainMuscles(parts,4);
+      return named.length?named.join(', '):f;
+    }
+  }
+  return f;
 }
 
 function focusMuscleGroups(focus){
@@ -2984,6 +3026,211 @@ function _routineDoneToday(kind){
   const flag=ROUTINE_KINDS[kind].entryFlag;
   return log.some(w=>w.stretch&&w[flag]&&w.date.slice(0,10)===todayIso());
 }
+// ─── Missed sessions & rescheduling ──────────────────────────────────────────
+function updateMissedCard(){
+  const card=document.getElementById('missed-card');if(!card)return;
+  const missed=missedSessions();
+  if(!missed.length){card.style.display='none';return;}
+  card.style.display='block';
+  const names=missed.slice(0,3).map(m=>focusLabel(m.s.focus)).join(', ');
+  card.querySelector('#missed-sub').textContent=
+    missed.length===1
+      ?`"${names}" von ${fmtD(missed[0].date.toISOString())} steht noch offen.`
+      :`${missed.length} Sessions offen: ${names}${missed.length>3?' …':''}`;
+}
+
+// Muscle groups a session actually stimulates
+function _sessionGroups(s){return focusMuscleGroups(s.focus);}
+// Which major groups got no stimulus in the last 7 days of completed work
+function _neglectedGroups(){
+  const recent=new Set();
+  const wk=new Date(todayIso()+'T12:00:00');wk.setDate(wk.getDate()-7);
+  log.forEach(w=>{if(w.stretch)return;if(new Date(w.date)>=wk)(mainMuscles([...(w.muscles||[]),...(w.exercises||[]).flatMap(e=>e.muscles||[])],9)).forEach(g=>{});});
+  // Use raw group keys for logic
+  const covered=new Set();
+  log.forEach(w=>{if(w.stretch||new Date(w.date)<wk)return;[...(w.muscles||[]),...(w.exercises||[]).flatMap(e=>e.muscles||[])].forEach(m=>covered.add(m));});
+  return covered;
+}
+
+let _reschedule=null;
+function openReschedule(){
+  const missed=missedSessions();
+  if(!missed.length){closeModal('modal-reschedule');updateMissedCard();return;}
+  _reschedule=missed;
+  const first=missed[0];
+  const planEnd=sessionDate(plan.weeks.length-1,{dow:0}); // Sunday of last week
+  // Free upcoming days this + next week (not occupied by an open session, not blocked)
+  const blocked=new Set(plan.blockedDays||[]);
+  const upcomingOpen=new Set();
+  plan.weeks.forEach((wk,wi)=>wk.sessions.forEach(s=>{if(!s.done&&!s.skipped){const d=sessionDate(wi,s);if(d>=new Date(todayIso()+'T12:00:00'))upcomingOpen.add(d.toDateString());}}));
+
+  const focusN=focusLabel(first.s.focus);
+  const intro=missed.length===1
+    ? '<b style="color:var(--tx)">'+focusN+'</b> war für '+fmtD(first.date.toISOString())+' geplant und ist ausgefallen.'
+    : '<b style="color:var(--tx)">'+missed.length+' Sessions</b> sind ausgefallen.';
+  let html='<div style="font-size:13px;color:var(--su);margin-bottom:14px;line-height:1.5">'+intro+' Wie willst du weitermachen?</div>';
+
+  // Option A: shift everything forward (plan may extend)
+  html+=_rescheduleOption('shift','⏩','Nach hinten schieben',
+    'Die verpasste'+(missed.length>1?'n':'')+' Session'+(missed.length>1?'s':'')+' und alle folgenden rücken auf die nächsten freien Tage. Nichts geht verloren — der Plan endet ggf. später.','var(--ac)');
+
+  // Option B: keep the weekly stimulus — merge into next session as a focus
+  const nextOpen=_nextOpenSession(first);
+  if(nextOpen){
+    const nextN=focusLabel(nextOpen.s.focus);
+    const mergeDesc='Statt nachzuholen bekommt deine nächste Session (<b>'+nextN+'</b>, '+fmtD(sessionDate(nextOpen.wi,nextOpen.s).toISOString())+') den Fokus der verpassten dazu — so trainierst du die Gruppe diese Woche wenigstens einmal, ohne den Plan zu verlängern.';
+    html+=_rescheduleOption('merge','🎯','Reiz retten',mergeDesc,'var(--co)');
+  }
+
+  // Option C: drop it
+  html+=_rescheduleOption('skip','✓','Streichen',
+    'Session'+(missed.length>1?'s':'')+' entfällt. Bei Kraftaufbau ist eine einzelne ausgelassene Einheit unkritisch — der Plan bleibt wie er ist.','var(--mu)');
+
+  document.getElementById('reschedule-body').innerHTML=html;
+  document.getElementById('modal-reschedule').classList.add('open');
+}
+function _rescheduleOption(id,icon,title,desc,color){
+  return `<button onclick="applyReschedule('${id}')" style="display:flex;gap:11px;width:100%;text-align:left;padding:14px;border-radius:13px;border:1px solid var(--br);background:var(--card);margin-bottom:10px;font-family:var(--f);align-items:flex-start">
+    <div style="font-size:19px;flex-shrink:0">${icon}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:3px">${title}</div>
+      <div style="font-size:12px;color:var(--mu);line-height:1.5">${desc}</div>
+    </div>
+  </button>`;
+}
+// The next still-open session at or after the missed one, that is a different day
+function _nextOpenSession(missed){
+  const missedDate=missed.date;
+  let best=null;
+  plan.weeks.forEach((wk,wi)=>wk.sessions.forEach((s,si)=>{
+    if(s.done||s.skipped)return;
+    const d=sessionDate(wi,s);
+    if(d>missedDate&&(!best||d<best.date))best={wi,si,s,date:d};
+  }));
+  return best;
+}
+function _nextFreeDate(fromDate,occupied,blocked){
+  const d=new Date(fromDate);
+  for(let i=0;i<21;i++){
+    d.setDate(d.getDate()+1);
+    if(blocked.has(d.getDay()))continue;
+    if(occupied.has(d.toDateString()))continue;
+    return new Date(d);
+  }
+  return null;
+}
+async function applyReschedule(mode){
+  const missed=_reschedule||missedSessions();if(!missed.length){closeModal('modal-reschedule');return;}
+  const blocked=new Set(plan.blockedDays||[]);
+
+  if(mode==='skip'){
+    const ok=await appConfirm('Streichen?',(missed.length>1?missed.length+' Sessions werden':'Die Session wird')+' als erledigt-übersprungen markiert und verschwindet.','Streichen','rgba(var(--hotRGB),.9)');
+    if(!ok)return;
+    missed.forEach(m=>{plan.weeks[m.wi].sessions[m.si].skipped=true;});
+    savePlan();closeModal('modal-reschedule');_afterReschedule('Gestrichen — Plan bleibt wie er ist.');
+    return;
+  }
+
+  if(mode==='merge'){
+    const first=missed[0];
+    const next=_nextOpenSession(first);
+    if(!next){showErr('Keine folgende Session zum Zusammenlegen.');return;}
+    const ok=await appConfirm('Reiz retten?',`"${focusLabel(first.s.focus)}" wird in deine nächste Session (${focusLabel(next.s.focus)}) integriert. Die verpasste entfällt.`,'Zusammenlegen');
+    if(!ok)return;
+    const ns=plan.weeks[next.wi].sessions[next.si];
+    if(!ns.origFocus)ns.origFocus=ns.focus;
+    // Combine focus + widen the muscle set; regenerate exercises on start
+    const merged=[...new Set([...focusMuscleGroups(ns.focus),...focusMuscleGroups(first.s.focus)])];
+    ns.focus='Ganzkörper – '+mainMuscles(merged,3).join(', ');
+    ns.durationMin=Math.min(50,(ns.durationMin||30)+10);
+    ns.merged=true;delete ns.savedWorkout;delete ns.exerciseCount;
+    missed.forEach(m=>{plan.weeks[m.wi].sessions[m.si].skipped=true;});
+    savePlan();closeModal('modal-reschedule');_afterReschedule('✓ Reiz gerettet: nächste Session deckt beides ab.');
+    return;
+  }
+
+  // mode === 'shift': push every overdue + all later open sessions onto free days.
+  // Anchor at the earliest overdue date OR today, whichever is earlier, so no
+  // past-dated session is left behind.
+  const missedDates=missed.map(m=>m.date);
+  const fromDate=new Date(Math.min(...missedDates.map(d=>d.getTime()),new Date(todayIso()+'T12:00:00').getTime()));
+  const queue=[];
+  plan.weeks.forEach((wk,wi)=>wk.sessions.forEach((s,si)=>{
+    if(s.done||s.skipped)return;
+    const d=sessionDate(wi,s);
+    if(d>=fromDate)queue.push({wi,si,s,date:d});
+  }));
+  queue.sort((a,b)=>a.date-b.date);
+  // Reassign each to the next free calendar day starting today
+  const occupied=new Set();
+  let cursor=new Date(todayIso()+'T12:00:00');cursor.setDate(cursor.getDate()-1);
+  const planEnd=sessionDate(plan.weeks.length-1,{dow:0});
+  let overshoot=false;
+  const assignments=[];
+  for(const item of queue){
+    const nd=_nextFreeDate(cursor,occupied,blocked);
+    if(!nd){overshoot=true;break;}
+    occupied.add(nd.toDateString());cursor=new Date(nd);
+    if(nd>planEnd)overshoot=true;
+    assignments.push({item,date:new Date(nd)});
+  }
+  if(overshoot){
+    const choice=await _confirmOvershoot();
+    if(choice==='cancel')return;
+    if(choice==='merge'){ // fall back to reiz-retten for the missed ones
+      closeModal('modal-reschedule');applyReschedule('merge');return;
+    }
+    // choice==='extend' → allow dates past plan end, extend weeks
+  }
+  // Apply: move each session to its new week/day
+  _relocateSessions(assignments);
+  savePlan();closeModal('modal-reschedule');
+  _afterReschedule('✓ Verschoben — Reihenfolge bleibt, nichts geht verloren.');
+}
+function _confirmOvershoot(){
+  return new Promise(resolve=>{
+    const body=document.getElementById('reschedule-body');
+    body.innerHTML=`<div style="font-size:13px;color:var(--su);margin-bottom:14px;line-height:1.5">Durch das Verschieben endet der Plan <b style="color:var(--am)">nach deinem geplanten Zieltermin</b>. Was ist dir lieber?</div>`+
+      _rescheduleOption('_extend','📆','Plan verlängern','Alle Sessions bleiben erhalten, das Plan-Ende verschiebt sich entsprechend nach hinten.','var(--ac)')+
+      _rescheduleOption('_merge','🎯','Im Zeitrahmen bleiben','Statt zu verlängern wird die verpasste Session in die nächste integriert (Reiz retten) — Zieltermin bleibt.','var(--co)')+
+      _rescheduleOption('_cancel','←','Abbrechen','','var(--mu)');
+    body.querySelectorAll('button').forEach(btn=>{
+      const m=btn.getAttribute('onclick').match(/applyReschedule\('(_\w+)'\)/);
+      if(m){btn.setAttribute('onclick','');btn.onclick=()=>resolve(m[1].slice(1));}
+    });
+  });
+}
+function _relocateSessions(assignments){
+  const start=new Date(plan.startDate+'T12:00:00');const sd=start.getDay();
+  const planMon=new Date(start);planMon.setDate(start.getDate()+(sd===0?-6:1-sd));
+  // Snapshot the actual session objects first (indices are about to change)
+  const moves=assignments.map(({item,date})=>({
+    sess:plan.weeks[item.wi].sessions[item.si],fromWi:item.wi,date
+  }));
+  // Remove them all from their current weeks
+  const moveSet=new Set(moves.map(m=>m.sess));
+  plan.weeks.forEach(wk=>{wk.sessions=wk.sessions.filter(s=>!moveSet.has(s));});
+  // Place each at its target week/day, extending the plan as needed
+  for(const {sess,date} of moves){
+    const diffDays=Math.floor((date-planMon)/86400000);
+    const targetWi=Math.max(0,Math.floor(diffDays/7));
+    while(targetWi>plan.weeks.length-1){
+      plan.weeks.push({week:plan.weeks.length+1,focus:plan.weeks[plan.weeks.length-1].focus,sessions:[]});
+    }
+    sess.dow=date.getDay();
+    plan.weeks[targetWi].sessions.push(sess);
+  }
+  const wo=[1,2,3,4,5,6,0];
+  plan.weeks.forEach(wk=>{wk.sessions=wk.sessions.sort((a,b)=>wo.indexOf(a.dow)-wo.indexOf(b.dow));});
+}
+function _afterReschedule(msg){
+  _reschedule=null;
+  try{localStorage.removeItem('coach_cache');}catch{}
+  updateMissedCard();updateHome();
+  if(document.getElementById('s-plan').classList.contains('active'))renderPlanView(getCurrentWeekIdx());
+  showErr(msg);
+}
+
 function updateMorningCard(){
   const card=document.getElementById('morning-card');if(!card)return;
   const rows=document.getElementById('routine-rows');if(!rows)return;
@@ -3944,13 +4191,13 @@ function showPlanLinkModal(entry){
   let html='';
   if(todayMatch){html+=`<div class="card" style="margin-bottom:10px;border-color:rgba(var(--acRGB),.35);background:rgba(var(--acRGB),.07)"><div style="font-size:10px;color:var(--ac);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Heute geplant</div><div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:2px">${todayMatch.focus}</div><div style="font-size:12px;color:var(--mu);margin-bottom:12px">${todayMatch.durationMin||30} min · ${INT_LABELS[todayMatch.intensity||'medium']}</div><button onclick="linkToSession(${wi},${week.sessions.indexOf(todayMatch)});closeModal('modal-plan-link')" class="btn btn-ac" style="padding:11px;font-size:13px;text-transform:none">✓ Als diese Session markieren</button></div>`;}
   const otherSessions=todaySessions.filter(s=>s!==todayMatch);
-  if(otherSessions.length){html+=`<div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:7px">Andere offene Sessions</div>`;otherSessions.slice(0,2).forEach(s=>{const si=week.sessions.indexOf(s);html+=`<button onclick="linkToSession(${wi},${si});closeModal('modal-plan-link')" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;font-family:var(--f);cursor:pointer"><div style="font-size:18px">${DAYS[s.dow]}</div><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.focus}</div></div></button>`;});}
+  if(otherSessions.length){html+=`<div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:7px">Andere offene Sessions</div>`;otherSessions.slice(0,2).forEach(s=>{const si=week.sessions.indexOf(s);html+=`<button onclick="linkToSession(${wi},${si});closeModal('modal-plan-link')" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;font-family:var(--f);cursor:pointer"><div style="font-size:18px">${DAYS[s.dow]}</div><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${focusLabel(s.focus)}</div></div></button>`;});}
   html+=`<button onclick="addAsExtraSession(${wi},[${(entry.muscles||[]).map(m=>`'${m}'`).join(',')}]);closeModal('modal-plan-link')" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--br);background:var(--up);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f);margin-bottom:7px">+ Als Zusatz-Training eintragen</button>`;
   html+=`<button onclick="closeModal('modal-plan-link');show('s-home')" style="width:100%;padding:10px;border-radius:10px;background:none;border:none;color:var(--mu);font-size:13px;font-family:var(--f)">Nicht verknüpfen</button>`;
   document.getElementById('plan-link-body').innerHTML=html;document.getElementById('modal-plan-link').classList.add('open');
 }
 function linkToSession(wi,si){markSessDone(wi,si,true);show('s-home');}
-function addAsExtraSession(wi,muscles){if(!plan?.weeks[wi])return;const todayDow=new Date().getDay();const muscleStr=(muscles||[]).map(m=>MUSCLE_DE[m]||m).join(' & ')||'Zusatz';plan.weeks[wi].sessions.push({dow:todayDow,focus:muscleStr,intensity:'medium',durationMin:20,done:true,doneDate:todayIso(),extra:true});savePlan();show('s-home');}
+function addAsExtraSession(wi,muscles){if(!plan?.weeks[wi])return;const todayDow=new Date().getDay();const muscleStr=mainMuscles(muscles||[],4).join(', ')||'Zusatz';plan.weeks[wi].sessions.push({dow:todayDow,focus:muscleStr,intensity:'medium',durationMin:20,done:true,doneDate:todayIso(),extra:true});savePlan();show('s-home');}
 
 // ─── History ──────────────────────────────────────────────────────────────────
 // ─── Cooldown suggestion after strength sessions ─────────────────────────────
@@ -4196,6 +4443,27 @@ function saveEdit(){
 
 // ─── Training Plan ────────────────────────────────────────────────────────────
 function showPlan(){plan=loadPlan();if(!plan){buildPlanCreate();show('s-plan-create');return;}renderPlanView(getCurrentWeekIdx());show('s-plan');}
+// Absolute calendar date of a session in a given plan week
+function sessionDate(wi,s){
+  const start=new Date(plan.startDate+'T12:00:00');const sd=start.getDay();
+  const monday=new Date(start);monday.setDate(start.getDate()+(sd===0?-6:1-sd));
+  const weekMon=new Date(monday);weekMon.setDate(monday.getDate()+wi*7);
+  const dowOffset=(s.dow===0?6:s.dow-1); // Mon=0..Sun=6
+  const d=new Date(weekMon);d.setDate(weekMon.getDate()+dowOffset);
+  return d;
+}
+// Sessions whose planned date is strictly before today and not done/skipped
+function missedSessions(){
+  if(!plan?.weeks?.length)return [];
+  const today=new Date(todayIso()+'T12:00:00');
+  const out=[];
+  plan.weeks.forEach((wk,wi)=>wk.sessions.forEach((s,si)=>{
+    if(s.done||s.skipped||s.extra)return;
+    const d=sessionDate(wi,s);
+    if(d<today)out.push({wi,si,s,date:d});
+  }));
+  return out;
+}
 function getCurrentWeekIdx(){if(!plan?.weeks?.length)return 0;const start=new Date(plan.startDate+'T12:00:00');const sd=start.getDay();const monday=new Date(start);monday.setDate(start.getDate()+(sd===0?-6:1-sd));const today=new Date(todayIso()+'T12:00:00');const daysDiff=Math.max(0,Math.floor((today-monday)/86400000));return Math.min(Math.floor(daysDiff/7),plan.weeks.length-1);}
 
 function renderWeekReport(){
@@ -4253,7 +4521,7 @@ function renderWeekReport(){
   </div>`;
 }
 
-function updatePlanHome(){if(!plan?.weeks?.length){document.getElementById('plan-home').style.display='none';return;}const wi=getCurrentWeekIdx();const week=plan.weeks[wi];if(!week){document.getElementById('plan-home').style.display='none';return;}const todayDow=new Date().getDay();const sess=week.sessions.find(s=>s.dow===todayDow&&!s.done);if(!sess){document.getElementById('plan-home').style.display='none';return;}document.getElementById('plan-home').style.display='block';document.getElementById('plan-home-focus').textContent=sess.focus;document.getElementById('plan-home-meta').textContent=(sess.durationMin||30)+' min · '+INT_LABELS[sess.intensity||'medium'];document.getElementById('plan-home-week').textContent='Woche '+(wi+1)+' / '+plan.weeks.length;pendingPlanSession={wi,si:week.sessions.indexOf(sess)};}
+function updatePlanHome(){if(!plan?.weeks?.length){document.getElementById('plan-home').style.display='none';return;}const wi=getCurrentWeekIdx();const week=plan.weeks[wi];if(!week){document.getElementById('plan-home').style.display='none';return;}const todayDow=new Date().getDay();const sess=week.sessions.find(s=>s.dow===todayDow&&!s.done);if(!sess){document.getElementById('plan-home').style.display='none';return;}document.getElementById('plan-home').style.display='block';document.getElementById('plan-home-focus').textContent=focusLabel(sess.focus);document.getElementById('plan-home-meta').textContent=(sess.durationMin||30)+' min · '+INT_LABELS[sess.intensity||'medium'];document.getElementById('plan-home-week').textContent='Woche '+(wi+1)+' / '+plan.weeks.length;pendingPlanSession={wi,si:week.sessions.indexOf(sess)};}
 // ─── Übungszahl: trainingswissenschaftliche Herleitung ────────────────────────
 // Kern: Die INTENSITÄT bestimmt Pause und Satzzahl. Beides zusammen bestimmt,
 // wie lange eine Übung dauert — und damit, wie viele in die Session passen.
@@ -4612,6 +4880,7 @@ function setPlanView(v){
   _planView=v;
   document.getElementById('plan-weeks-view').style.display=v==='weeks'?'block':'none';
   document.getElementById('plan-calendar').style.display=v==='calendar'?'block':'none';
+  const hint=document.getElementById('plan-cal-hint');if(hint)hint.style.display=v==='calendar'?'block':'none';
   const wBtn=document.getElementById('pv-weeks'),cBtn=document.getElementById('pv-calendar');
   if(v==='weeks'){wBtn.className='btn btn-ac';wBtn.style.cssText='flex:1;padding:9px;font-size:13px;border-radius:7px;text-transform:none';cBtn.className='';cBtn.style.cssText='flex:1;padding:9px;border-radius:7px;font-size:13px;background:none;border:none;color:var(--mu);font-family:var(--f);font-weight:600';}
   else{cBtn.className='btn btn-ac';cBtn.style.cssText='flex:1;padding:9px;font-size:13px;border-radius:7px;text-transform:none';wBtn.className='';wBtn.style.cssText='flex:1;padding:9px;border-radius:7px;font-size:13px;background:none;border:none;color:var(--mu);font-family:var(--f);font-weight:600';if(plan)renderPlanCalendar();}
@@ -4689,7 +4958,7 @@ function renderPlanCalendar(){
         cellBorder=sess.session.done?'rgba(var(--coRGB),.35)':'rgba(var(--acRGB),.35)';
         dot=`<div style="width:5px;height:5px;border-radius:50%;background:${sess.session.done?'var(--co)':ic};margin:2px auto 0"></div>`;
       }
-      html+=`<div onclick="${sess?`openCalSheet('${key}')`:''}" style="aspect-ratio:1;border-radius:9px;background:${cellBg};border:1.5px solid ${isToday?'var(--ac)':cellBorder};display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${sess?'pointer':'default'};position:relative;${isToday?'box-shadow:0 0 0 1px var(--ac)':''}">
+      html+=`<div ${sess?`data-calkey="${key}" onpointerdown="calCellPress(event,'${key}')" onpointerup="calCellRelease(event,'${key}')" onpointercancel="calCellRelease(event)" onpointerleave="calCellRelease(event)"`:''} style="aspect-ratio:1;border-radius:9px;background:${cellBg};border:1.5px solid ${isToday?'var(--ac)':cellBorder};display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${sess?'pointer':'default'};position:relative;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;${isToday?'box-shadow:0 0 0 1px var(--ac)':''}">
         <span style="font-size:12px;font-weight:${isToday?700:sess?600:400};color:${isToday?'var(--ac)':isPast&&!sess?.session.done?'var(--mu)':'var(--tx)'}">${day}</span>
         ${dot}
       </div>`;
@@ -4707,15 +4976,31 @@ function renderPlanCalendar(){
 }
 
 let _calSheetKey=null;
-function openCalSheet(dateKey){
+let _calPressTimer=null,_calLongFired=false;
+function calCellPress(e,key){
+  _calLongFired=false;
+  _calPressTimer=setTimeout(()=>{
+    _calLongFired=true;_calPressTimer=null;
+    if(navigator.vibrate)try{navigator.vibrate(12);}catch{}
+    openCalSheet(key);           // long-press
+  },400);
+}
+function calCellRelease(e,key){
+  if(_calPressTimer){            // released before long-press → treat as tap
+    clearTimeout(_calPressTimer);_calPressTimer=null;
+    if(!_calLongFired&&key)openCalSheet(key);
+  }
+}
+
+function openCalSheet(dk){
   const map=window._calSessionMap||{};
-  const entry=map[dateKey];
+  const entry=map[dk];
   if(!entry)return;
-  _calSheetKey=dateKey;
+  _calSheetKey=dk;
   const s=entry.session;
-  const dObj=new Date(dateKey+'T12:00:00');
+  const dObj=new Date(dk+'T12:00:00');
   const dfmt=dObj.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'});
-  document.getElementById('cal-sheet-focus').textContent=s.focus||'Session';
+  document.getElementById('cal-sheet-focus').textContent=focusLabel(s.focus)||'Session';
   document.getElementById('cal-sheet-meta').textContent=`${dfmt} · ${s.durationMin||30} min · ${INT_LABELS[s.intensity||'medium']}`;
   const warn=document.getElementById('cal-sheet-warn');warn.style.display='none';
   // Build candidate target dates: 14 days before/after, excluding blocked days and the current date
@@ -4727,7 +5012,7 @@ function openCalSheet(dateKey){
   for(let off=-14;off<=21;off++){
     const d=new Date(base+off*86400000);
     const k=dateKey(d);
-    if(k===dateKey)continue;
+    if(k===dk)continue;
     if(k<todayK)continue;                 // no moving into the past
     if(blocked.has(d.getDay()))continue;  // respect blocked weekdays
     if(map[k])continue;                   // day already has a session
@@ -4739,7 +5024,7 @@ function openCalSheet(dateKey){
     // Recovery check: is there a session on the adjacent day?
     const prev=dateKey(new Date(d.getTime()-86400000));
     const next=dateKey(new Date(d.getTime()+86400000));
-    const adjacent=(map[prev]&&prev!==dateKey)||(map[next]&&next!==dateKey);
+    const adjacent=(map[prev]&&prev!==dk)||(map[next]&&next!==dk);
     const isFullbody=plan.style==='fullbody';
     const risky=adjacent&&isFullbody;
     const b=document.createElement('button');
@@ -4784,6 +5069,8 @@ async function moveCalSession(targetKey, risky){
   renderPlanCalendar();
   renderPlanView(currentViewWeek);
   updatePlanHome();
+  try{updateMissedCard();}catch{}
+  showErr('✓ Verschoben auf '+new Date(targetKey+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})+'.');
 }
 
 async function deleteCalSession(){
@@ -4820,7 +5107,7 @@ function renderPlanView(wi=0){
   document.getElementById('plan-sessions').innerHTML=week.sessions.map((s,si)=>{const isToday=s.dow===todayDow,isNext=window._nextSess&&window._nextSess.pwi===wi&&window._nextSess.dow===s.dow&&!s.done,ic=INT_COLORS[s.intensity||'medium'];const c=isToday?'rgba(var(--acRGB),.13)':'var(--card)',bc=isToday?'rgba(var(--acRGB),.35)':'var(--br)';
     return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:44px;height:44px;border-radius:9px;background:${s.done?'rgba(var(--coRGB),.14)':isToday?'rgba(var(--acRGB),.17)':'var(--up)'};border:1px solid ${s.done?'rgba(var(--coRGB),.35)':isToday?'rgba(var(--acRGB),.28)':'var(--br)'};display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
       ${s.done?`<span style="font-size:18px;color:var(--co)">✓</span>`:`<span style="font-size:12px;font-weight:700;color:${isToday?'var(--ac)':'var(--mu)'};line-height:1.1">${DAYS[s.dow]}</span><span style="font-size:10px;color:${isToday?'var(--ac)':'var(--mu)'};line-height:1.2">${_sessDateShort(wi,s.dow)}</span>`}
-    </div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${s.focus}${isNext?' 📍':''}${s.savedWorkout?' 💾':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${(s.savedWorkout?s.savedWorkout.exercises.length:s.exerciseCount)?' · '+(s.savedWorkout?s.savedWorkout.exercises.length:s.exerciseCount)+' Üb.':''}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">⚡</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">💬</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
+    </div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${focusLabel(s.focus)}${isNext?' 📍':''}${s.savedWorkout?' 💾':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${(s.savedWorkout?s.savedWorkout.exercises.length:s.exerciseCount)?' · '+(s.savedWorkout?s.savedWorkout.exercises.length:s.exerciseCount)+' Üb.':''}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;display:flex;align-items:center;justify-content:center">✏</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">⚡</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">💬</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
   }).join('');
 }
 
