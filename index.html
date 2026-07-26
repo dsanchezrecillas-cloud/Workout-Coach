@@ -3720,7 +3720,28 @@ let swapIdx=0;
 function openSwapModal(idx){swapIdx=idx;const ex=curExercises[idx];document.getElementById('swap-title').textContent=ex.name+' tauschen';swapTab('library');document.getElementById('modal-swap').classList.add('open');}
 function swapTab(tab){const libBtn=document.getElementById('swap-tab-lib'),aiBtn=document.getElementById('swap-tab-ai'),libList=document.getElementById('swap-lib-list'),aiArea=document.getElementById('swap-ai-area');libBtn.style.borderColor=tab==='library'?'var(--ac)':'var(--br)';libBtn.style.background=tab==='library'?'rgba(var(--acRGB),.13)':'var(--up)';libBtn.style.color=tab==='library'?'var(--ac)':'var(--mu)';aiBtn.style.borderColor=tab==='ai'?'var(--ac)':'var(--br)';aiBtn.style.background=tab==='ai'?'rgba(var(--acRGB),.13)':'var(--up)';aiBtn.style.color=tab==='ai'?'var(--ac)':'var(--mu)';libList.style.display=tab==='library'?'flex':'none';aiArea.style.display=tab==='ai'?'block':'none';if(tab==='library'){window._swapStressed=recentStressedMuscles();const ex=curExercises[swapIdx];const muscles=ex.muscles||[];const all=[...DEFAULT_LIB,...library];const matching=all.filter(e=>e.name!==ex.name&&(e.muscles||[]).some(m=>muscles.includes(m)));const others=all.filter(e=>e.name!==ex.name&&!(e.muscles||[]).some(m=>muscles.includes(m)));const list=[...matching,...others];libList.innerHTML='';if(matching.length){const lbl=document.createElement('div');lbl.style.cssText='font-size:10px;color:var(--ac);letter-spacing:.08em;text-transform:uppercase;font-weight:600;padding:4px 2px';lbl.textContent='Gleiche Muskelgruppe';libList.appendChild(lbl);}list.forEach((e,i)=>{if(i===matching.length&&others.length){const lbl=document.createElement('div');lbl.style.cssText='font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;padding:8px 2px 4px';lbl.textContent='Andere';libList.appendChild(lbl);}const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);cursor:pointer;transition:all .12s;margin-bottom:6px';const stressed=window._swapStressed||new Set();const hitStressed=(e.muscles||[]).some(m=>stressed.has(m));
 row.innerHTML=`<div style="font-size:12px;color:var(--ac);flex-shrink:0;width:22px">${getExIcon(e.name)}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx)">${e.name}${e.bilateral?' ↔':''}</div><div style="font-size:11px;color:var(--mu)">${(e.muscles||[]).map(m=>MUSCLE_DE[m]||m).join(', ')}</div></div>${hitStressed?`<span style="font-size:10px;color:var(--am);font-weight:600;flex-shrink:0">⚠ &lt;48h</span>`:''}`;row.onclick=()=>{applySwap(e);};libList.appendChild(row);});}}
-function applySwap(ex){const old=curExercises[swapIdx];curExercises[swapIdx]={...ex,duration:old.duration,rest:old.rest,icon:getExIcon(ex.name)};closeModal('modal-swap');showReview();}
+function applySwap(ex){
+  const old=curExercises[swapIdx];
+  // A swap keeps the same slot in the workout, so the replacement inherits the
+  // old exercise's programming (sets, reps, work/rest, type) instead of falling
+  // back to bare defaults. Only the identity (name, muscles, tip) comes from the pick.
+  const isHold=ex.stretch||ex.type==='hold';
+  const merged={
+    ...ex,
+    type:isHold?'hold':(old.type==='hold'?'reps':(old.type||'reps')),
+    sets:old.sets||3,
+    reps:old.reps||10,
+    duration:old.duration||(isHold?40:40),
+    rest:old.rest||20,
+    group:old.group,           // stay in the superset if the slot was in one
+    trackWeight:old.trackWeight,
+    icon:getExIcon(ex.name)
+  };
+  if(isHold){delete merged.reps;merged.sets=old.sets||1;}
+  else delete merged.stretch;
+  curExercises[swapIdx]=merged;
+  closeModal('modal-swap');showReview();
+}
 async function getAISwap(){if(!loadKey()){showErr('API Key fehlt');return;}const ex=curExercises[swapIdx];const muscles=ex.muscles||[];document.getElementById('swap-ai-result').textContent='Lädt...';try{const raw=await callAPI([{role:'user',content:`3 Alternativen für "${ex.name}" (Muskeln: ${muscles.join(',')}). Kein Equipment, knieschonend. NUR JSON-Array: [{"name":"...","tip":"DE","muscles":["core"],"bilateral":false}]`}],400);const parsed=extractJSON(raw);const arr=Array.isArray(parsed)?parsed:[parsed];document.getElementById('swap-ai-result').innerHTML='';arr.filter(e=>e&&e.name).forEach(e=>{const b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;cursor:pointer;font-family:var(--f)';b.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx)">${e.name}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${e.tip||''}</div>`;b.onclick=()=>applySwap({...e,icon:getExIcon(e.name)});document.getElementById('swap-ai-result').appendChild(b);});}catch(err){document.getElementById('swap-ai-result').textContent='Fehler: '+err.message;}}
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
@@ -6228,7 +6249,20 @@ function addExToWorkout(exOrStr){
   if(ex.stretch){type='hold';dur=ex.hold||40;rest=10;}
   else if(n.match(/plank|wall sit|hollow|dead hang|l-sit/))type='hold';
   else if(n.match(/push|liegest|klimmzug|pull.up|dip|curl|lunge|squat|kniebeug|row|raise/)||ex.bilateral)type='reps';
-  curExercises.push({...ex,type,duration:type==='hold'?(ex.stretch?dur:45):dur,rest,reps:10,sets:1,icon:ex.stretch?'🧘':getExIcon(ex.name)});
+  // Match the current session: reps-exercises get real sets, not a lone set.
+  // Reuse the intensity the rest of the workout was built at (fallback: 3).
+  const sessionSets=(()=>{
+    const strengths=curExercises.filter(e=>!e.stretch&&!e.warmup&&(e.type==='reps'||e.type==='time')&&e.sets);
+    if(strengths.length){const m=Math.round(strengths.reduce((s,e)=>s+e.sets,0)/strengths.length);return Math.max(1,Math.min(5,m));}
+    return SETS_I[curSetup?.intensity]||3;
+  })();
+  const isHold=type==='hold';
+  const entry={...ex,type,
+    duration:isHold?(ex.stretch?dur:45):dur,rest,
+    sets:isHold?1:sessionSets,
+    icon:ex.stretch?'🧘':getExIcon(ex.name)};
+  if(!isHold)entry.reps=ex.reps||10; else delete entry.reps;
+  curExercises.push(entry);
   if(window._addingLive){
     // Added while training: close, stay in the timer, just refresh the list
     closeModal('modal-add-to-workout');
