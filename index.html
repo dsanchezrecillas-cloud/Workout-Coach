@@ -50,6 +50,14 @@ body{font-family:var(--f);color:var(--tx);min-height:100vh;min-height:-webkit-fi
 @keyframes cr{0%,100%{transform:translateY(0)rotate(0)}50%{transform:translateY(-9px)rotate(-14deg)}}
 .fade{animation:up .22s cubic-bezier(.16,1,.3,1) both}
 .screen{display:none;width:100%;max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);padding:max(env(safe-area-inset-top,28px),28px) 16px 80px;-webkit-font-smoothing:antialiased}
+/* Timer shrinks into a compact sticky bar once you scroll into the exercise list */
+#timer-wrap.compact{border-bottom:1px solid var(--br);box-shadow:0 6px 16px rgba(0,0,0,.28);padding-bottom:8px}
+#timer-wrap.compact #timer-ring-box{width:92px;height:92px;margin-bottom:2px}
+#timer-wrap.compact #t-disp{font-size:30px}
+#timer-wrap.compact #ph-label{font-size:8px;margin-bottom:0}
+#timer-wrap.compact #t-disp-unit{display:none!important}
+#timer-wrap.compact #t-ctr{font-size:9px;margin-top:1px}
+#timer-wrap.compact #sticky-exname{display:block}
 .screen.active{display:block}
 #s-gen.active,#s-chat.active{display:flex;flex-direction:column}
 #s-gen.active{align-items:center;justify-content:center;min-height:100vh;padding:0}
@@ -331,18 +339,22 @@ button:active:not(:disabled){transform:scale(.96)}
 
 <!-- TIMER -->
 <div id="s-timer" class="screen">
-  <div style="display:flex;gap:5px;margin-bottom:18px;align-items:center" id="prog-bars"></div>
-  <div style="position:relative;width:230px;height:230px;margin:0 auto 16px">
-    <svg width="230" height="230" style="transform:rotate(-90deg)">
+  <div style="display:flex;gap:5px;margin-bottom:14px;align-items:center" id="prog-bars"></div>
+  <!-- Timer becomes a sticky compact bar once you scroll past it -->
+  <div id="timer-wrap" style="position:sticky;top:0;z-index:20;background:var(--bg);padding-bottom:10px;margin:0 -2px 6px;transition:padding .2s">
+  <div id="timer-ring-box" style="position:relative;width:230px;height:230px;margin:0 auto 14px;transition:all .25s ease">
+    <svg id="timer-svg" width="230" height="230" viewBox="0 0 230 230" style="transform:rotate(-90deg);width:100%;height:100%">
       <circle cx="115" cy="115" r="100" fill="none" stroke="var(--ring)" stroke-width="8"/>
       <circle id="timer-arc" cx="115" cy="115" r="100" fill="none" stroke="#7c3aed" stroke-width="8" stroke-dasharray="628.3" stroke-dashoffset="628.3" stroke-linecap="round"/>
     </svg>
     <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
-      <div id="ph-label" style="font-size:10px;letter-spacing:.1em;color:var(--ac);text-transform:uppercase;font-weight:600;margin-bottom:4px"></div>
-      <div id="t-disp" class="mono" style="font-size:54px;font-weight:400;line-height:1;letter-spacing:-.02em;color:var(--tx)">00:40</div>
-      <div id="t-disp-unit" style="display:none;font-size:12px;color:var(--mu);font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin-top:4px">Wiederholungen</div>
-      <div id="t-ctr" style="font-size:11px;color:var(--mu);margin-top:4px;font-weight:500"></div>
+      <div id="ph-label" style="font-size:11px;letter-spacing:.1em;color:var(--ac);text-transform:uppercase;font-weight:700;margin-bottom:2px"></div>
+      <div id="t-disp" class="mono" style="font-size:76px;font-weight:500;line-height:.95;letter-spacing:-.03em;color:var(--tx)">00:40</div>
+      <div id="t-disp-unit" style="display:none;font-size:12px;color:var(--mu);font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin-top:2px">Wiederholungen</div>
+      <div id="t-ctr" style="font-size:12px;color:var(--mu);margin-top:3px;font-weight:600"></div>
     </div>
+  </div>
+  <div id="sticky-exname" style="display:none;text-align:center;font-size:13px;font-weight:600;color:var(--tx);padding:0 12px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
   </div>
   <div class="card" id="ex-card" style="margin-bottom:10px">
     <div id="done-view" style="display:none;text-align:center;padding:10px 0">
@@ -570,7 +582,7 @@ button:active:not(:disabled){transform:scale(.96)}
   <button class="back" onclick="show('s-home')">← zurück</button>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
     <div style="font-size:21px;font-weight:700;letter-spacing:-.02em">Übungsverzeichnis</div>
-    <div style="display:flex;gap:7px"><button onclick="openAddEx()" style="padding:7px 12px;border-radius:9px;background:rgba(var(--coRGB),.12);border:1px solid rgba(var(--coRGB),.26);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f)">+ Eigene</button><button onclick="aiLoadExercises()" style="padding:7px 12px;border-radius:9px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)" id="lib-load-btn">✦ KI lädt mehr</button></div>
+    <div style="display:flex;gap:7px"><button onclick="openAiFind()" style="padding:7px 12px;border-radius:9px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">✦ KI-Suche</button><button onclick="openAddEx()" style="padding:7px 12px;border-radius:9px;background:rgba(var(--coRGB),.12);border:1px solid rgba(var(--coRGB),.26);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f)">+ Eigene</button></div>
   </div>
   <div style="font-size:13px;color:var(--mu);margin-bottom:10px" id="lib-count"></div>
   <div style="position:relative;margin-bottom:10px">
@@ -913,6 +925,20 @@ button:active:not(:disabled){transform:scale(.96)}
       <div style="flex:1"><div style="font-size:10px;color:var(--mu);letter-spacing:.08em;font-weight:600;text-transform:uppercase;margin-bottom:5px">Deadline</div><input id="ch-deadline" type="date" class="inp"/></div>
     </div>
     <button onclick="saveNewChallenge()" class="btn btn-ac">Challenge starten</button>
+  </div>
+</div>
+
+<!-- MODAL: AI exercise finder -->
+<div class="modal-ov" id="modal-ai-find">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700">✦ Übung per KI finden</div>
+      <button aria-label="Schließen" onclick="closeModal('modal-ai-find')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--mu);line-height:1.5;margin-bottom:12px">Gib eine Übung ("Wadenheben") oder eine Muskelgruppe ("Waden") ein. Die KI legt passende Übungen mit Ausführung und typischen Fehlern im Verzeichnis an.</div>
+    <input id="ai-find-input" class="inp" placeholder="z.B. Wadenheben oder Waden" style="margin-bottom:10px" onkeydown="if(event.key==='Enter')runAiFind()"/>
+    <button onclick="runAiFind()" id="ai-find-btn" class="btn btn-ac" style="width:100%;padding:13px;font-size:14px;margin-bottom:12px">Suchen</button>
+    <div id="ai-find-result"></div>
   </div>
 </div>
 
@@ -1348,6 +1374,8 @@ function histTxt(){
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
 function show(id){
+  // Leaving the timer: let the screen sleep again and reset the compact bar
+  if(id!=='s-timer'){releaseWakeLock();const tw=document.getElementById('timer-wrap');if(tw)tw.classList.remove('compact');}
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   const el=document.getElementById(id);
   el.classList.add('active');el.classList.remove('fade');void el.offsetWidth;el.classList.add('fade');
@@ -3713,7 +3741,42 @@ function setExSets(idx,n){
   curExercises[idx].sets=n;_updateRevCard(idx);
 }
 function toggleExWeight(idx){if(!curExercises[idx])return;curExercises[idx].trackWeight=!curExercises[idx].trackWeight;_updateRevCard(idx);}
-function startWorkout(){initTimer();show('s-timer');}
+// Keep the screen awake during a workout (Wake Lock API where supported).
+let _wakeLock=null;
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator){
+      _wakeLock=await navigator.wakeLock.request('screen');
+      _wakeLock.addEventListener('release',()=>{_wakeLock=null;});
+    }
+  }catch(e){/* denied or unsupported — silently skip */}
+}
+function releaseWakeLock(){
+  try{if(_wakeLock){_wakeLock.release();_wakeLock=null;}}catch{}
+}
+// iOS drops the lock when the tab is backgrounded; re-acquire on return if still training.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&document.getElementById('s-timer')?.classList.contains('active')&&!_wakeLock){
+    requestWakeLock();
+  }
+});
+
+function startWorkout(){initTimer();show('s-timer');initTimerScroll();requestWakeLock();}
+
+// Shrink the timer into a sticky bar when the user scrolls into the exercise list,
+// so the countdown stays visible without the ring eating the whole screen.
+let _timerScrollBound=false;
+function initTimerScroll(){
+  if(_timerScrollBound)return;_timerScrollBound=true;
+  const onScroll=()=>{
+    const screen=document.getElementById('s-timer');
+    if(!screen||!screen.classList.contains('active'))return;
+    const wrap=document.getElementById('timer-wrap');if(!wrap)return;
+    const scrolled=(window.scrollY||document.documentElement.scrollTop||0)>90;
+    wrap.classList.toggle('compact',scrolled);
+  };
+  window.addEventListener('scroll',onScroll,{passive:true});
+}
 
 // ─── Swap modal ───────────────────────────────────────────────────────────────
 let swapIdx=0;
@@ -3989,6 +4052,8 @@ function updateTimer(){
       else tip='Letzte Übung — gleich geschafft';
     }}
     document.getElementById('ex-name').textContent=name;document.getElementById('ex-tip').textContent=tip;
+    const stickyName=document.getElementById('sticky-exname');
+    if(stickyName)stickyName.textContent=tStatus==='rest'?'Pause · gleich: '+name:name;
     // "Last time" reference for the current exercise (Strong/Hevy pattern)
     const lastEl=document.getElementById('ex-last');
     const resEl=document.getElementById('ex-reserve');
@@ -6065,6 +6130,76 @@ function showLibDetail(exStr){
   let ex;try{ex=typeof exStr==='object'?exStr:JSON.parse(exStr);}catch{return;}
   openInfoModal(ex);
 }
+// ─── Targeted AI exercise finder ─────────────────────────────────────────────
+function openAiFind(){
+  if(!loadKey()){showErr('Dafür brauchst du einen API-Key (Einstellungen).');return;}
+  document.getElementById('ai-find-input').value='';
+  document.getElementById('ai-find-result').innerHTML='';
+  document.getElementById('modal-ai-find').classList.add('open');
+  setTimeout(()=>document.getElementById('ai-find-input').focus(),100);
+}
+let _aiFindResults=[];
+async function runAiFind(){
+  const q=document.getElementById('ai-find-input').value.trim();
+  if(!q){return;}
+  const btn=document.getElementById('ai-find-btn');btn.textContent='Sucht…';btn.disabled=true;
+  const res=document.getElementById('ai-find-result');res.innerHTML='';
+  try{
+    const keys=Object.keys(MUSCLE_DE).filter(k=>k!=='fullbody').join(', ');
+    const have=[...DEFAULT_LIB,...library].map(e=>e.name).join(', ');
+    const prompt=`Der Nutzer sucht: "${q}". Das ist entweder ein Übungsname oder eine Muskelgruppe.
+Finde 1–4 dazu passende, knieschonende Home-/Körpergewichtsübungen (bei Muskelgruppe mehrere Varianten, bei konkretem Übungsnamen genau diese plus 1–2 Varianten).
+NICHT doppeln mit: ${have}.
+muscles NUR aus dieser Liste (englische Keys): ${keys}.
+Antworte NUR mit JSON-Array, sonst nichts:
+[{"name":"deutscher Name","muscles":["calves"],"bilateral":false,"equip":"bodyweight|bar|dumbbell|band|none","tip":"kurzer Ausführungstipp DE","details":"Ausführung in 1-2 Sätzen DE","mistakes":"häufiger Fehler DE"}]`;
+    const raw=await callAPI([{role:'user',content:prompt}],1000);
+    const parsed=extractJSON(raw);
+    const arr=(Array.isArray(parsed)?parsed:[parsed]).filter(e=>e&&e.name&&Array.isArray(e.muscles));
+    if(!arr.length){res.innerHTML='<div style="font-size:13px;color:var(--mu);text-align:center;padding:14px">Nichts Passendes gefunden. Formuliere es anders oder leg die Übung von Hand an.</div>';return;}
+    // Drop muscle keys the app doesn't know, and flag exact duplicates
+    const known=new Set(Object.keys(MUSCLE_DE));
+    const haveLower=new Set([...DEFAULT_LIB,...library].map(e=>e.name.toLowerCase()));
+    _aiFindResults=arr.map(e=>({...e,muscles:e.muscles.filter(m=>known.has(m)),_dup:haveLower.has(e.name.toLowerCase())}))
+                      .filter(e=>e.muscles.length);
+    renderAiFindResults();
+  }catch(e){res.innerHTML='<div style="font-size:13px;color:var(--am);text-align:center;padding:14px">Fehler: '+e.message+'</div>';}
+  finally{btn.textContent='Suchen';btn.disabled=false;}
+}
+function renderAiFindResults(){
+  const res=document.getElementById('ai-find-result');
+  const anyNew=_aiFindResults.some(e=>!e._dup&&!e._added);
+  res.innerHTML=
+    '<div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Gefunden</div>'+
+    _aiFindResults.map((e,i)=>{
+      const groups=mainMuscles(e.muscles,3).join(', ');
+      const state=e._added?'<span style="font-size:11px;color:var(--co);font-weight:600;flex-shrink:0">✓ drin</span>'
+        :e._dup?'<span style="font-size:11px;color:var(--mu);flex-shrink:0">schon da</span>'
+        :`<button onclick="addAiFindOne(${i})" style="padding:7px 12px;border-radius:9px;background:rgba(var(--coRGB),.14);border:1px solid rgba(var(--coRGB),.3);color:var(--co);font-size:12px;font-weight:700;font-family:var(--f);flex-shrink:0">+ Anlegen</button>`;
+      return `<div style="display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:11px;border:1px solid var(--br);background:var(--card);margin-bottom:7px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--tx)">${e.name}${e.bilateral?' ↔':''}</div>
+          <div style="font-size:11px;color:var(--mu);margin-top:1px">${groups}${e.tip?' · '+e.tip:''}</div>
+        </div>${state}</div>`;
+    }).join('')+
+    (anyNew?'<button onclick="addAllAiFind()" class="btn btn-co" style="width:100%;padding:12px;font-size:13px;text-transform:none;margin-top:4px">Alle anlegen</button>':'');
+}
+function _adoptFindResult(e){
+  library.push({name:e.name,muscles:e.muscles,bilateral:!!e.bilateral,equip:e.equip&&e.equip!=='none'?e.equip:undefined,
+    tip:e.tip||'',details:e.details||'',mistakes:e.mistakes||'',custom:true});
+  saveLibrary();
+}
+function addAiFindOne(i){
+  const e=_aiFindResults[i];if(!e||e._added||e._dup)return;
+  _adoptFindResult(e);e._added=true;renderAiFindResults();renderLibrary();
+  showErr('✓ "'+e.name+'" im Verzeichnis angelegt.');
+}
+function addAllAiFind(){
+  let n=0;_aiFindResults.forEach(e=>{if(!e._added&&!e._dup){_adoptFindResult(e);e._added=true;n++;}});
+  renderAiFindResults();renderLibrary();
+  showErr(n?'✓ '+n+' Übung'+(n>1?'en':'')+' angelegt.':'Nichts Neues.');
+}
+
 async function aiLoadExercises(){
   if(!loadKey()){showErr('API Key fehlt');return;}
   const btn=document.getElementById('lib-load-btn');btn.textContent='Lädt...';btn.disabled=true;
