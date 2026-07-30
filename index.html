@@ -425,6 +425,16 @@ button:active:not(:disabled){transform:scale(.96)}
 
   </div>
   <button id="reps-done-btn" onclick="repsDone()" style="display:none;width:100%;padding:15px;border-radius:13px;background:linear-gradient(135deg,#059669,#34d399);color:#fff;font-size:16px;font-weight:700;font-family:var(--f);letter-spacing:.02em;margin-bottom:8px">✓ Satz fertig</button>
+  <!-- Per-exercise effort rating (autoregulation) -->
+  <div id="ex-rpe" style="display:none;margin-bottom:8px;padding:12px;border-radius:13px;background:var(--card);border:1px solid var(--br)">
+    <div style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:2px" id="ex-rpe-title">Wie schwer war das?</div>
+    <div style="font-size:11px;color:var(--mu);margin-bottom:10px" id="ex-rpe-sub">Beeinflusst, ob die App beim nächsten Mal steigert.</div>
+    <div style="display:flex;gap:7px">
+      <button onclick="setExRpe(2)" class="rpe-opt" data-v="2" style="flex:1;padding:11px 6px;border-radius:10px;border:1px solid rgba(var(--coRGB),.3);background:rgba(var(--coRGB),.08);color:var(--co);font-size:12px;font-weight:700;font-family:var(--f)">😌<br>Leicht</button>
+      <button onclick="setExRpe(5)" class="rpe-opt" data-v="5" style="flex:1;padding:11px 6px;border-radius:10px;border:1px solid rgba(var(--acRGB),.3);background:rgba(var(--acRGB),.08);color:var(--ac);font-size:12px;font-weight:700;font-family:var(--f)">💪<br>Mittel</button>
+      <button onclick="setExRpe(8)" class="rpe-opt" data-v="8" style="flex:1;padding:11px 6px;border-radius:10px;border:1px solid rgba(var(--amRGB),.3);background:rgba(var(--amRGB),.08);color:var(--am);font-size:12px;font-weight:700;font-family:var(--f)">🥵<br>Schwer</button>
+    </div>
+  </div>
   <div style="display:flex;gap:8px;margin-bottom:4px">
     <button id="skip-ex-btn" onclick="skipEx()" style="flex:1;padding:10px;border-radius:10px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f);letter-spacing:.03em;text-transform:uppercase">⏭ Übung skippen</button>
     <button id="end-early-btn" onclick="endEarly()" style="flex:1;padding:10px;border-radius:10px;background:rgba(var(--hotRGB),.1);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:12px;font-weight:600;font-family:var(--f);letter-spacing:.03em;text-transform:uppercase">✕ Abbrechen</button>
@@ -2911,7 +2921,9 @@ function showReview(){
       <button onclick="openSwapModal(${i})" style="padding:5px 9px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:11px;font-weight:600;font-family:var(--f);flex-shrink:0">↻</button>
       <button onclick="deleteEx(${i})" style="width:28px;height:28px;border-radius:8px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center">×</button>
     </div>
-    ${(()=>{const s=progressionFor(ex);return s?`<button onclick="applyProgression(${i})" style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--coRGB),.35);background:rgba(var(--coRGB),.09);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f);text-align:left;display:flex;align-items:center;gap:7px"><span>↗</span><span style="flex:1">2× voll geschafft — bereit für ${s.label}</span><span style="font-weight:700">Übernehmen</span></button>`:'';})()}
+    ${(()=>{const s=progressionFor(ex);if(!s)return '';
+      if(s.hold)return `<div style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--amRGB),.3);background:rgba(var(--amRGB),.07);color:var(--am);font-size:12px;font-weight:600;font-family:var(--f);display:flex;align-items:center;gap:7px"><span>🥵</span><span style="flex:1">Letztes Mal schwer — Gewicht/Wdh halten, erst leichter machen</span></div>`;
+      return `<button onclick="applyProgression(${i})" style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--coRGB),.35);background:rgba(var(--coRGB),.09);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f);text-align:left;display:flex;align-items:center;gap:7px"><span>↗</span><span style="flex:1">2× voll geschafft — bereit für ${s.label}</span><span style="font-weight:700">Übernehmen</span></button>`;})()}
     <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--br)">
       <!-- Bilateral toggle -->
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
@@ -2966,11 +2978,13 @@ const COMPOUND_PRIO={legs:0,quads:0,hams:0,glutes:1,back:1,lats:1,chest:1,should
 function progressionFor(ex){
   if(ex._prog)return null;
   const hits=[];
+  const efforts=[];
   for(let k=log.length-1;k>=0&&hits.length<2;k--){
     const w=log[k];if(w.stretch)continue;
     const i=(w.exercises||[]).findIndex(e=>e.name===ex.name);
     if(i<0)continue;
     const pl=w.exercises[i];
+    if(pl._rpe!==undefined)efforts.push(pl._rpe);
     if((pl.type||'time')==='reps'){
       const planned=(pl.sets||1)*(pl.reps||10)*(pl.bilateral?2:1);
       let got=0;Object.entries(w.repLog||{}).forEach(([key,v])=>{const p=parseRepKey(key);if(p&&p.ex===i)got+=v||0;});
@@ -2980,13 +2994,18 @@ function progressionFor(ex){
     }
   }
   if(hits.length<2||!hits.every(Boolean))return null;
+  // Autoregulation: only step up once the current load feels manageable.
+  // If the most recent rated effort was hard (≥7), hold — consolidate first.
+  if(efforts.length&&efforts[0]>=7){
+    return {hold:true,label:'erst konsolidieren'};
+  }
   return(ex.type||'time')==='reps'
     ?{field:'reps',delta:2,label:'+2 Wdh'}
     :{field:'duration',delta:5,label:'+5s'};
 }
 function applyProgression(i){
   const ex=curExercises[i];if(!ex)return;
-  const s=progressionFor(ex);if(!s)return;
+  const s=progressionFor(ex);if(!s||s.hold)return;
   if(s.field==='reps')ex.reps=(ex.reps||10)+s.delta;
   else ex.duration=(ex.duration||40)+s.delta;
   ex._prog=true;
@@ -3684,7 +3703,9 @@ function _revCardHTML(ex,i){
       <button onclick="openSwapModal(${i})" style="padding:5px 9px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:11px;font-weight:600;font-family:var(--f);flex-shrink:0">↻</button>
       <button onclick="deleteEx(${i})" style="width:28px;height:28px;border-radius:8px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center">×</button>
     </div>
-    ${(()=>{const s=progressionFor(ex);return s?`<button onclick="applyProgression(${i})" style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--coRGB),.35);background:rgba(var(--coRGB),.09);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f);text-align:left;display:flex;align-items:center;gap:7px"><span>↗</span><span style="flex:1">2× voll geschafft — bereit für ${s.label}</span><span style="font-weight:700">Übernehmen</span></button>`:'';})()}
+    ${(()=>{const s=progressionFor(ex);if(!s)return '';
+      if(s.hold)return `<div style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--amRGB),.3);background:rgba(var(--amRGB),.07);color:var(--am);font-size:12px;font-weight:600;font-family:var(--f);display:flex;align-items:center;gap:7px"><span>🥵</span><span style="flex:1">Letztes Mal schwer — Gewicht/Wdh halten, erst leichter machen</span></div>`;
+      return `<button onclick="applyProgression(${i})" style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--coRGB),.35);background:rgba(var(--coRGB),.09);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f);text-align:left;display:flex;align-items:center;gap:7px"><span>↗</span><span style="flex:1">2× voll geschafft — bereit für ${s.label}</span><span style="font-weight:700">Übernehmen</span></button>`;})()}
     <!-- Bilateral toggle -->
     <div style="display:flex;align-items:center;gap:7px;margin-top:9px;margin-bottom:7px">
       <button onclick="toggleBilateral(${i})" style="padding:5px 10px;border-radius:8px;border:1.5px solid ${ex.bilateral?'var(--ac)':'var(--br)'};background:${ex.bilateral?'rgba(var(--acRGB),.15)':'var(--up)'};color:${ex.bilateral?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">↔ Beidseitig${ex.bilateral?' AN':' AUS'}</button>
@@ -3809,7 +3830,7 @@ async function getAISwap(){if(!loadKey()){showErr('API Key fehlt');return;}const
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
 const RREST=60;let isWU=false;
-function initTimer(){clearActive();window._holdSide=1;curSetup.reserve=false;const _eb=document.getElementById('ease-live');if(_eb){_eb.style.background='var(--up)';_eb.style.borderColor='var(--br)';_eb.style.color='var(--mu)';_eb.style.borderStyle='dashed';_eb.textContent='🎯 Leichter';}tStatus='idle';tRound=1;tIdx=0;tSet=1;tRun=false;tReps={};isWU=(wuVisible!==false)&&wuExercises.length>0;clearInterval(tIv);const f=isWU?wuExercises[0]:curExercises[0];tLeft=f?.duration||40;renderBars();renderExList();updateTimer();document.getElementById('reps-done-btn').style.display='none';}
+function initTimer(){clearActive();window._holdSide=1;curSetup.reserve=false;curExercises.forEach(e=>{delete e._rpe;});const _eb=document.getElementById('ease-live');if(_eb){_eb.style.background='var(--up)';_eb.style.borderColor='var(--br)';_eb.style.color='var(--mu)';_eb.style.borderStyle='dashed';_eb.textContent='🎯 Leichter';}tStatus='idle';tRound=1;tIdx=0;tSet=1;tRun=false;tReps={};isWU=(wuVisible!==false)&&wuExercises.length>0;clearInterval(tIv);const f=isWU?wuExercises[0]:curExercises[0];tLeft=f?.duration||40;renderBars();renderExList();updateTimer();document.getElementById('reps-done-btn').style.display='none';}
 function renderBars(){
   const w=document.getElementById('prog-bars');w.innerHTML='';
   const isCircuit=curSetup.trainingMode==='circuit';
@@ -4104,6 +4125,7 @@ function updateTimer(){
   renderExList();
   exList.forEach((_,i)=>{const row=document.getElementById('erow-'+i),dot=document.getElementById('edot-'+i);if(!row||!dot)return;const done=i<tIdx,cur=i===tIdx&&(tStatus==='work'||tStatus==='rest');row.style.opacity=done?.3:1;row.style.background=cur?pc+'10':'transparent';dot.style.borderColor=done?'var(--br)':cur?pc:'var(--br)';dot.style.color=done?'transparent':cur?pc:'var(--mu)';dot.textContent=done?'✓':(i+1);});
   const rd=document.getElementById('reps-done-btn');
+  const _rpeBox=document.getElementById('ex-rpe');if(_rpeBox&&tStatus!=='rest')_rpeBox.style.display='none';
   const skipExBtn=document.getElementById('skip-ex-btn');
   const isRepsMode=exType==='reps';
   const isActive=tStatus==='work'||tStatus==='rest'||tStatus==='round_rest';
@@ -4225,6 +4247,7 @@ function advance(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{
     }
     window._holdSide=1;
     tStatus='rest';tLeft=ex.rest||20;beep(660,.15);
+    updateTimer();maybeShowExRpe();
   }else if(tStatus==='rest'){
       const gr=!isWU?_groupRange(tIdx):null;
       if(gr){
@@ -4268,11 +4291,42 @@ function skipEx(){
     tStatus='rest';tLeft=1;advance();return;
   }
 }
+// ─── Per-exercise effort (autoregulation) ───────────────────────────────────
+// Stored on the exercise as _rpe (2=leicht, 5=mittel, 8=schwer). Feeds the
+// progression logic so we only add load once the current load feels manageable.
+let _rpeForIdx=null;
+function maybeShowExRpe(){
+  const box=document.getElementById('ex-rpe');if(!box)return;
+  // Only after the final set of a strength/hold exercise, during its rest phase
+  const ex=curExercises[tIdx];
+  const isLastSet=tSet>=(ex?.sets||1);
+  const eligible=ex&&!ex.warmup&&!isWU&&tStatus==='rest'&&isLastSet&&(ex.type==='reps'||ex.type==='hold'||ex.type==='time')&&!ex.stretch;
+  if(eligible&&ex._rpe===undefined){
+    _rpeForIdx=tIdx;
+    box.style.display='block';
+    document.getElementById('ex-rpe-title').textContent='"'+ex.name+'" — wie schwer?';
+    box.querySelectorAll('.rpe-opt').forEach(b=>b.style.outline='none');
+  }else{
+    box.style.display='none';_rpeForIdx=null;
+  }
+}
+function setExRpe(v){
+  if(_rpeForIdx===null)return;
+  const ex=curExercises[_rpeForIdx];if(!ex)return;
+  ex._rpe=v;
+  // Brief visual confirm, then hide
+  const box=document.getElementById('ex-rpe');
+  box.querySelectorAll('.rpe-opt').forEach(b=>{b.style.outline=(+b.dataset.v===v)?'2px solid currentColor':'none';b.style.outlineOffset='1px';});
+  const label=v<=2?'leicht':v<=5?'mittel':'schwer';
+  setTimeout(()=>{box.style.display='none';_rpeForIdx=null;},280);
+  showErr('Notiert: '+label);
+}
+
 function repsDone(){
   const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};
   clearInterval(tIv);tRun=false;
   tStatus='rest';tLeft=ex.rest||20;beep(660,.15);
-  tRun=true;updateTimer();renderExList();_tickTs=Date.now();tIv=setInterval(tick,1000);
+  tRun=true;updateTimer();renderExList();maybeShowExRpe();_tickTs=Date.now();tIv=setInterval(tick,1000);
 }
 // ─── Active-workout persistence (survive iOS killing the PWA) ────────────────
 const ACTIVE_KEY='coach_active';
