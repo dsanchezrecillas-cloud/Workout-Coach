@@ -3314,15 +3314,33 @@ function _nextOpenSession(missed){
   }));
   return best;
 }
-function _nextFreeDate(fromDate,occupied,blocked){
+function _nextFreeDate(fromDate,occupied,blocked,minGap){
+  const gap=Math.max(1,minGap||1);
   const d=new Date(fromDate);
-  for(let i=0;i<21;i++){
+  for(let i=0;i<28;i++){
     d.setDate(d.getDate()+1);
     if(blocked.has(d.getDay()))continue;
     if(occupied.has(d.toDateString()))continue;
+    // Respect a recovery gap: no occupied day within (gap-1) days before this one
+    let tooClose=false;
+    for(let g=1;g<gap;g++){
+      const chk=new Date(d);chk.setDate(d.getDate()-g);
+      if(occupied.has(chk.toDateString())){tooClose=true;break;}
+    }
+    if(tooClose)continue;
     return new Date(d);
   }
   return null;
+}
+// Typical spacing of the plan in days, from its weekly session frequency.
+// 3x/week ≈ every 2nd day; 2x/week ≈ every 3rd; caps at 1 rest day minimum.
+function _planRestGap(){
+  if(!plan?.weeks?.length)return 2;
+  const perWeek=Math.round(plan.weeks.reduce((s,w)=>s+w.sessions.filter(x=>!x.skipped).length,0)/plan.weeks.length);
+  if(perWeek<=2)return 3;
+  if(perWeek===3)return 2;
+  if(perWeek===4)return 2;
+  return 1; // 5+/week: allow back-to-back, user clearly trains daily
 }
 async function applyReschedule(mode){
   const missed=_reschedule||missedSessions();if(!missed.length){closeModal('modal-reschedule');return;}
@@ -3368,14 +3386,21 @@ async function applyReschedule(mode){
     if(d>=fromDate)queue.push({wi,si,s,date:d});
   }));
   queue.sort((a,b)=>a.date-b.date);
-  // Reassign each to the next free calendar day starting today
+  // Reassign each to the next free calendar day, keeping the plan's recovery spacing
   const occupied=new Set();
+  // Seed occupied with recently-completed sessions so we don't stack a shifted
+  // session right after a workout the user already did.
+  const gap=_planRestGap();
+  const seedFrom=new Date(todayIso()+'T12:00:00');seedFrom.setDate(seedFrom.getDate()-gap);
+  plan.weeks.forEach((wk,wi)=>wk.sessions.forEach(s=>{
+    if(s.done){const d=sessionDate(wi,s);if(d>=seedFrom)occupied.add(d.toDateString());}
+  }));
   let cursor=new Date(todayIso()+'T12:00:00');cursor.setDate(cursor.getDate()-1);
   const planEnd=sessionDate(plan.weeks.length-1,{dow:0});
   let overshoot=false;
   const assignments=[];
   for(const item of queue){
-    const nd=_nextFreeDate(cursor,occupied,blocked);
+    const nd=_nextFreeDate(cursor,occupied,blocked,gap);
     if(!nd){overshoot=true;break;}
     occupied.add(nd.toDateString());cursor=new Date(nd);
     if(nd>planEnd)overshoot=true;
