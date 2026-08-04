@@ -5803,10 +5803,10 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
     if(oldWeeks>planData.weeks.length)extendPlanWeeks(planData,oldWeeks,allowedTrainingDays,rbFullbody);
     // Final guard: no week-1 session may fall before the start date
     if(planData.weeks[0]?.sessions?.length){
-      const ok=new Set(week1DaysFiltered);
+      const ok=new Set(week1Days);
       const kept=planData.weeks[0].sessions.filter(s=>ok.has(s.dow));
       if(kept.length)planData.weeks[0].sessions=kept;
-      else planData.weeks[0].sessions=[{dow:(week1DaysFiltered[0]??startDow),focus:'Ganzkörper Start',intensity:'easy',durationMin:planOpts.durMin,done:false}];
+      else planData.weeks[0].sessions=[{dow:(week1Days[0]??startDow),focus:'Ganzkörper Start',intensity:'easy',durationMin:plan.durMin||30,done:false}];
     }
     plan=planData;savePlan();renderPlanView(0);show('s-plan');
     showErr('✓ Plan mit '+newFreq+'×/Woche neu aufgebaut.');
