@@ -455,7 +455,7 @@ button:active:not(:disabled){transform:scale(.96)}
     <div style="font-size:10px;letter-spacing:.1em;color:var(--mu);text-transform:uppercase;font-weight:600;margin-bottom:8px">Notiz</div>
     <textarea id="rat-note" class="inp" style="resize:none;height:65px;font-size:13px;margin-top:8px" placeholder="Wie hat es sich angefühlt?"></textarea>
   </div>
-  <div class="card" style="margin-bottom:20px"><div style="font-size:10px;letter-spacing:.1em;color:var(--mu);text-transform:uppercase;font-weight:600;margin-bottom:11px">Wiederholungen</div><div id="rat-reps"></div></div>
+  <div class="card" style="margin-bottom:20px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px"><div style="font-size:10px;letter-spacing:.1em;color:var(--mu);text-transform:uppercase;font-weight:600">Wiederholungen</div><button id="rat-edit-btn" onclick="toggleRatingEdit()" style="font-size:11px;font-weight:600;color:var(--ac);background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);border-radius:8px;padding:5px 11px;font-family:var(--f)">✏ Bearbeiten</button></div><div id="rat-reps"></div></div>
   <button onclick="saveWorkout()" class="btn btn-co">Speichern →</button>
 </div>
 
@@ -1431,7 +1431,7 @@ function closeModal(id){
   if(id==='modal-info'&&window._resumeAfterInfo){
     window._resumeAfterInfo=false;
     if(tStatus==='rest'||tStatus==='round_rest'||(tStatus==='work'&&isTimedPhase())){
-      tRun=true;updateTimer();_tickTs=Date.now();tIv=setInterval(tick,1000);
+      _startTick();updateTimer();
     }
   }
 }
@@ -3959,7 +3959,7 @@ function jumpToExercise(i){
   tLeft=ex.duration||40;
   updateTimer();renderExList();
   // Time-based exercises resume counting; reps-mode waits for "Satz fertig"
-  if((ex.type||'time')!=='reps'){tRun=true;_tickTs=Date.now();tIv=setInterval(tick,1000);}
+  if((ex.type||'time')!=='reps'){_startTick();}
 }
 
 function renderExList(){
@@ -3974,6 +3974,16 @@ function renderExList(){
       const setVal=uni||Math.max(l,r);
       if(setVal>0)loggedSets.push(setVal);
     }
+    // For holds: collect the held seconds per set (shown as e.g. "45s")
+    const isHoldEx=(e.type==='hold'||e.type==='time'||e.stretch)&&!e.reps;
+    const heldSets=[];
+    if(isHoldEx){
+      for(let s=1;s<=totalSets;s++){
+        const base=tRound+'_'+i+'_s'+s;
+        const sec=tReps[base+'_sec']||Math.max(tReps[base+'_sec_L']||0,tReps[base+'_sec_R']||0);
+        if(sec>0)heldSets.push(sec);
+      }
+    }
     const g=!isWU?(e.group||null):null;
     const prevG=(!isWU&&i>0)?(exList[i-1].group||null):null;
     const nextG=(!isWU&&i<exList.length-1)?(exList[i+1].group||null):null;
@@ -3986,7 +3996,7 @@ function renderExList(){
     return head+`<div id="erow-${i}" onclick="peekExercise(${i})" style="display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:8px;transition:all .25s;cursor:pointer;${gBorder}">
       <div id="edot-${i}" style="width:18px;height:18px;border-radius:50%;flex-shrink:0;border:1.5px solid var(--br);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:var(--mu)">${i+1}</div>
       <div style="font-size:12px;font-weight:500;flex:1;color:${e.warmup?'var(--am)':'var(--mu)'}">${e.name}${e.bilateral?' ↔':''}</div>
-      ${loggedSets.length?`<span style="font-size:11px;font-weight:700;color:var(--co)">${loggedSets.join('·')}</span>`:''}
+      ${loggedSets.length?`<span style="font-size:11px;font-weight:700;color:var(--co)">${loggedSets.join('·')}</span>`:heldSets.length?`<span style="font-size:11px;font-weight:700;color:var(--co)">${heldSets.map(s=>s+'s').join('·')}</span>`:''}
       <div style="font-size:11px;color:var(--mu)">${e.type==='reps'?(e.reps||10)+' Wdh':(e.bilateral&&(e.type==='hold'||e.stretch)?'2×'+e.duration+'s':e.duration+'s')}</div>
     </div>`;
   }).join('');}
@@ -4088,7 +4098,7 @@ function updateTimer(){
     }
   }
   const dv=document.getElementById('done-view'),av=document.getElementById('active-view'),rc=document.getElementById('rep-counter');
-  if(tStatus==='done'){dv.style.display='block';av.style.display='none';document.getElementById('tot-reps').textContent=Object.values(tReps).reduce((s,v)=>s+v,0)+' Gesamtwiederholungen';relWL();}
+  if(tStatus==='done'){dv.style.display='block';av.style.display='none';document.getElementById('tot-reps').textContent=repTotal(tReps)+' Gesamtwiederholungen';relWL();}
   else{
     dv.style.display='none';av.style.display='block';
     const icon=document.getElementById('ex-icon');icon.textContent=tStatus==='round_rest'?'⏸':(ex.icon||'○');icon.style.color=pc;icon.style.borderColor=pc+'33';icon.style.background=pc+'14';
@@ -4186,12 +4196,17 @@ function updateTimer(){
 // is on) the set after a rest wait for a tap instead of rolling on by themselves.
 function _beginPhase(){
   const timed=isTimedPhase();
-  if(!timed){tRun=false;updateTimer();renderExList();return;}
+  if(!timed){
+    // Reps have no countdown — make sure no stale interval keeps ticking the clock
+    if(tIv){clearInterval(tIv);tIv=null;}
+    tRun=false;updateTimer();renderExList();return;
+  }
   if(!autoAdvanceOn()&&tStatus==='work'){
     // Ready state: countdown is armed but paused until the user says go
+    if(tIv){clearInterval(tIv);tIv=null;}
     tStatus='ready';tRun=false;updateTimer();renderExList();return;
   }
-  tRun=true;updateTimer();renderExList();_tickTs=Date.now();tIv=setInterval(tick,1000);
+  _startTick();updateTimer();renderExList();
 }
 
 // Hold the clock without losing your place. Also used automatically when a
@@ -4202,7 +4217,7 @@ function pauseForModal(){
 }
 function resumeAfterModal(){
   if(window._pausedByModal&&!window._pausedByUser&&isTimedPhase()&&tStatus!=='idle'&&tStatus!=='done'){
-    tRun=true;_tickTs=Date.now();tIv=setInterval(tick,1000);
+    _startTick();
   }
   window._pausedByModal=false;
   updateTimer();
@@ -4215,6 +4230,21 @@ function isTimedPhase(){
   const t=(exList[tIdx]||{}).type||'time';
   return t!=='reps';
 }
+// Record how many seconds a hold was held, keyed per set (and per side for
+// two-sided holds), so the summary can show "45s" instead of a blank "—".
+function _logHold(i,secs){
+  if(secs<=0)return;
+  const side=(exListCur()[i]?.bilateral&&(exListCur()[i]?.type==='hold'||exListCur()[i]?.stretch))?(window._holdSide||1):null;
+  const rk=tRound+'_'+i+'_s'+tSet+'_sec'+(side?('_'+(side===1?'L':'R')):'');
+  tReps[rk]=secs;
+}
+function exListCur(){return isWU?wuExercises:curExercises;}
+// A hold/timed exercise is defined by its type, not by the absence of a reps
+// field — swap/add can leave a stale reps value, so we must not rely on !reps.
+function isHoldEx(ex){return !!ex&&ex.type!=='reps'&&(ex.type==='hold'||ex.type==='time'||ex.stretch||(!!ex.duration&&!ex.reps));}
+// Sum only actual repetitions, never held-seconds keys (which end in _sec).
+function repTotal(repLog){return Object.entries(repLog||{}).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+(v||0),0);}
+
 function autoAdvanceOn(){
   // Stretch sessions run hands-free: there are no reps to enter, and stopping
   // after every hold (and every side) would mean reaching for the phone ~10x.
@@ -4236,19 +4266,25 @@ function continueTimer(){
   const ex=exList[tIdx]||{};
   tLeft=ex.duration||40;
   updateTimer();renderExList();
-  if(isTimedPhase()){tRun=true;_tickTs=Date.now();tIv=setInterval(tick,1000);}
+  if(isTimedPhase()){_startTick();}
 }
 
 function startTimer(){
   if(tStatus==='ready'){continueTimer();return;}
   if(tStatus==='idle'){tStatus='work';const f=isWU?wuExercises[0]:curExercises[0];tLeft=f?.duration||40;tRound=1;tIdx=0;}
   reqWL();
-  if(isTimedPhase()){tRun=true;updateTimer();_tickTs=Date.now();tIv=setInterval(tick,1000);}
+  if(isTimedPhase()){_startTick();updateTimer();}
   else{tRun=false;updateTimer();}   // reps: wait for "Satz fertig"
 }
-function pauseTimer(){tRun=false;clearInterval(tIv);updateTimer();}
+function pauseTimer(){tRun=false;if(tIv){clearInterval(tIv);tIv=null;}updateTimer();}
 let _tickTs=0;
-function tick(){_tickTs=Date.now();if(tLeft<=4&&tLeft>1)beep(660,.08);if(tLeft<=1){clearInterval(tIv);tRun=false;advance();return;}tLeft--;document.getElementById('t-disp').textContent=fmtT(tLeft);const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};const mt=tStatus==='work'?(ex.duration||40):tStatus==='rest'?(ex.rest||20):RREST;document.getElementById('timer-arc').setAttribute('stroke-dashoffset',CIRC-((mt-tLeft)/mt)*CIRC);}
+function tick(){_tickTs=Date.now();if(tLeft<=4&&tLeft>1)beep(660,.08);if(tLeft<=1){clearInterval(tIv);tIv=null;tRun=false;advance();return;}tLeft--;document.getElementById('t-disp').textContent=fmtT(tLeft);const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};const mt=tStatus==='work'?(ex.duration||40):tStatus==='rest'?(ex.rest||20):RREST;document.getElementById('timer-arc').setAttribute('stroke-dashoffset',CIRC-((mt-tLeft)/mt)*CIRC);}
+// Single entry point for starting the countdown. Always clears any existing
+// interval first, so ticks can never stack and run the clock multiple times too fast.
+function _startTick(){
+  if(tIv){clearInterval(tIv);tIv=null;}
+  tRun=true;_tickTs=Date.now();tIv=setInterval(tick,1000);
+}
 // Superset helpers: exercises sharing the same non-empty `group` run as a rotation.
 function _groupOf(i){return (curExercises[i]||{}).group||null;}
 function _groupRange(i){
@@ -4261,6 +4297,10 @@ function _groupRange(i){
 }
 function advance(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};
   if(tStatus==='work'){
+    // Log how long a hold was actually held (full duration when the timer runs out)
+    if(!isWU&&(ex.type==='hold'||ex.type==='time'||ex.stretch)&&!ex.reps){
+      _logHold(tIdx,ex.duration||40);
+    }
     // Two-sided holds (stretches) run the full time per side
     const twoSided=ex.bilateral&&(ex.type==='hold'||ex.stretch);
     if(twoSided&&(window._holdSide||1)===1){
@@ -4310,6 +4350,12 @@ function skipEx(){
     tLeft=1;advance();return;
   }
   if(tStatus==='work'){
+    // If a hold was in progress, log how long it was actually held before skipping
+    const exS=exListCur()[tIdx]||{};
+    if(!isWU&&(exS.type==='hold'||exS.type==='time'||exS.stretch)&&!exS.reps){
+      const held=Math.max(0,(exS.duration||40)-tLeft);
+      if(held>0)_logHold(tIdx,held);
+    }
     // Skip exercise → jump to rest then next
     beep(440,.1);
     tSet=(isWU?1:(curExercises[tIdx]?.sets||1)); // jump past all remaining sets
@@ -4351,7 +4397,7 @@ function repsDone(){
   const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};
   clearInterval(tIv);tRun=false;
   tStatus='rest';tLeft=ex.rest||20;beep(660,.15);
-  tRun=true;updateTimer();renderExList();maybeShowExRpe();_tickTs=Date.now();tIv=setInterval(tick,1000);
+  _startTick();updateTimer();renderExList();maybeShowExRpe();
 }
 // ─── Active-workout persistence (survive iOS killing the PWA) ────────────────
 const ACTIVE_KEY='coach_active';
@@ -4445,14 +4491,27 @@ function showInfo(){
 }
 
 // ─── Rating ───────────────────────────────────────────────────────────────────
-function initRating(){const tot=Object.values(tReps).reduce((s,v)=>s+v,0);document.getElementById('rat-sub').textContent=mainMuscles(curSetup.muscles,3).join(', ')+' · '+tot+' Wdh';document.getElementById('rat-note').value='';rpe=6;const w=document.getElementById('rpe-btns');w.innerHTML='';for(let n=1;n<=10;n++){const nc=rpc(n),btn=document.createElement('button');btn.style.cssText=`flex:1;padding:9px 0;border-radius:7px;font-size:12px;font-family:var(--m);cursor:pointer;border:1.5px solid ${n===rpe?nc:'var(--br)'};background:${n===rpe?nc+'18':'var(--up)'};color:${n===rpe?nc:'var(--mu)'};font-weight:${n===rpe?700:400};transition:all .15s`;btn.textContent=n;btn.onclick=()=>{rpe=n;w.querySelectorAll('button').forEach((b,i)=>{const bc=rpc(i+1);b.style.borderColor=(i+1)===n?bc:'var(--br)';b.style.background=(i+1)===n?bc+'18':'var(--up)';b.style.color=(i+1)===n?bc:'var(--mu)';b.style.fontWeight=(i+1)===n?700:400;});document.getElementById('rpe-lbl').textContent=RPE_L[n];document.getElementById('rpe-lbl').style.color=nc;};w.appendChild(btn);}document.getElementById('rpe-lbl').textContent=RPE_L[rpe];document.getElementById('rpe-lbl').style.color=rpc(rpe);document.getElementById('rat-reps').innerHTML=curExercises.map((ex,i)=>{
+function initRating(){_ratingEditMode=false;const _reb=document.getElementById('rat-edit-btn');if(_reb)_reb.textContent='✏ Bearbeiten';const tot=Object.entries(tReps).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+v,0);document.getElementById('rat-sub').textContent=mainMuscles(curSetup.muscles,3).join(', ')+' · '+tot+' Wdh';document.getElementById('rat-note').value='';rpe=6;const w=document.getElementById('rpe-btns');w.innerHTML='';for(let n=1;n<=10;n++){const nc=rpc(n),btn=document.createElement('button');btn.style.cssText=`flex:1;padding:9px 0;border-radius:7px;font-size:12px;font-family:var(--m);cursor:pointer;border:1.5px solid ${n===rpe?nc:'var(--br)'};background:${n===rpe?nc+'18':'var(--up)'};color:${n===rpe?nc:'var(--mu)'};font-weight:${n===rpe?700:400};transition:all .15s`;btn.textContent=n;btn.onclick=()=>{rpe=n;w.querySelectorAll('button').forEach((b,i)=>{const bc=rpc(i+1);b.style.borderColor=(i+1)===n?bc:'var(--br)';b.style.background=(i+1)===n?bc+'18':'var(--up)';b.style.color=(i+1)===n?bc:'var(--mu)';b.style.fontWeight=(i+1)===n?700:400;});document.getElementById('rpe-lbl').textContent=RPE_L[n];document.getElementById('rpe-lbl').style.color=nc;};w.appendChild(btn);}document.getElementById('rpe-lbl').textContent=RPE_L[rpe];document.getElementById('rpe-lbl').style.color=rpc(rpe);document.getElementById('rat-reps').innerHTML=curExercises.map((ex,i)=>{
   const sets=ex.sets||1;let totalReps=0;const setReps=[];
+  const isHold=isHoldEx(ex);
+  const heldSecs=[];
   for(let s=1;s<=sets;s++){
     const rk=tRound+'_'+i+'_s'+s;
     const u=(tReps[rk]||0),l=(tReps[rk+'_L']||0),r2=(tReps[rk+'_R']||0);
     const r=ex.bilateral?l+r2:u;if(r>0||s===1)setReps.push(ex.bilateral?`${l}L/${r2}R`:r);totalReps+=r;
+    if(isHold){
+      const sec=tReps[rk+'_sec']||Math.max(tReps[rk+'_sec_L']||0,tReps[rk+'_sec_R']||0);
+      if(sec>0)heldSecs.push(sec);
+    }
   }
   const tot2=totalReps;
+  // Holds: show the held seconds ("45s · 45s"); reps: the rep breakdown
+  if(isHold){
+    const setsLabelH=sets>1?' ('+sets+' Sätze)':'';
+    const borderH=i<curExercises.length-1?'var(--br)':'transparent';
+    const val=heldSecs.length?heldSecs.map(x=>x+'s').join(' · '):'—';
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid '+borderH+'"><div style="font-size:13px;color:var(--su)">'+ex.name+setsLabelH+'</div><div style="font-size:13px;font-family:var(--m);color:'+(heldSecs.length?'var(--co)':'var(--mu)')+';font-weight:'+(heldSecs.length?600:400)+';text-align:right">'+val+'</div></div>';
+  }
   const setsStr=setReps.length>1?setReps.join(' · ')+(tot2>0?' = '+tot2:''):(setReps[0]||0)+(typeof setReps[0]==='number'?' Wdh':'');
   const border=i<curExercises.length-1?'var(--br)':'transparent';
   const setsLabel=sets>1?' ('+sets+' Sätze)':'';
@@ -4501,7 +4560,60 @@ function adoptExercisesToLibrary(exercises){
   return added;
 }
 
+// Edit sets directly on the post-workout rating screen, before saving.
+// Writes straight into tReps, which is what saveWorkout persists.
+let _ratingEditMode=false;
+function toggleRatingEdit(){
+  _ratingEditMode=!_ratingEditMode;
+  const btn=document.getElementById('rat-edit-btn');
+  if(_ratingEditMode){btn.textContent='✓ Fertig';renderRatingEdit();}
+  else{
+    commitRatingEdit();
+    btn.textContent='✏ Bearbeiten';
+    initRating(); // re-render read-only view + refresh the header total
+  }
+}
+function renderRatingEdit(){
+  const el=document.getElementById('rat-reps');
+  el.innerHTML=curExercises.map((ex,i)=>{
+    const isHold=isHoldEx(ex);
+    const bi=!!ex.bilateral;
+    const sets=ex.sets||1;
+    let rows='';
+    for(let s=1;s<=sets;s++){
+      const base=tRound+'_'+i+'_s'+s;const id=i+'_'+s;
+      if(isHold){
+        const sec=tReps[base+'_sec']||Math.max(tReps[base+'_sec_L']||0,tReps[base+'_sec_R']||0)||0;
+        rows+=`<div style="display:flex;align-items:center;gap:7px;padding:3px 0"><div style="font-size:11px;color:var(--mu);width:42px">Satz ${s}</div><button onclick="adjRat('${id}_sec',-5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px">−</button><input id="rat-${id}_sec" type="number" inputmode="numeric" value="${sec}" style="width:52px;text-align:center;background:var(--up);border:1px solid var(--br);border-radius:7px;padding:5px 2px;color:var(--tx);font-size:13px;font-weight:600;font-family:var(--m)"/><button onclick="adjRat('${id}_sec',5)" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:14px">+</button><span style="font-size:11px;color:var(--mu)">Sek.</span></div>`;
+      }else if(bi){
+        const l=tReps[base+'_L']||0,r=tReps[base+'_R']||0;
+        rows+=`<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><div style="font-size:11px;color:var(--mu);width:42px">Satz ${s}</div><span style="font-size:10px;color:var(--mu)">L</span><input id="rat-${id}_L" type="number" inputmode="numeric" value="${l}" style="width:44px;text-align:center;background:var(--up);border:1px solid var(--br);border-radius:7px;padding:5px 2px;color:var(--tx);font-size:13px;font-family:var(--m)"/><span style="font-size:10px;color:var(--mu)">R</span><input id="rat-${id}_R" type="number" inputmode="numeric" value="${r}" style="width:44px;text-align:center;background:var(--up);border:1px solid var(--br);border-radius:7px;padding:5px 2px;color:var(--tx);font-size:13px;font-family:var(--m)"/></div>`;
+      }else{
+        const v=tReps[base]||0;
+        rows+=`<div style="display:flex;align-items:center;gap:7px;padding:3px 0"><div style="font-size:11px;color:var(--mu);width:42px">Satz ${s}</div><button onclick="adjRat('${id}',-1)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px">−</button><input id="rat-${id}" type="number" inputmode="numeric" value="${v}" style="width:48px;text-align:center;background:var(--up);border:1px solid var(--br);border-radius:7px;padding:5px 2px;color:var(--tx);font-size:13px;font-weight:600;font-family:var(--m)"/><button onclick="adjRat('${id}',1)" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:14px">+</button><span style="font-size:11px;color:var(--mu)">${isHold?'Sek.':'Wdh'}</span></div>`;
+      }
+    }
+    return`<div style="padding:8px 0;border-bottom:1px solid var(--br)"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:3px">${ex.name||'Übung'}${bi?' ↔':''}</div>${rows}</div>`;
+  }).join('');
+}
+function adjRat(id,d){const inp=document.getElementById('rat-'+id);if(!inp)return;inp.value=Math.max(0,(parseInt(inp.value)||0)+d);}
+function commitRatingEdit(){
+  curExercises.forEach((ex,i)=>{
+    const isHold=isHoldEx(ex);
+    const bi=!!ex.bilateral;const sets=ex.sets||1;
+    for(let s=1;s<=sets;s++){
+      const base=tRound+'_'+i+'_s'+s;const id=i+'_'+s;
+      // clear old keys for this set
+      delete tReps[base];delete tReps[base+'_L'];delete tReps[base+'_R'];delete tReps[base+'_sec'];delete tReps[base+'_sec_L'];delete tReps[base+'_sec_R'];
+      if(isHold){const sec=Math.max(0,parseInt(document.getElementById('rat-'+id+'_sec')?.value)||0);if(sec)tReps[base+'_sec']=sec;}
+      else if(bi){const l=Math.max(0,parseInt(document.getElementById('rat-'+id+'_L')?.value)||0);const r=Math.max(0,parseInt(document.getElementById('rat-'+id+'_R')?.value)||0);if(l)tReps[base+'_L']=l;if(r)tReps[base+'_R']=r;}
+      else{const v=Math.max(0,parseInt(document.getElementById('rat-'+id)?.value)||0);if(v)tReps[base]=v;}
+    }
+  });
+}
+
 function saveWorkout(){
+  if(_ratingEditMode){commitRatingEdit();_ratingEditMode=false;}
   const entry={id:Date.now(),date:new Date().toISOString(),muscles:curSetup.muscles||[],durationMin:curSetup.durationMin||20,exercises:curExercises,repLog:{...tReps},rpe,note:document.getElementById('rat-note').value.trim()};
   // Stretch sessions count for consistency, but not as training load
   if(curSetup.stretch||window._isStretchSession){entry.stretch=true;entry.areaId=curSetup.areaId||null;if(curSetup.routine==='morning'||curSetup.morning)entry.morning=true;if(curSetup.routine==='evening')entry.evening=true;}
@@ -4640,7 +4752,7 @@ function renderHistory(){
   // Chart: strength sessions only — stretch RPE is not comparable and adds noise
   const strength=log.filter(w=>!w.stretch);
   const rd=strength.slice(-8).map(w=>{
-    const reps=Object.values(w.repLog||{}).reduce((s,v)=>s+v,0);
+    const reps=repTotal(w.repLog);
     return{l:fmtDW(w.date),v:w.rpe,c:rpc(w.rpe),sub:reps>0?reps+' Wdh':''};
   });
   const hw=document.getElementById('hist-chart');
@@ -4682,7 +4794,7 @@ function renderHistory(){
       }
     }
   }else hw.style.display='none';
-  const escN=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.values(w.repLog||{}).reduce((s,v)=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${w.stretch?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:'')):(mainMuscles(w.muscles,3).join(', ')||'Workout')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{const per=repsPerExercise(w).filter(p=>p.reps>0);if(!per.length)return'';return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${per.map(p=>`<div onclick="openExerciseDetail('${(p.name||'').replace(/'/g,"\\'")}')" style="display:flex;justify-content:space-between;font-size:12px;cursor:pointer;padding:2px 0"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''} <span style="color:var(--br)">›</span></span><span style="color:var(--su);font-weight:600;margin-left:8px">${p.reps} Wdh</span></div>`).join('')}</div>`;})()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${escN(w.note)}</div>`:''}</div>`;}).join('');}
+  const escN=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.entries(w.repLog||{}).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${w.stretch?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:'')):(mainMuscles(w.muscles,3).join(', ')||'Workout')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{const per=repsPerExercise(w).filter(p=>p.reps>0||p.secs>0);if(!per.length)return'';return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${per.map(p=>`<div onclick="openExerciseDetail('${(p.name||'').replace(/'/g,"\\'")}')" style="display:flex;justify-content:space-between;font-size:12px;cursor:pointer;padding:2px 0"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''} <span style="color:var(--br)">›</span></span><span style="color:var(--su);font-weight:600;margin-left:8px">${p.isHold?p.secs+'s':p.reps+' Wdh'}</span></div>`).join('')}</div>`;})()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${escN(w.note)}</div>`:''}</div>`;}).join('');}
 function showHistory(){show('s-history');}
 async function delW(idx){const ok=await appConfirm('Training löschen?','Diese Aktion kann nicht rückgängig gemacht werden.');if(!ok)return;log.splice(idx,1);persist();updateHome();showHistory();}
 async function delLastWorkout(){if(!log.length)return;const last=log[log.length-1];const ok=await appConfirm('Letztes Training löschen?','RPE '+(last.rpe||'?')+'/10 · '+fmtD(last.date));if(!ok)return;log.pop();persist();updateHome();}
@@ -4713,9 +4825,14 @@ function repsPerExercise(w){
     name:ex.name||'Übung',
     bilateral:!!ex.bilateral,
     plannedSets:ex.sets||1,
-    reps:0
+    isHold:isHoldEx(ex),
+    reps:0,
+    secs:0
   }));
   Object.entries(w.repLog||{}).forEach(([k,v])=>{
+    // Held-seconds keys: "<round>_<ex>_s<set>_sec" (optionally _L/_R)
+    const hm=k.match(/^\d+_(\d+)_s\d+_sec(?:_[LR])?$/);
+    if(hm){const ei=+hm[1];if(out[ei])out[ei].secs+=(v||0);return;}
     const p=parseRepKey(k);
     if(!p||!out[p.ex])return;
     out[p.ex].reps+=(v||0);
@@ -4728,6 +4845,7 @@ function renderEditReps(idx){
   const exs=w.exercises||[];
   if(!exs.length){el.innerHTML='<div style="font-size:12px;color:var(--mu);padding:4px 0">Keine Übungen gespeichert.</div>';return;}
   el.innerHTML=exs.map((ex,i)=>{
+    const isHold=isHoldEx(ex);
     let sets=setsOfExercise(w,i);
     // Show at least the planned number of sets so missed entries can be added
     const want=Math.max(sets.length,ex.sets||1);
@@ -4735,6 +4853,18 @@ function renderEditReps(idx){
     const bi=!!ex.bilateral;
     const rows=sets.map(st=>{
       const id=i+'_'+st.round+'_'+st.set;
+      // Holds are edited in seconds, not reps
+      if(isHold){
+        const base=st.round+'_'+i+'_s'+st.set;
+        const secVal=(w.repLog?.[base+'_sec'])||Math.max(w.repLog?.[base+'_sec_L']||0,w.repLog?.[base+'_sec_R']||0)||0;
+        return`<div style="display:flex;align-items:center;gap:7px;padding:4px 0">
+          <div style="font-size:11px;color:var(--mu);width:44px;flex-shrink:0">Satz ${st.set}</div>
+          <button onclick="adjEditSet('${id}-sec',-5)" style="width:26px;height:26px;border-radius:7px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:14px;flex-shrink:0">−</button>
+          <input id="edset-${id}-sec" type="number" inputmode="numeric" value="${secVal}" style="width:52px;text-align:center;background:var(--up);border:1px solid var(--br);border-radius:7px;padding:5px 2px;color:var(--tx);font-size:13px;font-weight:600;font-family:var(--m)"/>
+          <button onclick="adjEditSet('${id}-sec',5)" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:14px;flex-shrink:0">+</button>
+          <span style="font-size:11px;color:var(--mu)">Sek.</span>
+        </div>`;
+      }
       if(bi){
         return`<div style="display:flex;align-items:center;gap:6px;padding:4px 0">
           <div style="font-size:11px;color:var(--mu);width:44px;flex-shrink:0">Satz ${st.set}</div>
@@ -4773,18 +4903,25 @@ function saveEdit(){
   const exs=w.exercises||[];
   w.repLog=w.repLog||{};
   exs.forEach((ex,i)=>{
+    const isHold=isHoldEx(ex);
     const bi=!!ex.bilateral;
     let sets=setsOfExercise(w,i);
     const want=Math.max(sets.length,ex.sets||1);
     for(let s=sets.length+1;s<=want;s++)sets.push({round:1,set:s});
-    // drop existing rep keys for this exercise (weights stay)
+    // drop existing rep/second keys for this exercise (weights stay)
     Object.keys(w.repLog).forEach(k=>{
       const p=parseRepKey(k);
       if(p&&p.ex===i)delete w.repLog[k];
+      else if(new RegExp('^\\d+_'+i+'_s\\d+_sec').test(k))delete w.repLog[k];
     });
     sets.forEach(st=>{
       const id=i+'_'+st.round+'_'+st.set;
       const base=st.round+'_'+i+'_s'+st.set;
+      if(isHold){
+        const sec=Math.max(0,parseInt(document.getElementById('edset-'+id+'-sec')?.value)||0);
+        if(sec)w.repLog[base+'_sec']=sec;
+        return;
+      }
       if(bi){
         const l=Math.max(0,parseInt(document.getElementById('edset-'+id+'-L')?.value)||0);
         const r=Math.max(0,parseInt(document.getElementById('edset-'+id+'-R')?.value)||0);
@@ -6493,7 +6630,7 @@ function addExToWorkout(exOrStr){
     if(window._resumeAfterInfo){
       window._resumeAfterInfo=false;
       if(isTimedPhase()&&tStatus!=='idle'&&tStatus!=='done'&&tStatus!=='ready'){
-        tRun=true;_tickTs=Date.now();tIv=setInterval(tick,1000);updateTimer();
+        _startTick();updateTimer();
       }
     }
     return;
@@ -6638,7 +6775,7 @@ const BUILT_IN_ACH=[
 ];
 
 function calcAchProgress(ach){
-  const total_reps=log.flatMap(w=>Object.values(w.repLog||{})).reduce((s,v)=>s+v,0);
+  const total_reps=log.reduce((s,w)=>s+repTotal(w.repLog),0);
   switch(ach.type){
     case 'workouts':return{cur:log.length,pct:Math.min(100,Math.round(log.length/ach.target*100))};
     case 'streak':return{cur:streak(),pct:Math.min(100,Math.round(streak()/ach.target*100))};
@@ -6663,7 +6800,7 @@ function calcChallengeProgress(ch){
   switch(ch.type){
     case 'reps':{let r=0;filtered.forEach(w=>{const exArr=w.exercises||[];exArr.forEach((ex,ei)=>{if(!ch.exercise||(ex.name||'').toLowerCase().includes(ch.exercise.toLowerCase())){const rk='1_'+ei;r+=(w.repLog?.[rk]||0)+(w.repLog?.[rk+'_L']||0)+(w.repLog?.[rk+'_R']||0);}});});return{cur:r,pct:Math.min(100,Math.round(r/ch.target*100))};}
     case 'workouts':return{cur:filtered.length,pct:Math.min(100,Math.round(filtered.length/ch.target*100))};
-    case 'total_reps':{const r=filtered.flatMap(w=>Object.values(w.repLog||{})).reduce((s,v)=>s+v,0);return{cur:r,pct:Math.min(100,Math.round(r/ch.target*100))};}
+    case 'total_reps':{const r=filtered.reduce((s,w)=>s+repTotal(w.repLog),0);return{cur:r,pct:Math.min(100,Math.round(r/ch.target*100))};}
     case 'streak':{
       // Longest run of consecutive calendar days with a workout inside the window
       const dayset=new Set(filtered.map(w=>w.date.slice(0,10)));
@@ -6817,7 +6954,7 @@ function renderAnalytics(range){
 
   if(!filtered.length){document.getElementById('analytics-content').innerHTML=`<div style="text-align:center;padding:40px 0;color:var(--mu)"><div style="font-size:36px;margin-bottom:10px">📊</div><div style="font-size:14px">Noch keine Daten für diesen Zeitraum.</div></div>`;try{renderProgress();}catch(e){}return;}
 
-  const totalReps=filtered.flatMap(w=>Object.values(w.repLog||{})).reduce((s,v)=>s+v,0);
+  const totalReps=filtered.reduce((s,w)=>s+repTotal(w.repLog),0);
   const avgRpe=filtered.length?Math.round(filtered.reduce((s,w)=>s+(w.rpe||0),0)/filtered.length*10)/10:0;
   const totalMin=filtered.reduce((s,w)=>s+(w.durationMin||0),0);
 
