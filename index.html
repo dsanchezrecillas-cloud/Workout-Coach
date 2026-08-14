@@ -2923,7 +2923,7 @@ function showReview(){
     </div>
     ${(()=>{const s=progressionFor(ex);if(!s)return '';
       if(s.hold)return `<div style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--amRGB),.3);background:rgba(var(--amRGB),.07);color:var(--am);font-size:12px;font-weight:600;font-family:var(--f);display:flex;align-items:center;gap:7px"><span>🥵</span><span style="flex:1">Letztes Mal schwer — Gewicht/Wdh halten, erst leichter machen</span></div>`;
-      return `<button onclick="applyProgression(${i})" style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--coRGB),.35);background:rgba(var(--coRGB),.09);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f);text-align:left;display:flex;align-items:center;gap:7px"><span>↗</span><span style="flex:1">2× voll geschafft — bereit für ${s.label}</span><span style="font-weight:700">Übernehmen</span></button>`;})()}
+      return `<button onclick="applyProgression(${i})" style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--coRGB),.35);background:rgba(var(--coRGB),.09);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f);text-align:left;display:flex;align-items:center;gap:7px"><span>↗</span><span style="flex:1">${s.need||3}× voll geschafft — bereit für ${s.label}</span><span style="font-weight:700">Übernehmen</span></button>`;})()}
     <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--br)">
       <!-- Bilateral toggle -->
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
@@ -2977,9 +2977,12 @@ const COMPOUND_PRIO={legs:0,quads:0,hams:0,glutes:1,back:1,lats:1,chest:1,should
 // Fully completed an exercise in the last 2 sessions it appeared in → suggest more.
 function progressionFor(ex){
   if(ex._prog)return null;
+  // Consolidate before adding load: only suggest a step-up after you've hit the
+  // full target three sessions in a row (double-progression), not just twice.
+  const NEED=3;
   const hits=[];
   const efforts=[];
-  for(let k=log.length-1;k>=0&&hits.length<2;k--){
+  for(let k=log.length-1;k>=0&&hits.length<NEED;k--){
     const w=log[k];if(w.stretch)continue;
     const i=(w.exercises||[]).findIndex(e=>e.name===ex.name);
     if(i<0)continue;
@@ -2993,15 +2996,15 @@ function progressionFor(ex){
       hits.push(true); // timed/hold: finishing the session counts as completed
     }
   }
-  if(hits.length<2||!hits.every(Boolean))return null;
+  if(hits.length<NEED||!hits.every(Boolean))return null;
   // Autoregulation: only step up once the current load feels manageable.
   // If the most recent rated effort was hard (≥7), hold — consolidate first.
   if(efforts.length&&efforts[0]>=7){
     return {hold:true,label:'erst konsolidieren'};
   }
   return(ex.type||'time')==='reps'
-    ?{field:'reps',delta:2,label:'+2 Wdh'}
-    :{field:'duration',delta:5,label:'+5s'};
+    ?{field:'reps',delta:2,label:'+2 Wdh',need:NEED}
+    :{field:'duration',delta:5,label:'+5s',need:NEED};
 }
 function applyProgression(i){
   const ex=curExercises[i];if(!ex)return;
@@ -3730,7 +3733,7 @@ function _revCardHTML(ex,i){
     </div>
     ${(()=>{const s=progressionFor(ex);if(!s)return '';
       if(s.hold)return `<div style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--amRGB),.3);background:rgba(var(--amRGB),.07);color:var(--am);font-size:12px;font-weight:600;font-family:var(--f);display:flex;align-items:center;gap:7px"><span>🥵</span><span style="flex:1">Letztes Mal schwer — Gewicht/Wdh halten, erst leichter machen</span></div>`;
-      return `<button onclick="applyProgression(${i})" style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--coRGB),.35);background:rgba(var(--coRGB),.09);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f);text-align:left;display:flex;align-items:center;gap:7px"><span>↗</span><span style="flex:1">2× voll geschafft — bereit für ${s.label}</span><span style="font-weight:700">Übernehmen</span></button>`;})()}
+      return `<button onclick="applyProgression(${i})" style="width:100%;margin-top:9px;padding:8px 11px;border-radius:9px;border:1px solid rgba(var(--coRGB),.35);background:rgba(var(--coRGB),.09);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f);text-align:left;display:flex;align-items:center;gap:7px"><span>↗</span><span style="flex:1">${s.need||3}× voll geschafft — bereit für ${s.label}</span><span style="font-weight:700">Übernehmen</span></button>`;})()}
     <!-- Bilateral toggle -->
     <div style="display:flex;align-items:center;gap:7px;margin-top:9px;margin-bottom:7px">
       <button onclick="toggleBilateral(${i})" style="padding:5px 10px;border-radius:8px;border:1.5px solid ${ex.bilateral?'var(--ac)':'var(--br)'};background:${ex.bilateral?'rgba(var(--acRGB),.15)':'var(--up)'};color:${ex.bilateral?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">↔ Beidseitig${ex.bilateral?' AN':' AUS'}</button>
