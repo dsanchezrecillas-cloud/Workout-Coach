@@ -3831,10 +3831,8 @@ function swapTab(tab){const libBtn=document.getElementById('swap-tab-lib'),aiBtn
 row.innerHTML=`<div style="font-size:12px;color:var(--ac);flex-shrink:0;width:22px">${getExIcon(e.name)}</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx)">${e.name}${e.bilateral?' ↔':''}</div><div style="font-size:11px;color:var(--mu)">${(e.muscles||[]).map(m=>MUSCLE_DE[m]||m).join(', ')}</div></div>${hitStressed?`<span style="font-size:10px;color:var(--am);font-weight:600;flex-shrink:0">⚠ &lt;48h</span>`:''}`;row.onclick=()=>{applySwap(e);};libList.appendChild(row);});}}
 function applySwap(ex){
   const old=curExercises[swapIdx];
-  // A swap keeps the same slot in the workout, so the replacement inherits the
-  // old exercise's programming (sets, reps, work/rest, type) instead of falling
-  // back to bare defaults. Only the identity (name, muscles, tip) comes from the pick.
   const isHold=ex.stretch||ex.type==='hold';
+  // Start from the slot's programming so the replacement fits the workout…
   const merged={
     ...ex,
     type:isHold?'hold':(old.type==='hold'?'reps':(old.type||'reps')),
@@ -3848,8 +3846,46 @@ function applySwap(ex){
   };
   if(isHold){delete merged.reps;merged.sets=old.sets||1;}
   else delete merged.stretch;
+  // …but if you've done THIS exercise before, prefer your own last numbers,
+  // so a swap remembers your history instead of copying the slot blindly.
+  const last=lastPerformance(ex.name);
+  if(last){
+    if(!isHold&&last.reps){merged.reps=last.reps;merged._fromHistory=true;}
+    if(last.sets){merged.sets=last.sets;merged._fromHistory=true;}
+    if(isHold&&last.secs){merged.duration=last.secs;merged._fromHistory=true;}
+  }
   curExercises[swapIdx]=merged;
   closeModal('modal-swap');showReview();
+  if(last&&merged._fromHistory){
+    const bits=[];if(merged.sets)bits.push(merged.sets+' Sätze');if(!isHold&&merged.reps)bits.push(merged.reps+' Wdh');if(isHold&&merged.duration)bits.push(merged.duration+'s');
+    showErr('Aus deinem Verlauf übernommen: '+bits.join(' × '));
+  }
+}
+// Most recent programming actually performed for an exercise: the typical set
+// count and a representative rep number (the top set) from the last session
+// where it appeared. Returns null if it's never been logged.
+function lastPerformance(exName){
+  const h=getExerciseHistory(exName);
+  // Held seconds, if this exercise stored them (scan most recent first).
+  // Also yields a set count for pure holds, which carry no reps.
+  let secs=0, holdSets=0;
+  const logs=(log||[]).slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+  for(const wkt of logs){
+    const i=(wkt.exercises||[]).findIndex(e=>(e.name||'').toLowerCase()===exName.toLowerCase());
+    if(i<0)continue;
+    let best=0,cnt=0;
+    Object.entries(wkt.repLog||{}).forEach(([k,v])=>{
+      const m=k.match(new RegExp('^\\d+_'+i+'_s\\d+_sec(?:_[LR])?$'));
+      if(m){cnt++;if(v>best)best=v;}
+    });
+    if(best>0){secs=best;holdSets=cnt;break;}
+  }
+  if(!h.length&&!secs)return null;
+  const recent=h.length?h[h.length-1]:null; // sorted ascending by date
+  const sets=(recent?.sets?.length||0)||holdSets;
+  if(!sets)return null;
+  const reps=recent?Math.max(...recent.sets,0)||0:0;
+  return {sets,reps,secs};
 }
 async function getAISwap(){if(!loadKey()){showErr('API Key fehlt');return;}const ex=curExercises[swapIdx];const muscles=ex.muscles||[];document.getElementById('swap-ai-result').textContent='Lädt...';try{const raw=await callAPI([{role:'user',content:`3 Alternativen für "${ex.name}" (Muskeln: ${muscles.join(',')}). Kein Equipment, knieschonend. NUR JSON-Array: [{"name":"...","tip":"DE","muscles":["core"],"bilateral":false}]`}],400);const parsed=extractJSON(raw);const arr=Array.isArray(parsed)?parsed:[parsed];document.getElementById('swap-ai-result').innerHTML='';arr.filter(e=>e&&e.name).forEach(e=>{const b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;cursor:pointer;font-family:var(--f)';b.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx)">${e.name}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${e.tip||''}</div>`;b.onclick=()=>applySwap({...e,icon:getExIcon(e.name)});document.getElementById('swap-ai-result').appendChild(b);});}catch(err){document.getElementById('swap-ai-result').textContent='Fehler: '+err.message;}}
 
@@ -6620,6 +6656,14 @@ function addExToWorkout(exOrStr){
     sets:isHold?1:sessionSets,
     icon:ex.stretch?'🧘':getExIcon(ex.name)};
   if(!isHold)entry.reps=ex.reps||10; else delete entry.reps;
+  // If this exercise has been done before, prefer your own last numbers.
+  const lastP=lastPerformance(ex.name);
+  if(lastP){
+    if(!isHold&&lastP.reps)entry.reps=lastP.reps;
+    if(lastP.sets)entry.sets=lastP.sets;
+    if(isHold&&lastP.secs)entry.duration=lastP.secs;
+    entry._fromHistory=true;
+  }
   curExercises.push(entry);
   if(window._addingLive){
     // Added while training: close, stay in the timer, just refresh the list
