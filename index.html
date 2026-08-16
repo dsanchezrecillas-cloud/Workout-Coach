@@ -1130,6 +1130,9 @@ button:active:not(:disabled){transform:scale(.96)}
     <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap" id="sess-day-picker"></div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Intensität</div>
     <div style="display:flex;gap:8px;margin-bottom:18px" id="sess-int-picker"></div>
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px">Fokus heute</div>
+    <div style="font-size:11px;color:var(--mu);margin-bottom:10px">Weicht nur für diese Session vom Plan ab — z.B. Push, wenn die Beine noch Muskelkater haben.</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px" id="sess-focus-picker"></div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Wo trainierst du?</div>
     <div style="display:flex;gap:7px;margin-bottom:16px" id="sess-loc-picker"></div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Equipment</div>
@@ -2405,11 +2408,14 @@ function focusLabel(focus){
   if(!f)return 'Workout';
   const hasSep=/[&,]/.test(f);
   const rawish=/[a-z]_[a-z]|_/.test(f)||/\bSonstige\b/.test(f);
-  if(hasSep&&(rawish||f.split(/\s*[&,]\s*/).length>=4)){
-    const parts=f.split(/\s*[&,]\s*/).map(p=>p.trim()).filter(Boolean);
-    const named=mainMuscles(parts,6).filter(x=>x&&x!=='Sonstige');
+  // Any &/comma-joined list whose parts are known muscle keys gets translated,
+  // so "chest & shoulders & triceps" reads "Brust, Schulter, Trizeps".
+  const parts0=f.split(/\s*[&,]\s*/).map(p=>p.trim()).filter(Boolean);
+  const looksLikeKeys=parts0.length>=2&&parts0.every(p=>MUSCLE_DE[p]||MUSCLE_DE_SHORT[p]||MUSCLE_MAIN?.[p]);
+  if(hasSep&&(rawish||looksLikeKeys||parts0.length>=4)){
+    const named=mainMuscles(parts0,6).filter(x=>x&&x!=='Sonstige');
     if(!named.length)return f;
-    if(named.length>=4||parts.length>=6){
+    if(named.length>=4||parts0.length>=6){
       const focusReg=_deriveFocus(named);
       return focusReg?'Ganzkörper · Fokus '+focusReg:'Ganzkörper';
     }
@@ -3761,8 +3767,15 @@ function _revCardHTML(ex,i){
     <div id="alt-info-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--br);font-size:12px;color:var(--mu)"></div>`;
 }
 function toggleBilateral(idx){
-  if(!curExercises[idx])return;
-  curExercises[idx].bilateral=!curExercises[idx].bilateral;
+  const ex=curExercises[idx];if(!ex)return;
+  const wasBi=!!ex.bilateral;
+  ex.bilateral=!wasBi;
+  // A bilateral rep target counts both sides together, so switching to one-sided
+  // should halve the reference (20 both sides → 10 per side), and back doubles it.
+  if(ex.reps&&(ex.type||'reps')==='reps'){
+    if(wasBi)ex.reps=Math.max(1,Math.round(ex.reps/2));   // bilateral → single
+    else ex.reps=ex.reps*2;                                // single → bilateral
+  }
   _updateRevCard(idx);
 }
 
@@ -3923,6 +3936,12 @@ function toggleBilateralLive(){
   const rk=tRound+'_'+tIdx;
   const wasBi=!!ex.bilateral;
   ex.bilateral=!wasBi;
+  // Adjust the planned rep reference so it stays meaningful per counting mode:
+  // bilateral 20 (both sides) ↔ single 10 (per side).
+  if(ex.reps&&(ex.type||'reps')==='reps'){
+    if(wasBi)ex.reps=Math.max(1,Math.round(ex.reps/2));
+    else ex.reps=ex.reps*2;
+  }
   if(wasBi){
     // L/R -> single: keep the larger side as the value
     const l=tReps[rk+'_L']||0,r=tReps[rk+'_R']||0;
@@ -5736,13 +5755,38 @@ function chatFromPlan(wi,si){
   chatHistory.push({role:'assistant',content:`Bereit für "${sess.focus}"!`});
 }
 
-let sessEditWi=0,sessEditSi=0,sessEditDow2=1,sessEditInt2='medium',sessEditEquip=['bodyweight'],sessEditCount=5;
+let sessEditWi=0,sessEditSi=0,sessEditDow2=1,sessEditInt2='medium',sessEditEquip=['bodyweight'],sessEditCount=5,sessEditFocus=null;
 let sessEditTargetWi=-1; // -1 = no week change
 function openSessEdit(wi,si){
   sessEditWi=wi;sessEditSi=si;sessEditTargetWi=wi;
   const sess=plan.weeks[wi].sessions[si];
   sessEditDow2=sess.dow;sessEditInt2=sess.intensity||'medium';sessEditEquip=sess.equipment?[...sess.equipment]:['bodyweight'];sessEditCount=sess.autoCount?null:(sess.exerciseCount||null);
+  sessEditFocus=sess.focus; // start from the plan's focus for this session
   document.getElementById('sess-wi').value=wi;document.getElementById('sess-si').value=si;document.getElementById('sess-modal-title').textContent=sess.focus;
+  // Focus picker: quick presets + "Plan" to keep the original. Only changes THIS session.
+  const fp=document.getElementById('sess-focus-picker');
+  if(fp){
+    fp.innerHTML='';
+    const planFocus=sess.focus;
+    const presets=[
+      {label:'📋 Wie geplant',val:planFocus,plan:true},
+      {label:'Ganzkörper',val:'Ganzkörper'},
+      {label:'Push (Brust/Schulter/Trizeps)',val:'chest & shoulders & triceps'},
+      {label:'Pull (Rücken/Bizeps)',val:'back & lats & biceps'},
+      {label:'Oberkörper',val:'chest & back & shoulders & arms'},
+      {label:'Unterkörper',val:'legs & glutes & hamstrings & calves'},
+      {label:'Core',val:'core & abs'}
+    ];
+    const paintFocus=()=>fp.querySelectorAll('button').forEach(b=>{const s=b.dataset.val===sessEditFocus;b.style.borderColor=s?'var(--ac)':'var(--br)';b.style.background=s?'rgba(var(--acRGB),.15)':'var(--up)';b.style.color=s?'var(--ac)':'var(--mu)';});
+    presets.forEach(p=>{
+      const b=document.createElement('button');b.dataset.val=p.val;
+      b.textContent=p.label;
+      b.style.cssText='padding:8px 12px;border-radius:9px;border:1.5px solid var(--br);background:var(--up);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)';
+      b.onclick=()=>{sessEditFocus=p.val;paintFocus();};
+      fp.appendChild(b);
+    });
+    paintFocus();
+  }
   const dp=document.getElementById('sess-day-picker');dp.innerHTML='';[1,2,3,4,5,6,0].forEach(dow=>{const d=DAYS[dow];const b=document.createElement('button');b.className='day-pill'+(dow===sessEditDow2?' active':'');b.textContent=d;b.onclick=()=>{sessEditDow2=dow;dp.querySelectorAll('.day-pill').forEach(x=>x.className='day-pill');b.className='day-pill active';};dp.appendChild(b);});
   const ip=document.getElementById('sess-int-picker');ip.innerHTML='';['easy','medium','hard'].forEach(int=>{const b=document.createElement('button');b.className='chip'+(int===sessEditInt2?' '+(int==='easy'?'co':int==='medium'?'am':'hot'):'');b.textContent=INT_LABELS[int];b.onclick=()=>{sessEditInt2=int;ip.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip '+(int==='easy'?'co':int==='medium'?'am':'hot');};ip.appendChild(b);});
   const ep=document.getElementById('sess-equip-picker');ep.innerHTML='';EQUIPMENT.forEach(eq=>{const b=document.createElement('button');const active=sessEditEquip.includes(eq.id);b.className='chip'+(active?' ac':'');b.innerHTML=`${eq.icon} ${eq.label}`;b.onclick=()=>{if(sessEditEquip.includes(eq.id)){if(sessEditEquip.length===1)return;sessEditEquip=sessEditEquip.filter(e=>e!==eq.id);b.className='chip';}else{sessEditEquip=[...sessEditEquip,eq.id];b.className='chip ac';};};ep.appendChild(b);});
@@ -5795,6 +5839,12 @@ function openSessEdit(wi,si){
 function saveSessEdit(){
   if(!plan?.weeks[sessEditWi]?.sessions[sessEditSi])return;
   const s=plan.weeks[sessEditWi].sessions[sessEditSi];
+  // Apply a focus override for this session if the user picked a different one
+  if(sessEditFocus&&sessEditFocus!==s.focus){
+    s.focus=sessEditFocus;
+    // Reset any generated title so it reflects the new focus next time
+    delete s.generatedTitle;
+  }
   s.dow=sessEditDow2;s.intensity=sessEditInt2;s.equipment=[...sessEditEquip];s.location=window._sessLoc||'home';s.exerciseCount=sessEditCount||recommendExercises(s.durationMin||30,s.focus,plan?.goal,s.intensity).count;s.autoCount=!sessEditCount;
   // Manual count -> re-estimate duration so the badge stays honest
   if(sessEditCount){
