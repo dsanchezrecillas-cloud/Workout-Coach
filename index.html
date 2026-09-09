@@ -1137,6 +1137,20 @@ button:active:not(:disabled){transform:scale(.96)}
     <div style="display:flex;gap:7px;margin-bottom:16px" id="sess-loc-picker"></div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Equipment</div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px" id="sess-equip-picker"></div>
+    <div id="sess-kb-detail" style="display:none;background:var(--up);border:1px solid var(--br);border-radius:11px;padding:12px;margin-bottom:18px">
+      <div style="font-size:11px;color:var(--mu);margin-bottom:9px">⚫ Deine Kettlebell — damit passende Übungen gewählt werden</div>
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;align-items:center"><span style="font-size:12px;color:var(--tx)">Anzahl</span>
+          <button onclick="setKbCount(1)" id="kb-c1" class="chip">1</button>
+          <button onclick="setKbCount(2)" id="kb-c2" class="chip">2</button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center"><span style="font-size:12px;color:var(--tx)">Gewicht</span>
+          <button onclick="adjKbWeight(-2)" style="width:28px;height:28px;border-radius:8px;background:var(--card);border:1px solid var(--br);color:var(--mu);font-size:15px">−</button>
+          <span id="kb-weight" style="font-size:14px;font-weight:700;color:var(--tx);min-width:44px;text-align:center;font-family:var(--m)">10 kg</span>
+          <button onclick="adjKbWeight(2)" style="width:28px;height:28px;border-radius:8px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:15px">+</button>
+        </div>
+      </div>
+    </div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px">Anzahl Übungen</div>
     <div style="font-size:11px;color:var(--mu);margin-bottom:4px">Wird aus Dauer, Ziel und Intensität berechnet. Nur ändern, wenn du bewusst mehr oder weniger willst.</div>
     <div id="sess-count-why" style="font-size:11px;color:var(--ac);margin-bottom:10px"></div>
@@ -1175,6 +1189,24 @@ const EQUIPMENT=[
   {id:'bench',label:'Bank / Sofa',icon:'🛋️'},
 ];
 const EQUIP_LABELS={'bodyweight':'Körpergewicht','bar':'Klimmzugstange','dumbbells':'Kurzhanteln','resistance_band':'Widerstandsband','kettlebell':'Kettlebell','bench':'Bank/Sofa'};
+// Kettlebell inventory lives in the profile (gear doesn't change per session).
+// {count:1|2, weight:10}. Used to tell the generator what's actually available.
+function kbConfig(){const p=loadProfile()||{};return p.kettlebell||{count:1,weight:0};}
+function kbLabel(){const k=kbConfig();if(!k||!k.count)return 'Kettlebell';const w=k.weight?(' '+k.weight+' kg'):'';return (k.count>=2?'2× Kettlebell':'1 Kettlebell')+w;}
+// Turn the selected equipment list into a prompt-ready string, expanding
+// kettlebell into how many and how heavy so the AI picks feasible exercises.
+function equipSummary(list){
+  const arr=(list&&list.length)?list:['bodyweight'];
+  return arr.map(e=>{
+    if(e==='kettlebell'){
+      const k=kbConfig();
+      if(!k.count)return 'Kettlebell';
+      const w=k.weight?(k.weight+' kg'):'unbekanntes Gewicht';
+      return k.count>=2?('2 Kettlebells à '+w):('1 Kettlebell ('+w+') — nur einarmige/einseitige KB-Übungen, keine Doppel-KB-Übungen');
+    }
+    return EQUIP_LABELS[e]||e;
+  }).join(', ');
+}
 const GOALS=[
   {id:'fitness',label:'Allgemeine Fitness',desc:'Ausgewogen — Kraft, Ausdauer, Beweglichkeit',icon:'⚡'},
   {id:'strength',label:'Kraft & Muskelaufbau',desc:'Progressive Überlastung, Compound-Bewegungen',icon:'💪'},
@@ -1625,6 +1657,7 @@ const STUDIO_LIB=[
   {name:'Langhantelrudern',muscles:['upper_back','lats','biceps'],gym:true,equip:'barbell',tip:'Vorgebeugt fixieren',details:'Stange zum Bauch, Ellenbogen eng.',mistakes:'Oberkörper aufrichten'},
   {name:'Ausfallschritte (Kurzhantel)',muscles:['quads','glutes'],gym:true,equip:'dumbbells',bilateral:true,tip:'Knie über Ferse',details:'Großer Schritt, hinteres Knie Richtung Boden.',mistakes:'Zu kurzer Schritt'},
   {name:'Goblet Squat',muscles:['quads','glutes'],gym:true,equip:'dumbbells',tip:'Ellenbogen innen',details:'Hantel vor der Brust, tief in die Hocke.',mistakes:'Oberkörper kippt nach vorn'}
+
 ];
 
 // ─── Dehnübungen ──────────────────────────────────────────────────────────────
@@ -1721,6 +1754,17 @@ const DEFAULT_LIB=[
   {name:'Tuck Jump',muscles:['legs','core'],bilateral:false,tip:'Knie zur Brust ziehen',details:'Aus dem Stand hochspringen und Knie zur Brust ziehen. Weich landen.',mistakes:'Keine Kniebewegung'},
   {name:'Skater',muscles:['legs','glutes'],bilateral:true,tip:'Seitlich springen, weich landen',details:'Seitlich von Bein zu Bein springen. Landebein leicht gebeugt.',mistakes:'Aufrecht stehen statt seitlich neigen'},
   {name:'High Knees',muscles:['legs','core'],bilateral:false,tip:'Knie bis Hüfthöhe heben',details:'Auf der Stelle laufen und Knie explosiv wechselnd hoch ziehen.',mistakes:'Oberkörper nach hinten lehnen'},
+  {name:'Kettlebell Swing',muscles:['glutes','hamstrings','back'],equip:'kettlebell',tip:'Kraft aus der Hüfte, nicht den Armen',details:'Hüftbreiter Stand, KB zwischen den Beinen nach hinten pendeln, dann explosiv die Hüfte strecken — die Kugel schwingt bis Brusthöhe. Arme bleiben locker, die Bewegung kommt aus dem Hüftstoß.',mistakes:'Mit den Armen heben statt aus der Hüfte, Rücken rund machen'},
+  {name:'Goblet Squat (Kettlebell)',muscles:['quads','glutes'],equip:'kettlebell',tip:'KB eng an der Brust halten',details:'KB an den Hörnern vor der Brust halten, Ellenbogen innen. Tief in die Hocke, Brust aufrecht, Fersen am Boden.',mistakes:'Oberkörper kippt nach vorn, Fersen heben'},
+  {name:'Einarmiges Kettlebell-Rudern',muscles:['back','lats','biceps'],equip:'kettlebell',bilateral:true,tip:'Schulterblatt zuerst zurückziehen',details:'Vorgebeugt, freie Hand auf Knie oder Bank abstützen, Rücken gerade. KB zur Hüfte ziehen, Ellenbogen eng am Körper.',mistakes:'Mit Schwung reißen, Oberkörper mitdrehen'},
+  {name:'Kettlebell Clean & Press',muscles:['shoulders','legs','back'],equip:'kettlebell',bilateral:true,tip:'Clean und Press in einem Fluss',details:'KB vom Boden in die Racking-Position (an der Schulter) ziehen, dann kontrolliert über Kopf drücken. Ganzkörper-Bewegung.',mistakes:'KB auf den Unterarm knallen lassen'},
+  {name:'Kettlebell Overhead Press',muscles:['shoulders','triceps'],equip:'kettlebell',bilateral:true,tip:'Handgelenk gerade, Ellenbogen unter der Kugel',details:'Aus der Racking-Position an der Schulter senkrecht über Kopf drücken, KB ruht auf der Handaußenseite.',mistakes:'Ins Hohlkreuz ausweichen'},
+  {name:'Kettlebell Goblet Ausfallschritt',muscles:['quads','glutes'],equip:'kettlebell',bilateral:true,tip:'KB an der Brust, Oberkörper aufrecht',details:'KB als Goblet halten, großer Schritt nach vorne oder hinten, hinteres Knie Richtung Boden.',mistakes:'Knie kippt nach innen'},
+  {name:'Kettlebell Deadlift',muscles:['glutes','hamstrings','back'],equip:'kettlebell',tip:'Hüfte zurück, Rücken gerade',details:'KB steht zwischen den Füßen, Hüfte nach hinten schieben, KB mit geradem Rücken aufnehmen und über Hüftstreckung hochkommen.',mistakes:'Aus dem Rücken heben statt aus Hüfte/Beinen'},
+  {name:'Kettlebell Halo',muscles:['shoulders','core'],equip:'kettlebell',tip:'Langsam und kontrolliert',details:'KB an den Hörnern vor dem Gesicht halten, langsam um den Kopf kreisen — eng an der Schädeldecke entlang. Richtung nach jeder Runde wechseln.',mistakes:'Zu großer Radius, Nacken anspannen'},
+  {name:'Türkischer Half Get-up',muscles:['core','shoulders'],equip:'kettlebell',bilateral:true,tip:'Blick immer zur Kugel',details:'Rückenlage, KB mit gestrecktem Arm nach oben. Über den gebeugten gleichseitigen Fuß auf den Ellenbogen, dann auf die Hand aufrichten — Arm bleibt senkrecht. Kontrolliert zurück.',mistakes:'Arm kippt, zu schnell'},
+  {name:'Kettlebell Russian Twist',muscles:['core','obliques'],equip:'kettlebell',tip:'Brust offen, aus dem Rumpf drehen',details:'Sitzend, Oberkörper leicht zurück, Füße angehoben oder am Boden. KB vor der Brust von Seite zu Seite führen.',mistakes:'Nur die Arme bewegen, Rücken rund'}
+
 ];
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -4297,6 +4341,23 @@ function _logHold(i,secs){
   tReps[rk]=secs;
 }
 function exListCur(){return isWU?wuExercises:curExercises;}
+// ── Kettlebell inventory editor (session modal) ──
+function _paintKb(){
+  const k=kbConfig();
+  const c1=document.getElementById('kb-c1'),c2=document.getElementById('kb-c2'),wl=document.getElementById('kb-weight');
+  if(c1)c1.className='chip'+(k.count!==2?' ac':'');
+  if(c2)c2.className='chip'+(k.count===2?' ac':'');
+  if(wl)wl.textContent=(k.weight||0)+' kg';
+}
+function _saveKb(k){const p=loadProfile()||{};p.kettlebell={count:k.count||1,weight:Math.max(0,k.weight||0)};saveProfile(p);_paintKb();}
+function setKbCount(n){const k=kbConfig();_saveKb({count:n,weight:k.weight});}
+function adjKbWeight(d){const k=kbConfig();_saveKb({count:k.count,weight:Math.max(0,(k.weight||0)+d)});}
+function _syncKbDetail(equipList){
+  const box=document.getElementById('sess-kb-detail');if(!box)return;
+  const on=(equipList||[]).includes('kettlebell');
+  box.style.display=on?'block':'none';
+  if(on){const k=kbConfig();if(!k.weight)_saveKb({count:k.count||1,weight:10});else _paintKb();}
+}
 // A hold/timed exercise is defined by its type, not by the absence of a reps
 // field — swap/add can leave a stale reps value, so we must not rely on !reps.
 function isHoldEx(ex){return !!ex&&ex.type!=='reps'&&(ex.type==='hold'||ex.type==='time'||ex.stretch||(!!ex.duration&&!ex.reps));}
@@ -5139,7 +5200,7 @@ function startPlanSession(){
   const isGym=loc==='gym';
   const equip=isGym
     ? 'Fitnessstudio — Maschinen, Kabelzug, Langhantel, SZ-Stange, Kurzhanteln, Squat Rack, verstellbare Bänke'
-    : (sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht');
+    : equipSummary(sess.equipment);
   const rec=recommendExercises(sess.durationMin||30,sess.focus,plan.goal,sess.intensity);
   const count=sess.exerciseCount||rec.count;
   const avoidTxt=(sess.refocused&&sess.avoidMuscles?.length)
@@ -5710,7 +5771,7 @@ async function regenPlanSession(){
 }
 function _startSessAt_legacy(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;
-  const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Nur Körpergewicht';const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);
+  const equip=equipSummary(sess.equipment);const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);
 }
 
 // Leave the review without starting the workout. Goes back to the plan when the
@@ -5736,7 +5797,7 @@ function reviewBackToChat(){
 function chatFromPlan(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;pendingPlanSession={wi,si};chatHistory=[];chatCtx={};
   const week=plan.weeks[wi];
-  const equip=sess.equipment?.length?sess.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '):'Körpergewicht';
+  const equip=equipSummary(sess.equipment);
   show('s-chat');document.getElementById('chat-msgs').innerHTML='';
   const focusClean=sess.focus.split('&').map(p=>p.trim()).map(p=>MUSCLE_DE[p]||MUSCLE_DE_SHORT[p]||p).join(' & ');
   addAIMsg(`Bereit für "${focusClean}"! ${sess.durationMin||30} Minuten, ${INT_LABELS[sess.intensity||'medium']}, ${equip}. Direkt starten oder noch Wünsche?`,['Direkt erstellen','Ich hab noch Wünsche']);
@@ -5789,7 +5850,8 @@ function openSessEdit(wi,si){
   }
   const dp=document.getElementById('sess-day-picker');dp.innerHTML='';[1,2,3,4,5,6,0].forEach(dow=>{const d=DAYS[dow];const b=document.createElement('button');b.className='day-pill'+(dow===sessEditDow2?' active':'');b.textContent=d;b.onclick=()=>{sessEditDow2=dow;dp.querySelectorAll('.day-pill').forEach(x=>x.className='day-pill');b.className='day-pill active';};dp.appendChild(b);});
   const ip=document.getElementById('sess-int-picker');ip.innerHTML='';['easy','medium','hard'].forEach(int=>{const b=document.createElement('button');b.className='chip'+(int===sessEditInt2?' '+(int==='easy'?'co':int==='medium'?'am':'hot'):'');b.textContent=INT_LABELS[int];b.onclick=()=>{sessEditInt2=int;ip.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip '+(int==='easy'?'co':int==='medium'?'am':'hot');};ip.appendChild(b);});
-  const ep=document.getElementById('sess-equip-picker');ep.innerHTML='';EQUIPMENT.forEach(eq=>{const b=document.createElement('button');const active=sessEditEquip.includes(eq.id);b.className='chip'+(active?' ac':'');b.innerHTML=`${eq.icon} ${eq.label}`;b.onclick=()=>{if(sessEditEquip.includes(eq.id)){if(sessEditEquip.length===1)return;sessEditEquip=sessEditEquip.filter(e=>e!==eq.id);b.className='chip';}else{sessEditEquip=[...sessEditEquip,eq.id];b.className='chip ac';};};ep.appendChild(b);});
+  const ep=document.getElementById('sess-equip-picker');ep.innerHTML='';EQUIPMENT.forEach(eq=>{const b=document.createElement('button');const active=sessEditEquip.includes(eq.id);b.className='chip'+(active?' ac':'');b.innerHTML=`${eq.icon} ${eq.label}`;b.onclick=()=>{if(sessEditEquip.includes(eq.id)){if(sessEditEquip.length===1)return;sessEditEquip=sessEditEquip.filter(e=>e!==eq.id);b.className='chip';}else{sessEditEquip=[...sessEditEquip,eq.id];b.className='chip ac';};_syncKbDetail(sessEditEquip);};ep.appendChild(b);});
+  _syncKbDetail(sessEditEquip);
   // Location picker — decides which exercise pool and progression style is used
   const lp=document.getElementById('sess-loc-picker');
   if(lp){
