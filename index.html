@@ -252,6 +252,7 @@ button:active:not(:disabled){transform:scale(.96)}
     <button onclick="startChat()" class="btn btn-ac" style="flex:1">🏋️ Mit Coach trainieren</button>
     <button onclick="showPlan()" style="width:46px;border-radius:13px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0">📅</button>
     <button onclick="openStretchModal()" title="Dehn-Session" style="width:52px;padding:15px 0;border-radius:13px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.3);color:#38bdf8;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0">🧘</button>
+    <button onclick="openPresetWorkouts()" title="Fertige Workouts" style="width:52px;padding:15px 0;border-radius:13px;background:rgba(var(--amRGB),.12);border:1px solid rgba(var(--amRGB),.3);color:var(--am);font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0">⚡</button>
   </div>
   <div style="display:flex;gap:8px">
     <button onclick="showHistory()" id="hist-btn" style="display:none;flex:1;padding:13px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">📋 Verlauf</button>
@@ -898,6 +899,11 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
   <div id="analytics-content"></div>
   <div id="progress-block"></div>
+  <div style="margin-top:22px">
+    <button onclick="runProgressAnalysis()" id="prog-analyze-btn" style="width:100%;padding:14px;border-radius:13px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.3);color:var(--ac);font-size:14px;font-weight:600;font-family:var(--f)">✦ KI-Fortschritts-Analyse</button>
+    <div style="font-size:11px;color:var(--mu);text-align:center;margin-top:7px">Wertet deinen Verlauf aus und schlägt konkret vor, wie du weiter progressiv steigerst.</div>
+    <div id="prog-analysis" style="margin-top:14px"></div>
+  </div>
 </div>
 
 <div class="modal-ov" id="modal-weight">
@@ -935,6 +941,32 @@ button:active:not(:disabled){transform:scale(.96)}
       <div style="flex:1"><div style="font-size:10px;color:var(--mu);letter-spacing:.08em;font-weight:600;text-transform:uppercase;margin-bottom:5px">Deadline</div><input id="ch-deadline" type="date" class="inp"/></div>
     </div>
     <button onclick="saveNewChallenge()" class="btn btn-ac">Challenge starten</button>
+  </div>
+</div>
+
+<!-- MODAL: Import workout from text -->
+<div class="modal-ov" id="modal-import">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700">📥 Workout importieren</div>
+      <button aria-label="Schließen" onclick="closeModal('modal-import')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--mu);line-height:1.5;margin-bottom:12px">Kopier den Text eines Workouts (z.B. die TikTok-/Instagram-Caption) und füg ihn hier ein. Die KI baut daraus ein Workout, das du danach anpassen kannst.</div>
+    <textarea id="import-text" class="inp" placeholder="z.B.&#10;30 MIN AMRAP&#10;• 5 Pullover&#10;• 5 Curls&#10;• 10 Rows – 5 pro Seite&#10;..." style="resize:none;height:150px;font-size:13px;margin-bottom:10px;line-height:1.5"></textarea>
+    <button onclick="runImportWorkout()" id="import-btn" class="btn btn-ac" style="width:100%;padding:13px;font-size:14px">Workout erstellen</button>
+    <div id="import-status" style="font-size:12px;color:var(--mu);text-align:center;margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- MODAL: Preset (ready-made) workouts -->
+<div class="modal-ov" id="modal-presets">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700">⚡ Fertige Workouts</div>
+      <button aria-label="Schließen" onclick="closeModal('modal-presets')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--mu);line-height:1.5;margin-bottom:12px">Bewährte Workouts zum sofort Loslegen. Du kannst danach alles anpassen.</div>
+    <div id="preset-list"></div>
   </div>
 </div>
 
@@ -1135,21 +1167,14 @@ button:active:not(:disabled){transform:scale(.96)}
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px" id="sess-focus-picker"></div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Wo trainierst du?</div>
     <div style="display:flex;gap:7px;margin-bottom:16px" id="sess-loc-picker"></div>
-    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Equipment</div>
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px">Equipment</div>
+    <div style="font-size:11px;color:var(--mu);margin-bottom:10px">Körpergewicht ist immer dabei — wähl zusätzlich alles aus, was du gerade da hast.</div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px" id="sess-equip-picker"></div>
     <div id="sess-kb-detail" style="display:none;background:var(--up);border:1px solid var(--br);border-radius:11px;padding:12px;margin-bottom:18px">
-      <div style="font-size:11px;color:var(--mu);margin-bottom:9px">⚫ Deine Kettlebell — damit passende Übungen gewählt werden</div>
-      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-        <div style="display:flex;gap:6px;align-items:center"><span style="font-size:12px;color:var(--tx)">Anzahl</span>
-          <button onclick="setKbCount(1)" id="kb-c1" class="chip">1</button>
-          <button onclick="setKbCount(2)" id="kb-c2" class="chip">2</button>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center"><span style="font-size:12px;color:var(--tx)">Gewicht</span>
-          <button onclick="adjKbWeight(-2)" style="width:28px;height:28px;border-radius:8px;background:var(--card);border:1px solid var(--br);color:var(--mu);font-size:15px">−</button>
-          <span id="kb-weight" style="font-size:14px;font-weight:700;color:var(--tx);min-width:44px;text-align:center;font-family:var(--m)">10 kg</span>
-          <button onclick="adjKbWeight(2)" style="width:28px;height:28px;border-radius:8px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:15px">+</button>
-        </div>
-      </div>
+      <div style="font-size:11px;color:var(--mu);margin-bottom:9px">⚫ Deine Kettlebells</div>
+      <div id="kb-list" style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px"></div>
+      <button onclick="addKb()" style="width:100%;padding:9px;border-radius:9px;background:rgba(var(--acRGB),.1);border:1px solid rgba(var(--acRGB),.26);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">+ Kettlebell hinzufügen</button>
+      <div style="font-size:11px;color:var(--mu);margin-top:9px;line-height:1.5">Trag jede Kettlebell mit ihrem Gewicht ein. Die App wählt je Übung ein passendes Gewicht — und weiß, dass Doppel-KB-Übungen nur mit zwei gleich schweren gehen. Das tatsächliche Gewicht bestätigst du beim Training.</div>
     </div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px">Anzahl Übungen</div>
     <div style="font-size:11px;color:var(--mu);margin-bottom:4px">Wird aus Dauer, Ziel und Intensität berechnet. Nur ändern, wenn du bewusst mehr oder weniger willst.</div>
@@ -1181,7 +1206,7 @@ const INT_COLORS={easy:'var(--co)',medium:'var(--am)',hard:'var(--hot)'};
 const MUSCLE_DE={chest:'Brust',back:'Rücken',shoulders:'Schultern',arms:'Arme',core:'Core',glutes:'Gesäß',legs:'Beine',fullbody:'Ganzkörper',biceps:'Bizeps',triceps:'Trizeps',quads:'Quadrizeps',hamstrings:'Hamstrings',calves:'Waden',lats:'Latissimus',abs:'Bauch',lower_back:'Unterer Rücken',upper_back:'Oberer Rücken',hip_flexors:'Hüftbeuger',inner_thighs:'Innenschenkel',rear_shoulders:'Hintere Schulter'};
 
 const EQUIPMENT=[
-  {id:'bodyweight',label:'Nur Körpergewicht',icon:'🤸'},
+  {id:'bodyweight',label:'Körpergewicht',icon:'🤸'},
   {id:'bar',label:'Klimmzugstange',icon:'🏋️'},
   {id:'dumbbells',label:'Kurzhanteln',icon:'💪'},
   {id:'resistance_band',label:'Widerstandsband',icon:'🪢'},
@@ -1191,18 +1216,38 @@ const EQUIPMENT=[
 const EQUIP_LABELS={'bodyweight':'Körpergewicht','bar':'Klimmzugstange','dumbbells':'Kurzhanteln','resistance_band':'Widerstandsband','kettlebell':'Kettlebell','bench':'Bank/Sofa'};
 // Kettlebell inventory lives in the profile (gear doesn't change per session).
 // {count:1|2, weight:10}. Used to tell the generator what's actually available.
-function kbConfig(){const p=loadProfile()||{};return p.kettlebell||{count:1,weight:0};}
-function kbLabel(){const k=kbConfig();if(!k||!k.count)return 'Kettlebell';const w=k.weight?(' '+k.weight+' kg'):'';return (k.count>=2?'2× Kettlebell':'1 Kettlebell')+w;}
+// Kettlebell inventory: a list of the weights you own, e.g. [10,16,24].
+// Migrates the old {count,weight} shape. Empty list = has a KB but weight unset.
+function kbConfig(){
+  const p=loadProfile()||{};
+  const k=p.kettlebell;
+  if(!k)return {weights:[]};
+  if(Array.isArray(k.weights))return {weights:k.weights.slice().sort((a,b)=>a-b)};
+  // migrate {count,weight}
+  const ws=[];const wt=k.weight||0;const n=k.count||1;for(let i=0;i<n;i++)if(wt)ws.push(wt);
+  return {weights:ws};
+}
+function kbWeights(){return kbConfig().weights;}
+function saveKbWeights(ws){const p=loadProfile()||{};p.kettlebell={weights:ws.filter(w=>w>0).sort((a,b)=>a-b)};saveProfile(p);}
+// The weight to pre-fill for a KB exercise: the lightest owned (safe default).
+function kbDefaultWeight(){const ws=kbWeights();return ws.length?ws[0]:0;}
+function kbLabel(){const ws=kbWeights();if(!ws.length)return 'Kettlebell';return ws.length+'× Kettlebell ('+ws.join(', ')+' kg)';}
 // Turn the selected equipment list into a prompt-ready string, expanding
 // kettlebell into how many and how heavy so the AI picks feasible exercises.
 function equipSummary(list){
   const arr=(list&&list.length)?list:['bodyweight'];
   return arr.map(e=>{
     if(e==='kettlebell'){
-      const k=kbConfig();
-      if(!k.count)return 'Kettlebell';
-      const w=k.weight?(k.weight+' kg'):'unbekanntes Gewicht';
-      return k.count>=2?('2 Kettlebells à '+w):('1 Kettlebell ('+w+') — nur einarmige/einseitige KB-Übungen, keine Doppel-KB-Übungen');
+      const ws=kbWeights();
+      if(!ws.length)return 'Kettlebell (Gewicht unbekannt)';
+      // Are there at least two of the same weight? (needed for real double-KB work)
+      const counts={};ws.forEach(w=>counts[w]=(counts[w]||0)+1);
+      const pair=Object.entries(counts).filter(([,c])=>c>=2).map(([w])=>w+' kg');
+      let s='Kettlebells vorhanden: '+ws.map(w=>w+' kg').join(', ')+'. Wähle je Übung ein passendes Gewicht aus diesem Bestand';
+      if(ws.length===1)s+=' — nur EINE KB, also ausschließlich einarmige/einseitige KB-Übungen, keine Doppel-KB-Übungen.';
+      else if(pair.length)s+=`. Doppel-KB-Übungen nur mit gleichem Paar möglich (${pair.join(' oder ')}).`;
+      else s+='. Es gibt keine zwei gleich schweren — daher KEINE Doppel-KB-Übungen mit gleichem Gewicht, nur einarmige/einseitige Varianten.';
+      return s;
     }
     return EQUIP_LABELS[e]||e;
   }).join(', ');
@@ -1725,21 +1770,17 @@ const DEFAULT_LIB=[
   {name:'Plank',muscles:['core'],bilateral:false,tip:'Körper gerade wie ein Brett',details:'Unterarme und Zehen. Hüfte weder hoch noch runter. Bauch fest.',mistakes:'Hüfte zu hoch oder hängend'},
   {name:'Dead Bug',muscles:['core'],bilateral:false,tip:'Rücken bleibt flach am Boden',details:'Abwechselnd Arm und gegenüberliegendes Bein strecken.',mistakes:'Lendenwirbel hebt sich'},
   {name:'Mountain Climber',muscles:['core','chest'],bilateral:false,tip:'Hüfte ruhig halten',details:'Aus Plank. Knie abwechselnd zur Brust.',mistakes:'Hüfte wippt'},
-  {name:'Superman',muscles:['back'],bilateral:false,tip:'Arme und Beine heben',details:'Bauchlage. Gleichzeitig Arme und Beine heben.',mistakes:'Nacken überstrecken'},
-  {name:'Bird Dog',muscles:['back','core'],bilateral:true,tip:'Gegenüberliegend Arm+Bein',details:'Vierfüßlerstand. Arm und gegenüberliegendes Bein 2 Sek halten.',mistakes:'Rotation in der Hüfte'},
   {name:'Klimmzug',muscles:['back','arms'],bilateral:false,tip:'Schulterblätter zusammenziehen',details:'Aus hängen Brust zur Stange.',mistakes:'Mit Schwung hoch'},
   {name:'Negativer Klimmzug',muscles:['back','arms'],bilateral:false,tip:'3 Sek kontrolliert runter',details:'Oben starten. 3-5 Sek absenken.',mistakes:'Zu schnell fallen'},
   {name:'Ausfallschritt',muscles:['legs','glutes'],bilateral:true,tip:'Knie über Zehe',details:'Schritt vor. Knie beider Beine 90°.',mistakes:'Knie kippt innen'},
   {name:'Reverse Lunge',muscles:['legs','glutes'],bilateral:true,tip:'Schritt nach hinten',details:'Rückwärtiger Ausfallschritt. Knieschonender.',mistakes:'Oberkörper neigt vor'},
   {name:'Glute Kick-back',muscles:['glutes'],bilateral:true,tip:'Gesäß kontrahieren',details:'Vierfüßlerstand. Bein nach hinten oben strecken.',mistakes:'Lendenwirbel überstrecken'},
-  {name:'Pike Push-up',muscles:['shoulders'],bilateral:false,tip:'Hüfte hoch, Kopf zur Matte',details:'A-Form. Kopf zwischen Hände.',mistakes:'Hüfte sinkt ab'},
   {name:'Shoulder Tap',muscles:['core','chest'],bilateral:false,tip:'Hüfte ruhig',details:'Push-up Position. Schulter abwechselnd antippen.',mistakes:'Hüfte rotiert'},
   {name:'Tricep Dip',muscles:['arms'],bilateral:false,tip:'Ellbogen nach hinten',details:'Hände auf Bank. Absenken bis 90°.',mistakes:'Ellbogen flaren'},
   {name:'Renegade Row',muscles:['back','arms','core'],bilateral:true,tip:'Hüfte ruhig, Core fest',details:'Push-up Position. Abwechselnd zur Hüfte ziehen.',mistakes:'Hüfte rotiert'},
   {name:'Wall Sit',muscles:['legs'],bilateral:false,tip:'Oberschenkel parallel',details:'Rücken an Wand, Beine 90°. Halten.',mistakes:'Knie über Zehen'},
   {name:'Hip Thrust',muscles:['glutes'],bilateral:false,tip:'Schultern auf Bank',details:'Schulterblätter auf Sofa. Hüfte heben und kontrahieren.',mistakes:'Lendenwirbel überstrecken'},
   {name:'Russian Twist',muscles:['core'],bilateral:false,tip:'Rumpf rotieren',details:'Sitzen, Beine angehoben. Oberkörper rotieren.',mistakes:'Mit Armen schwingen'},
-  {name:'Hollow Body Hold',muscles:['core'],bilateral:false,tip:'Lendenwirbel am Boden',details:'Arme über Kopf, Beine heben. Halten.',mistakes:'Lendenwirbel hebt sich'},
   {name:'Diamond Push-up',muscles:['arms','chest'],bilateral:false,tip:'Hände bilden Diamant',details:'Hände eng unter Brust. Trizeps-Fokus.',mistakes:'Hüfte hängt'},
   {name:'Lateral Raise',muscles:['shoulders'],bilateral:false,tip:'Arme bis Schulterhöhe',details:'Leichte Hanteln. Seitlich heben.',mistakes:'Traps übernehmen'},
   {name:'Bicep Curl',muscles:['arms'],bilateral:true,tip:'Ellbogen bleibt am Körper',details:'Hantel oder Band. Unterarm heben.',mistakes:'Mit Körper helfen'},
@@ -1763,7 +1804,16 @@ const DEFAULT_LIB=[
   {name:'Kettlebell Deadlift',muscles:['glutes','hamstrings','back'],equip:'kettlebell',tip:'Hüfte zurück, Rücken gerade',details:'KB steht zwischen den Füßen, Hüfte nach hinten schieben, KB mit geradem Rücken aufnehmen und über Hüftstreckung hochkommen.',mistakes:'Aus dem Rücken heben statt aus Hüfte/Beinen'},
   {name:'Kettlebell Halo',muscles:['shoulders','core'],equip:'kettlebell',tip:'Langsam und kontrolliert',details:'KB an den Hörnern vor dem Gesicht halten, langsam um den Kopf kreisen — eng an der Schädeldecke entlang. Richtung nach jeder Runde wechseln.',mistakes:'Zu großer Radius, Nacken anspannen'},
   {name:'Türkischer Half Get-up',muscles:['core','shoulders'],equip:'kettlebell',bilateral:true,tip:'Blick immer zur Kugel',details:'Rückenlage, KB mit gestrecktem Arm nach oben. Über den gebeugten gleichseitigen Fuß auf den Ellenbogen, dann auf die Hand aufrichten — Arm bleibt senkrecht. Kontrolliert zurück.',mistakes:'Arm kippt, zu schnell'},
-  {name:'Kettlebell Russian Twist',muscles:['core','obliques'],equip:'kettlebell',tip:'Brust offen, aus dem Rumpf drehen',details:'Sitzend, Oberkörper leicht zurück, Füße angehoben oder am Boden. KB vor der Brust von Seite zu Seite führen.',mistakes:'Nur die Arme bewegen, Rücken rund'}
+  {name:'Kettlebell Russian Twist',muscles:['core','obliques'],equip:'kettlebell',tip:'Brust offen, aus dem Rumpf drehen',details:'Sitzend, Oberkörper leicht zurück, Füße angehoben oder am Boden. KB vor der Brust von Seite zu Seite führen.',mistakes:'Nur die Arme bewegen, Rücken rund'},
+  {name:'Kettlebell Pullover',muscles:['lats','chest','core'],equip:'kettlebell',tip:'Rippen unten, Core fest',details:'Rückenlage, KB mit beiden Händen über der Brust. Arme fast gestreckt hinter den Kopf senken — nur so weit, wie es die Schulterbeweglichkeit erlaubt — und zurück.',mistakes:'Ins Hohlkreuz fallen, zu weit nach hinten'},
+  {name:'Kettlebell Curl',muscles:['biceps','forearms'],equip:'kettlebell',tip:'Ellenbogen eng am Körper',details:'KB an den Hörnern oder am Griff halten, aus dem Ellenbogen curlen, Oberarm ruhig. Kontrolliert ablassen.',mistakes:'Mit Schwung aus der Hüfte'},
+  {name:'Kettlebell Crush Press',muscles:['chest','triceps'],equip:'kettlebell',tip:'KB fest zusammendrücken',details:'Rückenlage oder Stand, KB an den Seiten fest zusammenpressen (Brustspannung) und nach vorne/oben strecken. Spannung die ganze Zeit halten.',mistakes:'Druck nachlassen'},
+  {name:'Kettlebell Horn Push-up',muscles:['chest','triceps','core'],equip:'kettlebell',tip:'Handgelenke stabil',details:'Liegestütz mit beiden Händen an den Hörnern der KB — enger Griff, mehr Trizeps und tiefe Brustaktivierung. Körper in einer Linie.',mistakes:'Hüfte durchhängen, KB wackelt'},
+  {name:'Kettlebell Reverse Lunge',muscles:['quads','glutes'],equip:'kettlebell',bilateral:true,tip:'KB als Goblet oder einseitig',details:'Aus dem Stand großer Schritt nach hinten, hinteres Knie Richtung Boden, kontrolliert zurück. KB vor der Brust oder auf einer Seite.',mistakes:'Vorderes Knie kippt nach innen'},
+  {name:'Toes-to-Bar / Knee Raise',muscles:['core','abs','lats'],equip:'bar',tip:'Aus dem Bauch, nicht schwingen',details:'An der Klimmzugstange hängen, Knie (oder gestreckte Beine) kontrolliert Richtung Brust/Stange ziehen. Ohne Schwung.',mistakes:'Mit Körperschwung arbeiten'},
+  {name:'Hängendes Beinheben',muscles:['core','abs'],equip:'bar',tip:'Schulterblätter aktiv',details:'An der Stange hängen, Beine gestreckt oder gebeugt bis mindestens Hüfthöhe anheben, langsam senken.',mistakes:'Pendeln, mit Schwung reißen'}
+
+
 
 ];
 
@@ -2093,6 +2143,53 @@ async function fetchCoach(force){
     try{localStorage.setItem('coach_cache',JSON.stringify({key:cacheKey,message:obj.message,tip:obj.tip}));}catch{}
   }catch(e){document.getElementById('c-text').textContent='Coach: '+e.message;}
   document.getElementById('c-spinner').style.display='none';
+}
+
+// ─── AI progress analysis (on-demand, history-aware) ─────────────────────────
+// Uses the model's sports-science knowledge applied to the user's real logs.
+// Not a live web search — it reasons over what you've actually done.
+async function runProgressAnalysis(){
+  if(!loadKey()){showErr('Dafür brauchst du einen API-Key (Einstellungen).');return;}
+  if(!log.length){document.getElementById('prog-analysis').innerHTML='<div style="font-size:13px;color:var(--mu);text-align:center;padding:12px">Noch keine Trainings zum Auswerten.</div>';return;}
+  const btn=document.getElementById('prog-analyze-btn');btn.textContent='Analysiere\u2026';btn.disabled=true;
+  const out=document.getElementById('prog-analysis');out.innerHTML='';
+  try{
+    const perEx={};
+    log.slice(-40).forEach(w=>{
+      if(w.stretch)return;
+      (w.exercises||[]).forEach((ex,i)=>{
+        if(ex.warmup)return;
+        let reps=0,secs=0,wt=0;
+        for(let s=1;s<=(ex.sets||1);s++){
+          const b='_'+i+'_s'+s;
+          Object.entries(w.repLog||{}).forEach(([k,v])=>{
+            if(new RegExp('^\\d+'+b+'$').test(k))reps+=v;
+            else if(new RegExp('^\\d+'+b+'_[LR]$').test(k))reps+=v;
+            else if(new RegExp('^\\d+'+b+'_sec').test(k))secs=Math.max(secs,v);
+            else if(new RegExp('^\\d+'+b+'_w$').test(k))wt=Math.max(wt,v);
+          });
+        }
+        (perEx[ex.name]=perEx[ex.name]||[]).push({date:w.date.slice(0,10),reps,secs,wt,rpe:ex._rpe});
+      });
+    });
+    const trend=Object.entries(perEx).filter(([,v])=>v.length>=2).slice(0,12)
+      .map(([n,v])=>{const f=v[0],l=v[v.length-1];const fmt=x=>x.secs?x.secs+'s':x.reps+'Wdh'+(x.wt?('@'+x.wt+'kg'):'');return n+': '+fmt(f)+' \u2192 '+fmt(l)+' ('+v.length+'\u00d7)';}).join('\n');
+    const goalTxt=plan?(GOALS.find(g=>g.id===plan.goal)||{}).label||'Fitness':'Fitness';
+    const kbW=kbWeights();const kbTxt=kbW.length?('Verf\u00fcgbare Kettlebells: '+kbW.map(w=>w+'kg').join(', ')+'. Progression bei nur einem Gewicht \u00fcber Wdh/Tempo, sonst n\u00e4chstschwerere KB.'):'';
+    const prompt='Du bist Trainingswissenschaftler. Analysiere den echten Trainingsverlauf und gib eine konkrete, progressive Empfehlung. Ziel: '+goalTxt+'. '+kbTxt+'\nVERLAUF (Entwicklung je \u00dcbung, erste\u2192letzte Werte):\n'+(trend||'Zu wenig wiederholte \u00dcbungen f\u00fcr einen Trend.')+'\n\nGESAMT: '+log.length+' Trainings.\n\nAntworte NUR mit JSON, konkret und ohne Floskeln, alles auf Deutsch:\n{"fortschritt":"1-2 S\u00e4tze: wo klare Steigerung sichtbar ist","plateau":"1-2 S\u00e4tze: welche \u00dcbung(en) stagnieren + warum wahrscheinlich","naechste_schritte":["3-4 konkrete Progressions-Schritte f\u00fcr die n\u00e4chsten Wochen \u2014 \u00dcbungsname + konkrete Zahl"],"tipp":"1 sportwissenschaftlicher Tipp passend zur Situation"}';
+    const raw=await callAPI([{role:'user',content:prompt}],900);
+    let obj;
+    try{const m=raw.match(/\{[\s\S]*\}/);obj=JSON.parse(m?m[0]:raw);}catch{obj=extractJSON(raw)||{};}
+    if(Array.isArray(obj))obj=obj[0]||{};
+    const card=(title,body,color)=>'<div style="background:var(--card);border:1px solid var(--br);border-radius:12px;padding:13px 14px;margin-bottom:9px"><div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:'+(color||'var(--ac)')+';margin-bottom:6px">'+title+'</div><div style="font-size:13px;color:var(--tx);line-height:1.6">'+body+'</div></div>';
+    let h='';
+    if(obj.fortschritt)h+=card('\u2197 Fortschritt',obj.fortschritt,'var(--co)');
+    if(obj.plateau)h+=card('\u23f8 Plateau',obj.plateau,'var(--am)');
+    if(Array.isArray(obj.naechste_schritte)&&obj.naechste_schritte.length)h+=card('N\u00e4chste Schritte','<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px">'+obj.naechste_schritte.map(s=>'<li>'+s+'</li>').join('')+'</ul>');
+    if(obj.tipp)h+=card('\ud83d\udca1 Sportwissenschaft',obj.tipp);
+    out.innerHTML=h||'<div style="font-size:13px;color:var(--mu)">Keine Analyse m\u00f6glich.</div>';
+  }catch(e){out.innerHTML='<div style="font-size:13px;color:var(--am);text-align:center;padding:10px">Fehler: '+e.message+'</div>';}
+  finally{btn.textContent='\u2726 KI-Fortschritts-Analyse';btn.disabled=false;}
 }
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────
@@ -2861,6 +2958,16 @@ WANN Supersatz: antagonistische Paare (Drücken+Ziehen, Quads+Hamstrings) — sp
       }
     }
     if(_isGymWorkout)exArr.forEach(ex=>{if(!ex.warmup&&ex.trackWeight===undefined)ex.trackWeight=true;});
+    // Kettlebell / dumbbell exercises track weight by default, pre-filled with
+    // the user's default KB weight so logging what you actually lifted is one tap.
+    exArr.forEach(ex=>{
+      if(ex.warmup||ex.trackWeight!==undefined)return;
+      const n=(ex.name||'').toLowerCase();
+      if(ex.equip==='kettlebell'||ex.equip==='dumbbells'||/kettlebell|kurzhantel|goblet|hantel|clean|snatch|swing/.test(n)){
+        ex.trackWeight=true;
+        if(ex.equip==='kettlebell'||/kettlebell|swing|goblet/.test(n)){const dw=kbDefaultWeight();if(dw)ex.defaultWeight=dw;}
+      }
+    });
     exArr.forEach(ex=>{
       if(ex.cooldown){ex.type='hold';ex.sets=1;ex.stretch=true;ex.warmup=false;if(!ex.duration||ex.duration<20)ex.duration=35;}
       let s=parseInt(ex.sets);
@@ -3906,6 +4013,12 @@ function applySwap(ex){
   };
   if(isHold){delete merged.reps;merged.sets=old.sets||1;}
   else delete merged.stretch;
+  // Kettlebell/dumbbell swap-in: track weight, pre-fill KB default
+  const nn=(ex.name||'').toLowerCase();
+  if(ex.equip==='kettlebell'||ex.equip==='dumbbells'||/kettlebell|kurzhantel|goblet|swing|clean|snatch/.test(nn)){
+    merged.trackWeight=true;
+    if(ex.equip==='kettlebell'||/kettlebell|swing|goblet/.test(nn)){const dw=kbDefaultWeight();if(dw)merged.defaultWeight=dw;}
+  }
   // …but if you've done THIS exercise before, prefer your own last numbers,
   // so a swap remembers your history instead of copying the slot blindly.
   const last=lastPerformance(ex.name);
@@ -4245,7 +4358,7 @@ function updateTimer(){
     if(wi2){
       const showW=tStatus==='rest'&&!isWU&&(curExercises[tIdx]?.trackWeight);
       wi2.style.display=showW?'block':'none';
-      if(showW){const wRk=tRound+'_'+tIdx+'_s'+tSet+'_w';const wEl=document.getElementById('weight-n');if(wEl)wEl.value=tReps[wRk]||0;}
+      if(showW){const wRk=tRound+'_'+tIdx+'_s'+tSet+'_w';const wEl=document.getElementById('weight-n');if(wEl)wEl.value=tReps[wRk]||curExercises[tIdx]?.defaultWeight||0;}
     }
     if(tStatus==='rest'){
     const isBi=ex.bilateral===true;
@@ -4342,21 +4455,26 @@ function _logHold(i,secs){
 }
 function exListCur(){return isWU?wuExercises:curExercises;}
 // ── Kettlebell inventory editor (session modal) ──
-function _paintKb(){
-  const k=kbConfig();
-  const c1=document.getElementById('kb-c1'),c2=document.getElementById('kb-c2'),wl=document.getElementById('kb-weight');
-  if(c1)c1.className='chip'+(k.count!==2?' ac':'');
-  if(c2)c2.className='chip'+(k.count===2?' ac':'');
-  if(wl)wl.textContent=(k.weight||0)+' kg';
+function renderKbList(){
+  const el=document.getElementById('kb-list');if(!el)return;
+  const ws=kbWeights();
+  if(!ws.length){el.innerHTML='<div style="font-size:12px;color:var(--mu);padding:2px 0">Noch keine Kettlebell eingetragen.</div>';return;}
+  el.innerHTML=ws.map((w,i)=>`<div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:16px">⚫</span>
+    <button onclick="adjKbAt(${i},-2)" style="width:28px;height:28px;border-radius:8px;background:var(--card);border:1px solid var(--br);color:var(--mu);font-size:15px">−</button>
+    <span style="font-size:14px;font-weight:700;color:var(--tx);min-width:52px;text-align:center;font-family:var(--m)">${w} kg</span>
+    <button onclick="adjKbAt(${i},2)" style="width:28px;height:28px;border-radius:8px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:15px">+</button>
+    <button onclick="removeKb(${i})" aria-label="Entfernen" style="margin-left:auto;width:28px;height:28px;border-radius:8px;background:rgba(var(--hotRGB),.08);border:1px solid rgba(var(--hotRGB),.24);color:var(--hot);font-size:13px">✕</button>
+  </div>`).join('');
 }
-function _saveKb(k){const p=loadProfile()||{};p.kettlebell={count:k.count||1,weight:Math.max(0,k.weight||0)};saveProfile(p);_paintKb();}
-function setKbCount(n){const k=kbConfig();_saveKb({count:n,weight:k.weight});}
-function adjKbWeight(d){const k=kbConfig();_saveKb({count:k.count,weight:Math.max(0,(k.weight||0)+d)});}
+function addKb(){const ws=kbWeights();ws.push(ws.length?ws[ws.length-1]:10);saveKbWeights(ws);renderKbList();}
+function removeKb(i){const ws=kbWeights();ws.splice(i,1);saveKbWeights(ws);renderKbList();}
+function adjKbAt(i,d){const ws=kbWeights();if(ws[i]==null)return;ws[i]=Math.max(2,ws[i]+d);saveKbWeights(ws);renderKbList();}
 function _syncKbDetail(equipList){
   const box=document.getElementById('sess-kb-detail');if(!box)return;
   const on=(equipList||[]).includes('kettlebell');
   box.style.display=on?'block':'none';
-  if(on){const k=kbConfig();if(!k.weight)_saveKb({count:k.count||1,weight:10});else _paintKb();}
+  if(on){if(!kbWeights().length)saveKbWeights([10]);renderKbList();}
 }
 // A hold/timed exercise is defined by its type, not by the absence of a reps
 // field — swap/add can leave a stale reps value, so we must not rely on !reps.
@@ -5188,6 +5306,48 @@ function recommendExercises(durationMin,focus,goal,intensity){
   return {count:Math.max(2,Math.min(max,n)),superset,sets,rest,perExMin:Math.round(perEx/60*10)/10};
 }
 
+// Compact digest of what the user actually did for the muscles in this focus,
+// so the generator can build progressively (heavier/more reps than last time)
+// instead of starting from scratch each session.
+function historyDigest(focus,maxItems){
+  if(!log?.length)return '';
+  const focusMs=new Set(String(focus||'').split(/\s*[&,]\s*/).map(p=>p.trim()).filter(Boolean));
+  // Most-recent performance per exercise that overlaps the focus
+  const seen={};
+  for(let k=log.length-1;k>=0;k--){
+    const w=log[k];if(w.stretch)continue;
+    (w.exercises||[]).forEach((ex,i)=>{
+      if(ex.warmup||seen[ex.name])return;
+      const overlaps=!focusMs.size||(ex.muscles||[]).some(m=>focusMs.has(m));
+      if(!overlaps)return;
+      // reps per set
+      const sets=[];let secs=0,wt=0;
+      for(let s=1;s<=(ex.sets||1);s++){
+        const base=w.id!=null?null:null;const rk=(w.repLog?[Object.keys(w.repLog).find(kk=>new RegExp('^\\d+_'+i+'_s'+s+'$').test(kk))]:[])[0];
+        const uni=rk?w.repLog[rk]:0;
+        const l=w.repLog?.[Object.keys(w.repLog).find(kk=>new RegExp('^\\d+_'+i+'_s'+s+'_L$').test(kk))||'']||0;
+        const r=w.repLog?.[Object.keys(w.repLog).find(kk=>new RegExp('^\\d+_'+i+'_s'+s+'_R$').test(kk))||'']||0;
+        const secK=Object.keys(w.repLog||{}).find(kk=>new RegExp('^\\d+_'+i+'_s'+s+'_sec').test(kk));
+        if(secK)secs=Math.max(secs,w.repLog[secK]||0);
+        const wK=Object.keys(w.repLog||{}).find(kk=>new RegExp('^\\d+_'+i+'_s'+s+'_w$').test(kk));
+        if(wK)wt=Math.max(wt,w.repLog[wK]||0);
+        const v=uni||Math.max(l,r);if(v>0)sets.push(v);
+      }
+      const rpe=ex._rpe;
+      let desc='';
+      if(secs>0)desc=secs+'s gehalten';
+      else if(sets.length)desc=sets.join('/')+' Wdh';
+      else return;
+      if(wt>0)desc+=' @ '+wt+'kg';
+      if(rpe!==undefined)desc+=rpe<=2?' (leicht)':rpe<=5?' (mittel)':' (schwer)';
+      seen[ex.name]=desc;
+    });
+  }
+  const items=Object.entries(seen).slice(0,maxItems||8);
+  if(!items.length)return '';
+  return '\nBISHERIGE LEISTUNG (letzte Werte je Übung — baue PROGRESSIV darauf auf: bei "leicht/mittel" etwas mehr Wdh oder Gewicht ansetzen, bei "schwer" die Last halten und erst festigen; nutze wo möglich dieselben Übungen, damit Fortschritt vergleichbar bleibt):\n'+items.map(([n,d])=>`- ${n}: ${d}`).join('\n');
+}
+
 function startPlanSession(){
   if(!pendingPlanSession||!plan)return;
   const wi=pendingPlanSession.wi;
@@ -5225,7 +5385,7 @@ function startPlanSession(){
   const weekNote=week.note?` Wochenziel: ${week.note}`:'';
   const goalTxt=GOALS.find(g=>g.id===(plan.goal||'fitness'))?.label||'Fitness';
   const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.
-PLANKONTEXT — Ziel des Plans: ${goalTxt}. ${phase}${weekNote} ${doseTxt}${locTxt}${avoidTxt}${coolTxt}${ssHint}`;
+PLANKONTEXT — Ziel des Plans: ${goalTxt}. ${phase}${weekNote} ${doseTxt}${locTxt}${avoidTxt}${coolTxt}${ssHint}${historyDigest(sess.focus)}`;
   generateWorkout(summary);
 }
 function onDurSlider(which){
@@ -5812,7 +5972,7 @@ function chatFromPlan(wi,si){
   const weekNote=week?.note?` Wochenziel: ${week.note}`:'';
   const goalTxt=GOALS.find(g=>g.id===(plan.goal||'fitness'))?.label||'Fitness';
   const ssHint=(sess.wantSuperset||rec.superset)?' Nutze 1-2 antagonistische Supersätze (group), damit alle Muster ins Zeitbudget passen.':'';
-  chatCtx.summary=`${focusClean}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.\nPLANKONTEXT — Ziel: ${goalTxt}. ${phase}${weekNote} Aus Intensität abgeleitet: sets=${rec.sets}, rest≈${rec.rest}s — halte dich daran.${ssHint}`;
+  chatCtx.summary=`${focusClean}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.\nPLANKONTEXT — Ziel: ${goalTxt}. ${phase}${weekNote} Aus Intensität abgeleitet: sets=${rec.sets}, rest≈${rec.rest}s — halte dich daran.${ssHint}${historyDigest(sess.focus)}`;
   chatHistory.push({role:'assistant',content:`Bereit für "${sess.focus}"!`});
 }
 
@@ -6102,7 +6262,173 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
 }
 
 // Templates & Save for later
+// Canonical form of an exercise name for duplicate detection across languages
+// and small variations (Klimmzug ≈ Pull-up). Collapses to lowercase, strips
+// punctuation/parentheticals, maps German↔English base terms, drops a trailing
+// plural -s. Modifiers stay in the string, so "Negativ-Klimmzug" ≠ "Klimmzug".
+const EX_SYNONYMS=[
+  [/pull[\s-]?ups?|chin[\s-]?ups?/g,'klimmzug'],
+  [/push[\s-]?ups?|press[\s-]?ups?|liegestutze?n?/g,'liegestutz'],
+  [/squats?|kniebeugen?/g,'kniebeuge'],
+  [/lunges?|ausfallschritte?/g,'ausfallschritt'],
+  [/\brows?\b|rudern/g,'rudern'],
+  [/deadlifts?|kreuzheben/g,'kreuzheben'],
+  [/planks?|planke|unterarmstutz/g,'planke'],
+  [/crunches|crunch/g,'crunch'],
+  [/sit[\s-]?ups?/g,'situp'],
+  [/glute[\s-]?bridges?|huftheben/g,'glutebridge']
+];
+function _normExName(name){
+  let s=String(name||'').toLowerCase();
+  s=s.replace(/ß/g,'ss').replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u');
+  s=s.replace(/\([^)]*\)/g,' ');           // drop parentheticals like "(langsam)"
+  EX_SYNONYMS.forEach(([rx,rep])=>{s=s.replace(rx,rep);});
+  s=s.replace(/[^a-z0-9]+/g,'');           // collapse to bare tokens
+  s=s.replace(/s$/,'');                      // trailing plural
+  return s;
+}
+// Compact list of existing exercise names (core + user library) for the import
+// prompt, so the AI reuses them instead of inventing near-duplicates.
+function exNamesForPrompt(){
+  const names=[...new Set([...DEFAULT_LIB,...library].map(e=>e.name).filter(Boolean))];
+  // cap length so the prompt stays lean
+  return names.slice(0,90).join(', ');
+}
+
+// ─── Import a workout from pasted text (TikTok/IG caption etc.) ───────────────
+function openImportWorkout(){
+  if(!loadKey()){showErr('Dafür brauchst du einen API-Key (Einstellungen).');return;}
+  document.getElementById('import-text').value='';
+  document.getElementById('import-status').textContent='';
+  document.getElementById('modal-import').classList.add('open');
+  setTimeout(()=>document.getElementById('import-text').focus(),100);
+}
+async function runImportWorkout(){
+  const txt=(document.getElementById('import-text').value||'').trim();
+  if(txt.length<8){document.getElementById('import-status').textContent='Bitte den Workout-Text einfügen.';return;}
+  const btn=document.getElementById('import-btn');btn.textContent='Baue Workout…';btn.disabled=true;
+  const st=document.getElementById('import-status');st.textContent='Die KI liest das Workout…';
+  try{
+    const keys=Object.keys(MUSCLE_DE).filter(k=>k!=='fullbody').join(', ');
+    const sys='Du bekommst den Textausschnitt eines Workouts (z.B. eine Social-Media-Caption, evtl. mit Emojis und Werbetext). Extrahiere NUR die tatsächlichen Übungen und baue ein strukturiertes Workout. Ignoriere Gerede, Hashtags, Namen, Musik.\n'+
+      '- Erkenne das Format: Steht dort AMRAP / "so viele Runden wie möglich" / "Rounds" / Zirkel → mode:"circuit". Sonst mode:"sets".\n'+
+      '- Bei "X pro Seite" oder einseitigen Übungen bilateral:true und reps = Wdh PRO SEITE.\n'+
+      '- Halteübungen (Plank etc.) type:"hold" mit duration (Sekunden). Zählbare type:"reps" mit reps. Zeit-basierte type:"time".\n'+
+      '- muscles NUR aus dieser Liste (englische Keys): '+keys+'.\n'+
+      '- equip nur wenn klar erkennbar: "kettlebell", "dumbbells", "bar" (Klimmzugstange), "resistance_band", "bench". Sonst weglassen (Körpergewicht).\n'+
+      '- rounds: bei circuit die Rundenzahl schätzen (AMRAP mit Zeitangabe → großzügig, z.B. 6; sonst 3).\n'+
+      '- durationMin: Minuten wenn genannt, sonst 30.\n'+
+      '- WICHTIG gegen Dubletten: Wenn eine Übung inhaltlich einer bereits vorhandenen entspricht (z.B. Pull-up = Klimmzug, Push-up = Liegestütze, Squat = Kniebeuge, Row = Rudern), verwende EXAKT den vorhandenen Namen aus dieser Liste statt eines neuen: '+exNamesForPrompt()+'.\n'+
+      'Antworte NUR mit JSON, sonst nichts:\n'+
+      '{"name":"kurzer Titel DE","mode":"circuit|sets","rounds":6,"durationMin":30,"note":"1 Satz Hinweis falls im Text (Gewichtswahl, Scaling), sonst leer","exercises":[{"name":"deutscher Name","type":"reps|hold|time","reps":5,"duration":null,"sets":1,"rest":30,"bilateral":false,"muscles":["chest"],"equip":"kettlebell","tip":"kurz DE","details":"1 Satz DE","mistakes":"kurz DE"}]}';
+    const raw=await callAPI([{role:'user',content:'WORKOUT-TEXT:\n'+txt}],1400,sys);
+    let obj;try{const m=raw.match(/\{[\s\S]*\}/);obj=JSON.parse(m?m[0]:raw);}catch{obj=extractJSON(raw)||{};}
+    if(Array.isArray(obj))obj=obj[0]||{};
+    const exs=(obj.exercises||[]).filter(e=>e&&e.name);
+    if(!exs.length){st.textContent='Keine Übungen erkannt. Prüf den Text oder tipp die Übungen einzeln ein.';return;}
+    const known=new Set(Object.keys(MUSCLE_DE));
+    const dw=kbDefaultWeight();
+    const circuit=obj.mode==='circuit';
+    curExercises=exs.map(e=>{
+      const isHold=e.type==='hold'||(!e.reps&&e.duration&&e.type!=='time');
+      const ms=(e.muscles||[]).filter(m=>known.has(m));
+      const c={
+        name:e.name,
+        type:isHold?'hold':(e.type==='time'?'time':'reps'),
+        muscles:ms.length?ms:['fullbody'],
+        bilateral:!!e.bilateral,
+        sets:circuit?1:Math.min(5,Math.max(1,parseInt(e.sets)||3)),
+        rest:e.rest!=null?e.rest:(circuit?0:20),
+        tip:e.tip||'',details:e.details||'',mistakes:e.mistakes||'',
+        icon:getExIcon(e.name)
+      };
+      if(c.type==='reps')c.reps=parseInt(e.reps)||10;
+      else c.duration=parseInt(e.duration)||40;
+      if(e.equip)c.equip=e.equip;
+      // KB/dumbbell exercises: track weight, pre-fill default KB weight
+      const n=(e.name||'').toLowerCase();
+      if(e.equip==='kettlebell'||e.equip==='dumbbells'||/kettlebell|kurzhantel|goblet|swing|clean|snatch/.test(n)){
+        c.trackWeight=true;
+        if(e.equip==='kettlebell'||/kettlebell|swing|goblet/.test(n)){if(dw)c.defaultWeight=dw;}
+      }
+      return c;
+    });
+    wuExercises=[];
+    curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:parseInt(obj.durationMin)||30,
+      trainingMode:circuit?'circuit':'sets',rounds:circuit?(Math.min(8,Math.max(2,parseInt(obj.rounds)||4))):1,
+      presetNote:obj.note||'',importedTitle:obj.name||'Importiertes Workout'};
+    pendingPlanSession=null;
+    // Add any genuinely new exercises to the library so they're reusable later.
+    // Dedup by canonical name so Klimmzug/Pull-up etc. don't create doubles.
+    const haveNames=new Set([...DEFAULT_LIB,...library].map(x=>_normExName(x.name)));
+    let added=0;
+    curExercises.forEach(e=>{
+      const canon=_normExName(e.name);
+      if(haveNames.has(canon))return;
+      const isHold=e.type==='hold';
+      library.push({name:e.name,muscles:e.muscles||['fullbody'],bilateral:!!e.bilateral,
+        equip:e.equip,stretch:e.stretch||false,
+        tip:e.tip||'',details:e.details||'',mistakes:e.mistakes||'',
+        ...(isHold?{hold:e.duration||40}:{}),custom:true});
+      haveNames.add(canon);added++;
+    });
+    if(added)saveLibrary();
+    closeModal('modal-import');
+    showReview();
+    showErr('✓ "'+(obj.name||'Workout')+'" erstellt'+(added?' · '+added+' neue Übung'+(added>1?'en':'')+' im Verzeichnis':'')+' — anpassen und starten.');
+  }catch(e){st.textContent='Fehler: '+e.message;}
+  finally{btn.textContent='Workout erstellen';btn.disabled=false;}
+}
+
+// ─── Ready-made preset workouts ──────────────────────────────────────────────
+// Curated, launch-ready sessions. Circuit mode = "AMRAP-Stil": feste Wdh je
+// Übung, so viele Runden wie möglich in der Zeit.
+const PRESET_WORKOUTS=[
+  {
+    id:'kb-bar-amrap',
+    name:'Kettlebell + Stange AMRAP',
+    sub:'30 Min · 1 Kettlebell + Klimmzugstange · so viele saubere Runden wie möglich',
+    icon:'\u26AB',
+    mode:'circuit',rounds:6,durationMin:30,
+    note:'Wähle das Gewicht nach Curls/Presses, nicht nach den Squats. Keine Übung ist für sich schwer — die Ermüdung baut sich von Runde zu Runde auf. Wird es zu viel: Curls/Presses auf 3 Wdh, Lunges ohne Gewicht, Horn-Push-ups durch normale ersetzen.',
+    exercises:[
+      {name:'Kettlebell Pullover',muscles:['lats','chest','core'],equip:'kettlebell',type:'reps',reps:5,sets:1,rest:0,trackWeight:true},
+      {name:'Kettlebell Curl',muscles:['biceps','forearms'],equip:'kettlebell',type:'reps',reps:5,sets:1,rest:0,trackWeight:true},
+      {name:'Kettlebell Crush Press',muscles:['chest','triceps'],equip:'kettlebell',type:'reps',reps:5,sets:1,rest:0,trackWeight:true},
+      {name:'Goblet Squat (Kettlebell)',muscles:['quads','glutes'],equip:'kettlebell',type:'reps',reps:5,sets:1,rest:0,trackWeight:true},
+      {name:'Einarmiges Kettlebell-Rudern',muscles:['back','lats','biceps'],equip:'kettlebell',type:'reps',reps:5,sets:1,rest:0,bilateral:true,trackWeight:true},
+      {name:'Kettlebell Reverse Lunge',muscles:['quads','glutes'],equip:'kettlebell',type:'reps',reps:5,sets:1,rest:0,bilateral:true,trackWeight:true},
+      {name:'Kettlebell Horn Push-up',muscles:['chest','triceps','core'],equip:'kettlebell',type:'reps',reps:10,sets:1,rest:0},
+      {name:'Australian Pull-up',muscles:['back','biceps'],equip:'bar',type:'reps',reps:8,sets:1,rest:0},
+      {name:'Toes-to-Bar / Knee Raise',muscles:['core','abs','lats'],equip:'bar',type:'reps',reps:8,sets:1,rest:30}
+    ]
+  }
+];
+function openPresetWorkouts(){
+  const el=document.getElementById('preset-list');
+  el.innerHTML='<button onclick="closeModal(\'modal-presets\');openImportWorkout()" style="width:100%;padding:13px;border-radius:12px;background:rgba(var(--acRGB),.12);border:1px solid rgba(var(--acRGB),.3);color:var(--ac);font-size:13px;font-weight:600;font-family:var(--f);margin-bottom:12px">📥 Workout aus Text importieren (TikTok & Co.)</button>'+
+    PRESET_WORKOUTS.map((p,i)=>`<div onclick="startPreset('${p.id}')" style="background:var(--card);border:1px solid var(--br);border-radius:13px;padding:14px;margin-bottom:9px;cursor:pointer">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px"><span style="font-size:20px">${p.icon}</span><div style="font-size:15px;font-weight:700;color:var(--tx)">${p.name}</div></div>
+    <div style="font-size:12px;color:var(--mu);line-height:1.5;margin-bottom:8px">${p.sub}</div>
+    <div style="font-size:11px;color:var(--su);line-height:1.5">${p.exercises.map(e=>e.name+(e.bilateral?' \u2194':'')+' \u00b7 '+(e.type==='reps'?e.reps+(e.bilateral?'/Seite':'')+' Wdh':(e.duration||40)+'s')).join('<br>')}</div>
+    <div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--am)">\u26A1 Starten \u2192</div>
+  </div>`).join('');
+  document.getElementById('modal-presets').classList.add('open');
+}
+function startPreset(id){
+  const p=PRESET_WORKOUTS.find(x=>x.id===id);if(!p)return;
+  closeModal('modal-presets');
+  // Kettlebell exercises pre-fill the user's lightest KB as default weight
+  const dw=kbDefaultWeight();
+  curExercises=p.exercises.map(e=>{const c={...e,icon:getExIcon(e.name)};if(c.trackWeight&&dw&&!c.defaultWeight)c.defaultWeight=dw;return c;});
+  wuExercises=[];
+  curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:p.durationMin||30,
+    trainingMode:p.mode||'sets',rounds:p.rounds||1,presetNote:p.note||''};
+  pendingPlanSession=null;
+  showReview();
+}
 function loadTemplates(){try{return JSON.parse(localStorage.getItem('coach_templates'))||[];}catch{return[];}}
+
 function saveTemplates(t){safeSet('coach_templates',JSON.stringify(t));}
 function saveAsTemplate(){const name=prompt('Name für diese Vorlage:',curSetup.muscles?.map(m=>MUSCLE_DE_SHORT[m]||m).join(', ')||'Mein Workout');if(!name)return;const templates=loadTemplates();templates.push({id:Date.now(),name,muscles:curSetup.muscles||[],exercises:[...curExercises],warmup:[...wuExercises],createdAt:todayIso()});saveTemplates(templates);const btn=document.querySelector('button[onclick="saveAsTemplate()"]');if(btn){btn.textContent='✓ Gespeichert';setTimeout(()=>btn.textContent='💾 Als Vorlage speichern',2000);}document.getElementById('tpl-btn').style.display='block';}
 function openTemplates(){const templates=loadTemplates();const el=document.getElementById('templates-list');if(!templates.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--mu);font-size:13px">Noch keine Vorlagen gespeichert.</div>';document.getElementById('modal-templates').classList.add('open');return;}el.innerHTML=templates.map((t,i)=>`<div class="card" style="margin-bottom:9px"><div style="display:flex;align-items:flex-start;gap:10px"><div style="flex:1"><div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:3px">${t.name}</div><div style="font-size:11px;color:var(--mu)">${t.exercises.length} Übungen${t.warmup?.length?' + '+t.warmup.length+' Warmup':''} · ${t.createdAt}</div></div><button onclick="deleteTpl(${i})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center">✕</button></div><div style="display:flex;gap:7px;margin-top:11px"><button onclick="startFromTemplate(${i})" class="btn btn-ac" style="flex:1;padding:10px;font-size:13px;text-transform:none">Jetzt starten</button><button onclick="planFromTemplate(${i})" style="flex:1;padding:10px;border-radius:12px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:13px;font-weight:600;font-family:var(--f)">📅 Einplanen</button></div></div>`).join('');document.getElementById('modal-templates').classList.add('open');}
@@ -6328,6 +6654,28 @@ function exEquip(ex){
 }
 
 function clearLibSearch(){const i=document.getElementById('lib-search');if(i){i.value='';renderLibrary();}}
+// Remove duplicates from the user's library: exact custom copies of built-ins,
+// and canonical duplicates (Klimmzug/Pull-up). Keeps the richer entry. Returns
+// how many were removed. Runs silently once on load; also callable manually.
+function dedupLibrary(){
+  if(!Array.isArray(library)||!library.length)return 0;
+  const builtins=new Set([...DEFAULT_LIB,...(typeof STUDIO_LIB!=='undefined'?STUDIO_LIB:[])].map(e=>_normExName(e.name)));
+  const kept=[];const seen=new Set();let removed=0;
+  // richness score: prefer entries with details/tip/mistakes
+  const score=e=>(e.details?2:0)+(e.tip?1:0)+(e.mistakes?1:0);
+  // sort a copy by richness so the fuller entry wins when duplicated
+  const ordered=library.map((e,i)=>({e,i})).sort((a,b)=>score(b.e)-score(a.e));
+  const drop=new Set();
+  ordered.forEach(({e,i})=>{
+    const c=_normExName(e.name);
+    if(builtins.has(c)){drop.add(i);removed++;return;}   // duplicate of a built-in
+    if(seen.has(c)){drop.add(i);removed++;return;}        // duplicate within library
+    seen.add(c);
+  });
+  if(removed){library=library.filter((_,i)=>!drop.has(i));saveLibrary();}
+  return removed;
+}
+
 function renderLibrary(){
   // User edits of built-in exercises are stored in `library` with the same name
   // and override the default entry.
@@ -6533,8 +6881,8 @@ Antworte NUR mit JSON-Array, sonst nichts:
     if(!arr.length){res.innerHTML='<div style="font-size:13px;color:var(--mu);text-align:center;padding:14px">Nichts Passendes gefunden. Formuliere es anders oder leg die Übung von Hand an.</div>';return;}
     // Drop muscle keys the app doesn't know, and flag exact duplicates
     const known=new Set(Object.keys(MUSCLE_DE));
-    const haveLower=new Set([...DEFAULT_LIB,...library].map(e=>e.name.toLowerCase()));
-    _aiFindResults=arr.map(e=>({...e,muscles:e.muscles.filter(m=>known.has(m)),_dup:haveLower.has(e.name.toLowerCase())}))
+    const haveLower=new Set([...DEFAULT_LIB,...library].map(e=>_normExName(e.name)));
+    _aiFindResults=arr.map(e=>({...e,muscles:e.muscles.filter(m=>known.has(m)),_dup:haveLower.has(_normExName(e.name))}))
                       .filter(e=>e.muscles.length);
     renderAiFindResults();
   }catch(e){res.innerHTML='<div style="font-size:13px;color:var(--am);text-align:center;padding:14px">Fehler: '+e.message+'</div>';}
@@ -7236,6 +7584,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   try{
     log=loadLog();plan=loadPlan();library=loadLibrary();
     backfillLibraryFromLog();
+    dedupLibrary();
     updateHome();
     if(loadKey()&&log.length>=1)setTimeout(fetchCoach,800);
     document.querySelectorAll('.modal-ov').forEach(el=>el.addEventListener('click',e=>{
