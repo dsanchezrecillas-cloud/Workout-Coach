@@ -436,6 +436,7 @@ button:active:not(:disabled){transform:scale(.96)}
     </div>
   </div>
   <div id="ex-list" style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px"></div>
+  <button id="amrap-round-btn" onclick="amrapRoundDone()" style="display:none;width:100%;padding:17px;border-radius:14px;background:linear-gradient(135deg,#059669,#34d399);color:#fff;font-size:17px;font-weight:800;font-family:var(--f);letter-spacing:.02em;margin-bottom:8px;box-shadow:0 3px 14px rgba(var(--coRGB),.3)">✓ Runde geschafft</button>
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <button id="add-ex-live" onclick="addExerciseDuringWorkout()" style="flex:1;padding:10px;border-radius:10px;background:var(--up);border:1px dashed var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">＋ Übung</button>
     <button id="ease-live" onclick="toggleLiveEase()" style="flex:1;padding:10px;border-radius:10px;background:var(--up);border:1px dashed var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">🎯 Leichter</button>
@@ -1484,7 +1485,7 @@ function histTxt(){
 // ─── Navigation ───────────────────────────────────────────────────────────────
 function show(id){
   // Leaving the timer: let the screen sleep again and reset the compact bar
-  if(id!=='s-timer'){releaseWakeLock();const tw=document.getElementById('timer-wrap');if(tw)tw.classList.remove('compact');}
+  if(id!=='s-timer'){releaseWakeLock();const tw=document.getElementById('timer-wrap');if(tw)tw.classList.remove('compact');if(_amrapIv){clearInterval(_amrapIv);_amrapIv=null;}const td=document.getElementById('t-disp');if(td)td.style.fontSize='76px';}
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   const el=document.getElementById(id);
   el.classList.add('active');el.classList.remove('fade');void el.offsetWidth;el.classList.add('fade');
@@ -4037,7 +4038,86 @@ function updateAmrapBanner(){
   // warn in the last minute
   document.getElementById('amrap-time').style.color=left<=60?'var(--hot)':'var(--am)';
 }
-function startWorkout(){initTimer();_amrapStart=(curSetup.capMin?Date.now():0);show('s-timer');initTimerScroll();requestWakeLock();}
+function startWorkout(){
+  initTimer();
+  // AMRAP round-mode: a self-contained flow — run the circuit freely, tap
+  // "Runde geschafft" to count a round, the clock runs in real time until the cap.
+  if(_amrapRoundMode()){startAmrapRounds();return;}
+  _amrapStart=(curSetup.capMin?Date.now():0);show('s-timer');initTimerScroll();requestWakeLock();
+}
+// AMRAP round-mode is on for a time-capped circuit (no per-exercise timing there).
+function _amrapRoundMode(){return curSetup?.trainingMode==='circuit'&&!!curSetup.capMin;}
+// Rounds achieved the last time this same circuit (same exercise set) ran as AMRAP
+function _lastAmrapRounds(){
+  const sig=curExercises.map(e=>e.name).sort().join('|');
+  for(let i=log.length-1;i>=0;i--){
+    const w=log[i];if(!w.amrap||w.amrapRounds==null)continue;
+    const s=(w.exercises||[]).map(e=>e.name).sort().join('|');
+    if(s===sig)return w.amrapRounds;
+  }
+  return 0;
+}
+let _amrapIv=null;
+function startAmrapRounds(){
+  tStatus='amrap';tRound=1;tIdx=0;tSet=1;tRun=true;tReps={};
+  _amrapStart=Date.now();
+  // Compare to the last time this same circuit was done (by exercise signature)
+  window._amrapCompareRounds=_lastAmrapRounds();
+  show('s-timer');initTimerScroll();requestWakeLock();
+  renderAmrap();
+  if(_amrapIv)clearInterval(_amrapIv);
+  _amrapIv=setInterval(()=>{
+    if(tStatus!=='amrap')return;
+    updateAmrapBanner();updateAmrapCenter();
+    if(_amrapLeft()<=0)finishAmrap();
+  },1000);
+}
+function amrapRoundDone(){
+  if(tStatus!=='amrap')return;
+  if(_amrapLeft()<=0){finishAmrap();return;}
+  tRound++;beep(1000,.18);
+  updateAmrapBanner();updateAmrapCenter();
+}
+function finishAmrap(){
+  if(_amrapIv){clearInterval(_amrapIv);_amrapIv=null;}
+  // Rounds fully completed = tRound-1 (current round was in progress, not done)
+  window._amrapRoundsDone=Math.max(0,(tRound||1)-1);
+  tRun=false;tStatus='done';beep(1100,.5);
+  renderAmrap();updateAmrapBanner();
+}
+function updateAmrapCenter(){
+  const lbl=document.getElementById('ph-label'),disp=document.getElementById('t-disp'),unit=document.getElementById('t-disp-unit'),ctr=document.getElementById('t-ctr');
+  if(tStatus==='amrap'){
+    if(lbl)lbl.textContent='AKTUELLE RUNDE';
+    if(disp)disp.style.fontSize='96px',disp.textContent=String(tRound||1);
+    if(unit){unit.style.display='block';unit.textContent='Runde';}
+    if(ctr)ctr.textContent=(window._amrapCompareRounds?('letztes Mal: '+window._amrapCompareRounds+' Runden'):'');
+    const arc=document.getElementById('timer-arc');
+    if(arc){const cap=(curSetup.capMin||0)*60;const done=cap-_amrapLeft();arc.setAttribute('stroke-dashoffset',CIRC-(done/cap)*CIRC);}
+  }
+}
+// Render the AMRAP round view: list of exercises + big round button, hide the
+// per-exercise controls that don't apply here.
+function renderAmrap(){
+  const hide=id=>{const e=document.getElementById(id);if(e)e.style.display='none';};
+  const show2=(id,disp)=>{const e=document.getElementById(id);if(e)e.style.display=disp;};
+  hide('rep-counter');hide('reps-done-btn');hide('ex-rpe');hide('add-ex-live');hide('ease-live');hide('skip-ex-btn');hide('main-btn');
+  const av=document.getElementById('active-view'),dv=document.getElementById('done-view');
+  if(tStatus==='done'){
+    if(av)av.style.display='none';if(dv)dv.style.display='block';
+    hide('amrap-round-btn');
+    const rounds=window._amrapRoundsDone||0;
+    document.getElementById('tot-reps').textContent=rounds+' Runden in '+curSetup.capMin+' Min geschafft';
+    show2('main-btn','');const btn=document.getElementById('main-btn');
+    if(btn){btn.textContent='Bewerten →';btn.className='btn btn-co';btn.style.flex='1';btn.style.border='none';btn.onclick=()=>initRating();}
+    relWL();return;
+  }
+  if(av)av.style.display='none';   // no single "current exercise" card in AMRAP
+  if(dv)dv.style.display='none';
+  show2('amrap-round-btn','block');
+  const eb=document.getElementById('end-early-btn');if(eb){eb.style.flex='1';eb.textContent='✓ Fertig / Zeit vorbei';}
+  updateAmrapBanner();updateAmrapCenter();renderExList();
+}
 
 // Shrink the timer into a sticky bar when the user scrolls into the exercise list,
 // so the countdown stays visible without the ring eating the whole screen.
@@ -4280,6 +4360,7 @@ function renderExList(){
   }).join('');}
 
 function updateTimer(){
+  if(tStatus==='amrap'){updateAmrapBanner();updateAmrapCenter();return;}
   updateAmrapBanner();
   const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};
   const isWu=isWU||ex.warmup;
@@ -4791,7 +4872,9 @@ async function endEarly(){
     updateHome();show('s-home');
     return;
   }
-  const ok=await appConfirm('Training beenden?','Dein Fortschritt wird gespeichert.','Beenden','rgba(var(--hotRGB),.9)');if(!ok)return;clearInterval(tIv);tRun=false;tStatus='done';relWL();updateTimer();
+  const ok=await appConfirm('Training beenden?','Dein Fortschritt wird gespeichert.','Beenden','rgba(var(--hotRGB),.9)');if(!ok)return;
+  if(tStatus==='amrap'){finishAmrap();return;}
+  clearInterval(tIv);tRun=false;tStatus='done';relWL();updateTimer();
 }
 function addRep(side,d){
   const rk=tRound+'_'+tIdx+'_s'+tSet+(side?'_'+side:'');
@@ -4948,6 +5031,8 @@ function commitRatingEdit(){
 function saveWorkout(){
   if(_ratingEditMode){commitRatingEdit();_ratingEditMode=false;}
   const entry={id:Date.now(),date:new Date().toISOString(),muscles:curSetup.muscles||[],durationMin:curSetup.durationMin||20,exercises:curExercises,repLog:{...tReps},rpe,note:document.getElementById('rat-note').value.trim()};
+  // AMRAP round-mode: record how many full rounds were completed
+  if(_amrapRoundMode()){entry.amrapRounds=window._amrapRoundsDone||0;entry.capMin=curSetup.capMin;entry.amrap=true;}
   // Stretch sessions count for consistency, but not as training load
   if(curSetup.stretch||window._isStretchSession){entry.stretch=true;entry.areaId=curSetup.areaId||null;if(curSetup.routine==='morning'||curSetup.morning)entry.morning=true;if(curSetup.routine==='evening')entry.evening=true;}
   window._isStretchSession=false;
@@ -5127,7 +5212,7 @@ function renderHistory(){
       }
     }
   }else hw.style.display='none';
-  const escN=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.entries(w.repLog||{}).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${w.stretch?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:'')):(mainMuscles(w.muscles,3).join(', ')||'Workout')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{const per=repsPerExercise(w).filter(p=>p.reps>0||p.secs>0);if(!per.length)return'';return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${per.map(p=>`<div onclick="openExerciseDetail('${(p.name||'').replace(/'/g,"\\'")}')" style="display:flex;justify-content:space-between;font-size:12px;cursor:pointer;padding:2px 0"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''} <span style="color:var(--br)">›</span></span><span style="color:var(--su);font-weight:600;margin-left:8px">${p.isHold?p.secs+'s':p.reps+' Wdh'}</span></div>`).join('')}</div>`;})()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${escN(w.note)}</div>`:''}</div>`;}).join('');}
+  const escN=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.entries(w.repLog||{}).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${w.stretch?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:'')):(mainMuscles(w.muscles,3).join(', ')||'Workout')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${w.amrap&&w.amrapRounds!=null?' '+mkT('🔄 '+w.amrapRounds+' Runden','var(--am)'):''}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{const per=repsPerExercise(w).filter(p=>p.reps>0||p.secs>0);if(!per.length)return'';return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${per.map(p=>`<div onclick="openExerciseDetail('${(p.name||'').replace(/'/g,"\\'")}')" style="display:flex;justify-content:space-between;font-size:12px;cursor:pointer;padding:2px 0"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''} <span style="color:var(--br)">›</span></span><span style="color:var(--su);font-weight:600;margin-left:8px">${p.isHold?p.secs+'s':p.reps+' Wdh'}</span></div>`).join('')}</div>`;})()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${escN(w.note)}</div>`:''}</div>`;}).join('');}
 function showHistory(){show('s-history');}
 async function delW(idx){const ok=await appConfirm('Training löschen?','Diese Aktion kann nicht rückgängig gemacht werden.');if(!ok)return;log.splice(idx,1);persist();updateHome();showHistory();}
 async function delLastWorkout(){if(!log.length)return;const last=log[log.length-1];const ok=await appConfirm('Letztes Training löschen?','RPE '+(last.rpe||'?')+'/10 · '+fmtD(last.date));if(!ok)return;log.pop();persist();updateHome();}
