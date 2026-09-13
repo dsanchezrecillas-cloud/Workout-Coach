@@ -308,9 +308,24 @@ button:active:not(:disabled){transform:scale(.96)}
       <button onclick="setTrainingMode('sets')" id="mode-sets" style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--ac);background:rgba(var(--acRGB),.15);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">Sätze / Übung</button>
       <button onclick="setTrainingMode('circuit')" id="mode-circuit" style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--br);background:var(--up);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)">🔄 Circuit (Runden)</button>
     </div>
-    <div id="circuit-rounds-wrap" style="display:none;align-items:center;gap:8px">
-      <span style="font-size:12px;color:var(--mu);font-weight:600">Runden:</span>
-      <div style="display:flex;gap:6px" id="rounds-chips"></div>
+    <div id="circuit-rounds-wrap" style="display:none;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:6px" id="circuit-type-chips">
+        <button onclick="setCircuitType('rounds')" id="ctype-rounds" class="chip">Feste Runden</button>
+        <button onclick="setCircuitType('amrap')" id="ctype-amrap" class="chip">⏱ AMRAP (Zeit)</button>
+      </div>
+      <div id="rounds-row" style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:var(--mu);font-weight:600">Runden:</span>
+        <div style="display:flex;gap:6px" id="rounds-chips"></div>
+      </div>
+      <div id="amrap-row" style="display:none;align-items:center;gap:8px">
+        <span style="font-size:12px;color:var(--mu);font-weight:600">Zeit:</span>
+        <div style="display:flex;gap:6px" id="cap-chips"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:2px">
+        <button onclick="toggleExRest()" id="cx-exrest" class="chip">Pause zw. Übungen: AUS</button>
+        <button onclick="toggleRoundRest()" id="cx-roundrest" class="chip">Rundenpause: AUS</button>
+      </div>
+      <div style="font-size:11px;color:var(--mu);line-height:1.5">Ohne Pausen springt nichts automatisch weiter — du tippst nach jeder Übung „Weiter".</div>
     </div>
   </div>
   <div id="wu-sec" style="display:none;margin-bottom:14px">
@@ -343,6 +358,10 @@ button:active:not(:disabled){transform:scale(.96)}
   <div style="display:flex;gap:5px;margin-bottom:14px;align-items:center" id="prog-bars"></div>
   <!-- Timer becomes a sticky compact bar once you scroll past it -->
   <div id="timer-wrap" style="position:sticky;top:0;z-index:20;background:var(--bg);padding-bottom:10px;margin:0 -2px 6px;transition:padding .2s">
+  <div id="amrap-banner" style="display:none;background:linear-gradient(135deg,rgba(var(--amRGB),.16),rgba(var(--coRGB),.12));border:1px solid rgba(var(--amRGB),.3);border-radius:12px;padding:9px 14px;margin-bottom:10px;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:7px"><span style="font-size:15px">⏱</span><span id="amrap-time" style="font-size:19px;font-weight:800;font-family:var(--m);color:var(--am);letter-spacing:-.02em">30:00</span></div>
+    <div style="text-align:right"><div id="amrap-rounds" style="font-size:16px;font-weight:800;color:var(--co)">Runde 1</div><div style="font-size:9px;color:var(--mu);letter-spacing:.06em;text-transform:uppercase">so viele wie möglich</div></div>
+  </div>
   <div id="timer-ring-box" style="position:relative;width:230px;height:230px;margin:0 auto 14px;transition:all .25s ease">
     <svg id="timer-svg" width="230" height="230" viewBox="0 0 230 230" style="transform:rotate(-90deg);width:100%;height:100%">
       <circle cx="115" cy="115" r="100" fill="none" stroke="var(--ring)" stroke-width="8"/>
@@ -3944,8 +3963,38 @@ function setTrainingMode(mode){
     const cur=curSetup.rounds||3;rc.innerHTML='';
     [2,3,4,5,6].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===cur?' ac':'');b.textContent=n+'×';b.onclick=()=>{curSetup.rounds=n;rc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};rc.appendChild(b);});
     if(!curSetup.rounds)curSetup.rounds=3;
+    // AMRAP time-cap chips
+    const cc=document.getElementById('cap-chips');
+    if(cc){const curCap=curSetup.capMin||20;cc.innerHTML='';
+      [10,15,20,30,45].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===curCap?' ac':'');b.textContent=n+' Min';b.onclick=()=>{curSetup.capMin=n;cc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};cc.appendChild(b);});
+    }
+    _syncCircuitType();
   }
 }
+// Toggle between fixed-rounds and time-capped AMRAP for a circuit
+function setCircuitType(type){
+  if(type==='amrap'){if(!curSetup.capMin)curSetup.capMin=20;}
+  else{curSetup.capMin=0;}
+  _syncCircuitType();
+}
+function _syncCircuitType(){
+  const amrap=!!curSetup.capMin;
+  const rr=document.getElementById('rounds-row'),ar=document.getElementById('amrap-row');
+  const cr=document.getElementById('ctype-rounds'),ca=document.getElementById('ctype-amrap');
+  if(rr)rr.style.display=amrap?'none':'flex';
+  if(ar)ar.style.display=amrap?'flex':'none';
+  if(cr)cr.className='chip'+(amrap?'':' ac');
+  if(ca)ca.className='chip'+(amrap?' ac':'');
+  _syncPauseToggles();
+}
+// Circuit pause options. Default: both OFF → confirm-to-continue, no countdowns.
+function _syncPauseToggles(){
+  const ex=document.getElementById('cx-exrest'),rd=document.getElementById('cx-roundrest');
+  if(ex){ex.textContent='Pause zw. Übungen: '+(curSetup.exRest?'AN':'AUS');ex.className='chip'+(curSetup.exRest?' ac':'');}
+  if(rd){rd.textContent='Rundenpause: '+(curSetup.roundRest?'AN':'AUS');rd.className='chip'+(curSetup.roundRest?' ac':'');}
+}
+function toggleExRest(){curSetup.exRest=!curSetup.exRest;_syncPauseToggles();}
+function toggleRoundRest(){curSetup.roundRest=!curSetup.roundRest;_syncPauseToggles();}
 function setExType(idx,type){if(!curExercises[idx])return;curExercises[idx].type=type;if(type==='reps'&&!curExercises[idx].reps)curExercises[idx].reps=10;_updateRevCard(idx);}
 function setExSets(idx,n){
   if(!curExercises[idx])return;
@@ -3974,7 +4023,21 @@ document.addEventListener('visibilitychange',()=>{
   }
 });
 
-function startWorkout(){initTimer();show('s-timer');initTimerScroll();requestWakeLock();}
+// Time-capped AMRAP: a global session clock that runs the whole circuit.
+let _amrapStart=0;
+function _amrapElapsed(){return _amrapStart?Math.floor((Date.now()-_amrapStart)/1000):0;}
+function _amrapLeft(){const cap=(curSetup.capMin||0)*60;return cap?Math.max(0,cap-_amrapElapsed()):0;}
+function updateAmrapBanner(){
+  const b=document.getElementById('amrap-banner');if(!b)return;
+  if(!curSetup.capMin||tStatus==='done'){b.style.display='none';return;}
+  b.style.display='flex';
+  const left=_amrapLeft();
+  document.getElementById('amrap-time').textContent=fmtT(left);
+  document.getElementById('amrap-rounds').textContent='Runde '+(tRound||1);
+  // warn in the last minute
+  document.getElementById('amrap-time').style.color=left<=60?'var(--hot)':'var(--am)';
+}
+function startWorkout(){initTimer();_amrapStart=(curSetup.capMin?Date.now():0);show('s-timer');initTimerScroll();requestWakeLock();}
 
 // Shrink the timer into a sticky bar when the user scrolls into the exercise list,
 // so the countdown stays visible without the ring eating the whole screen.
@@ -4217,6 +4280,7 @@ function renderExList(){
   }).join('');}
 
 function updateTimer(){
+  updateAmrapBanner();
   const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};
   const isWu=isWU||ex.warmup;
   const exType=ex.type||'time';
@@ -4313,7 +4377,7 @@ function updateTimer(){
     }
   }
   const dv=document.getElementById('done-view'),av=document.getElementById('active-view'),rc=document.getElementById('rep-counter');
-  if(tStatus==='done'){dv.style.display='block';av.style.display='none';document.getElementById('tot-reps').textContent=repTotal(tReps)+' Gesamtwiederholungen';relWL();}
+  if(tStatus==='done'){dv.style.display='block';av.style.display='none';document.getElementById('tot-reps').textContent=(curSetup.capMin?((tRound||1)+' Runden in '+curSetup.capMin+' Min · '):'')+repTotal(tReps)+' Wdh';relWL();}
   else{
     dv.style.display='none';av.style.display='block';
     const icon=document.getElementById('ex-icon');icon.textContent=tStatus==='round_rest'?'⏸':(ex.icon||'○');icon.style.color=pc;icon.style.borderColor=pc+'33';icon.style.background=pc+'14';
@@ -4416,7 +4480,7 @@ function _beginPhase(){
     if(tIv){clearInterval(tIv);tIv=null;}
     tRun=false;updateTimer();renderExList();return;
   }
-  if(!autoAdvanceOn()&&tStatus==='work'){
+  if((!autoAdvanceOn()||_circuitNoExPause())&&tStatus==='work'){
     // Ready state: countdown is armed but paused until the user says go
     if(tIv){clearInterval(tIv);tIv=null;}
     tStatus='ready';tRun=false;updateTimer();renderExList();return;
@@ -4482,6 +4546,10 @@ function isHoldEx(ex){return !!ex&&ex.type!=='reps'&&(ex.type==='hold'||ex.type=
 // Sum only actual repetitions, never held-seconds keys (which end in _sec).
 function repTotal(repLog){return Object.entries(repLog||{}).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+(v||0),0);}
 
+// Circuit with the "pause between exercises" toggle OFF: no rest countdown,
+// nothing auto-advances — the user confirms "Weiter" after each exercise.
+function _circuitNoExPause(){return curSetup?.trainingMode==='circuit'&&!curSetup.exRest;}
+function _circuitNoRoundPause(){return curSetup?.trainingMode==='circuit'&&!curSetup.roundRest;}
 function autoAdvanceOn(){
   // Stretch sessions run hands-free: there are no reps to enter, and stopping
   // after every hold (and every side) would mean reaching for the phone ~10x.
@@ -4515,7 +4583,10 @@ function startTimer(){
 }
 function pauseTimer(){tRun=false;if(tIv){clearInterval(tIv);tIv=null;}updateTimer();}
 let _tickTs=0;
-function tick(){_tickTs=Date.now();if(tLeft<=4&&tLeft>1)beep(660,.08);if(tLeft<=1){clearInterval(tIv);tIv=null;tRun=false;advance();return;}tLeft--;document.getElementById('t-disp').textContent=fmtT(tLeft);const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};const mt=tStatus==='work'?(ex.duration||40):tStatus==='rest'?(ex.rest||20):RREST;document.getElementById('timer-arc').setAttribute('stroke-dashoffset',CIRC-((mt-tLeft)/mt)*CIRC);}
+function tick(){_tickTs=Date.now();
+  // Time-capped AMRAP: end the whole session when the global clock runs out
+  if(curSetup.capMin){updateAmrapBanner();if(_amrapLeft()<=0&&tStatus!=='done'){clearInterval(tIv);tIv=null;tRun=false;beep(1100,.5);tStatus='done';updateTimer();return;}}
+  if(tLeft<=4&&tLeft>1)beep(660,.08);if(tLeft<=1){clearInterval(tIv);tIv=null;tRun=false;advance();return;}tLeft--;document.getElementById('t-disp').textContent=fmtT(tLeft);const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};const mt=tStatus==='work'?(ex.duration||40):tStatus==='rest'?(ex.rest||20):RREST;document.getElementById('timer-arc').setAttribute('stroke-dashoffset',CIRC-((mt-tLeft)/mt)*CIRC);}
 // Single entry point for starting the countdown. Always clears any existing
 // interval first, so ticks can never stack and run the clock multiple times too fast.
 function _startTick(){
@@ -4548,8 +4619,12 @@ function advance(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{
       return;
     }
     window._holdSide=1;
+    maybeShowExRpe();
+    // Circuit without between-exercise pause: skip the rest countdown, move on
+    // (the next exercise will wait on a "Weiter" confirm via _beginPhase).
+    if(!isWU&&_circuitNoExPause()){tStatus='rest';tLeft=1;advance();return;}
     tStatus='rest';tLeft=ex.rest||20;beep(660,.15);
-    updateTimer();maybeShowExRpe();
+    updateTimer();
   }else if(tStatus==='rest'){
       const gr=!isWU?_groupRange(tIdx):null;
       if(gr){
@@ -4576,9 +4651,26 @@ function advance(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{
       if(!isWU&&tSet<totalSets){tSet++;tStatus='work';tLeft=ex.duration||40;beep(880,.1);_beginPhase();return;}
       }
       const nx=tIdx+1;if(nx<exList.length){window._holdSide=1;tIdx=nx;tSet=1;tStatus='work';tLeft=exList[nx].duration||40;beep(880,.1);}else if(isWU){isWU=false;tIdx=0;tStatus='work';tLeft=curExercises[0]?.duration||40;beep(1100,.3);renderExList();}else{
-        const totalRounds=curSetup.trainingMode==='circuit'?(curSetup.rounds||1):1;
-        if(tRound<totalRounds){tRound++;tIdx=0;tSet=1;tStatus='round_rest';tLeft=RREST;beep(880,.2);}
-        else{tStatus='done';beep(1100,.5);updateTimer();return;}
+        const cap=curSetup.trainingMode==='circuit'?(curSetup.capMin||0):0;
+        const startNextRound=()=>{
+          tRound++;tIdx=0;tSet=1;
+          if(_circuitNoRoundPause()){
+            // No round pause: go straight into the first exercise (which will
+            // wait on a "Weiter" confirm if between-exercise pause is also off)
+            window._holdSide=1;tStatus='work';tLeft=curExercises[0].duration||40;beep(1000,.2);_beginPhase();
+          }else{
+            tStatus='round_rest';tLeft=RREST;beep(880,.2);
+          }
+        };
+        if(cap){
+          // Time-capped AMRAP: keep starting rounds while time remains
+          if(_amrapLeft()>(_circuitNoRoundPause()?1:RREST)){startNextRound();if(_circuitNoRoundPause())return;}
+          else{tStatus='done';beep(1100,.5);updateTimer();return;}
+        }else{
+          const totalRounds=curSetup.trainingMode==='circuit'?(curSetup.rounds||1):1;
+          if(tRound<totalRounds){startNextRound();if(_circuitNoRoundPause())return;}
+          else{tStatus='done';beep(1100,.5);updateTimer();return;}
+        }
       }}else if(tStatus==='round_rest'){tStatus='work';tLeft=curExercises[0].duration||40;beep(880,.1);}_beginPhase();}
 function skipEx(){
   clearInterval(tIv);tRun=false;
@@ -4633,8 +4725,12 @@ function setExRpe(v){
 function repsDone(){
   const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};
   clearInterval(tIv);tRun=false;
+  maybeShowExRpe();
+  // Circuit without between-exercise pause: no rest countdown — go straight on.
+  // The tap on "Satz fertig" IS the confirmation to continue.
+  if(!isWU&&_circuitNoExPause()){tStatus='rest';tLeft=1;advance();return;}
   tStatus='rest';tLeft=ex.rest||20;beep(660,.15);
-  _startTick();updateTimer();renderExList();maybeShowExRpe();
+  _startTick();updateTimer();renderExList();
 }
 // ─── Active-workout persistence (survive iOS killing the PWA) ────────────────
 const ACTIVE_KEY='coach_active';
@@ -6389,7 +6485,7 @@ const PRESET_WORKOUTS=[
     name:'Kettlebell + Stange AMRAP',
     sub:'30 Min · 1 Kettlebell + Klimmzugstange · so viele saubere Runden wie möglich',
     icon:'\u26AB',
-    mode:'circuit',rounds:6,durationMin:30,
+    mode:'circuit',rounds:6,capMin:30,durationMin:30,
     note:'Wähle das Gewicht nach Curls/Presses, nicht nach den Squats. Keine Übung ist für sich schwer — die Ermüdung baut sich von Runde zu Runde auf. Wird es zu viel: Curls/Presses auf 3 Wdh, Lunges ohne Gewicht, Horn-Push-ups durch normale ersetzen.',
     exercises:[
       {name:'Kettlebell Pullover',muscles:['lats','chest','core'],equip:'kettlebell',type:'reps',reps:5,sets:1,rest:0,trackWeight:true},
@@ -6423,7 +6519,8 @@ function startPreset(id){
   curExercises=p.exercises.map(e=>{const c={...e,icon:getExIcon(e.name)};if(c.trackWeight&&dw&&!c.defaultWeight)c.defaultWeight=dw;return c;});
   wuExercises=[];
   curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:p.durationMin||30,
-    trainingMode:p.mode||'sets',rounds:p.rounds||1,presetNote:p.note||''};
+    trainingMode:p.mode||'sets',rounds:p.rounds||1,capMin:p.capMin||0,
+    exRest:!!p.exRest,roundRest:!!p.roundRest,presetNote:p.note||''};
   pendingPlanSession=null;
   showReview();
 }
