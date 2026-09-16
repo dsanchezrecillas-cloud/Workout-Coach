@@ -964,6 +964,24 @@ button:active:not(:disabled){transform:scale(.96)}
   </div>
 </div>
 
+<!-- MODAL: Save workout to portfolio -->
+<div class="modal-ov" id="modal-savewk">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700">💾 Workout speichern</div>
+      <button aria-label="Schließen" onclick="closeModal('modal-savewk')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--mu);line-height:1.5;margin-bottom:12px">Speichere dieses Workout in „Meine Workouts", um es jederzeit wieder zu starten und deine Rekorde zu vergleichen.</div>
+    <div style="display:flex;gap:7px;margin-bottom:10px">
+      <input id="savewk-title" class="inp" placeholder="Titel" style="flex:1;font-size:14px"/>
+      <button onclick="aiTitleForWorkout()" id="savewk-ai" style="flex-shrink:0;padding:0 12px;border-radius:10px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">✦ KI-Titel</button>
+    </div>
+    <div id="savewk-status" style="font-size:11px;color:var(--am);margin-bottom:10px;min-height:14px"></div>
+    <button onclick="confirmSaveWorkout()" class="btn btn-co" style="width:100%;padding:13px;font-size:14px">Speichern</button>
+    <button onclick="closeModal('modal-savewk');show('s-home')" style="width:100%;padding:10px;margin-top:7px;background:none;border:none;color:var(--mu);font-size:13px;font-family:var(--f)">Nicht speichern</button>
+  </div>
+</div>
+
 <!-- MODAL: Import workout from text -->
 <div class="modal-ov" id="modal-import">
   <div class="modal-box">
@@ -4063,6 +4081,7 @@ function startAmrapRounds(){
   _amrapStart=Date.now();
   // Compare to the last time this same circuit was done (by exercise signature)
   window._amrapCompareRounds=_lastAmrapRounds();
+  const _rec=currentWorkoutRecord();window._amrapRecord=(_rec&&_rec.rounds)||0;
   show('s-timer');initTimerScroll();requestWakeLock();
   renderAmrap();
   if(_amrapIv)clearInterval(_amrapIv);
@@ -4091,7 +4110,7 @@ function updateAmrapCenter(){
     if(lbl)lbl.textContent='AKTUELLE RUNDE';
     if(disp)disp.style.fontSize='96px',disp.textContent=String(tRound||1);
     if(unit){unit.style.display='block';unit.textContent='Runde';}
-    if(ctr)ctr.textContent=(window._amrapCompareRounds?('letztes Mal: '+window._amrapCompareRounds+' Runden'):'');
+    if(ctr){const rec=window._amrapRecord||0;ctr.textContent=rec?('🏆 Rekord: '+rec+' Runden'):(window._amrapCompareRounds?('letztes Mal: '+window._amrapCompareRounds+' Runden'):'');}
     const arc=document.getElementById('timer-arc');
     if(arc){const cap=(curSetup.capMin||0)*60;const done=cap-_amrapLeft();arc.setAttribute('stroke-dashoffset',CIRC-(done/cap)*CIRC);}
   }
@@ -5033,6 +5052,7 @@ function saveWorkout(){
   const entry={id:Date.now(),date:new Date().toISOString(),muscles:curSetup.muscles||[],durationMin:curSetup.durationMin||20,exercises:curExercises,repLog:{...tReps},rpe,note:document.getElementById('rat-note').value.trim()};
   // AMRAP round-mode: record how many full rounds were completed
   if(_amrapRoundMode()){entry.amrapRounds=window._amrapRoundsDone||0;entry.capMin=curSetup.capMin;entry.amrap=true;}
+  entry._mode=curSetup.trainingMode||'sets';entry._rounds=curSetup.rounds||1;
   // Stretch sessions count for consistency, but not as training load
   if(curSetup.stretch||window._isStretchSession){entry.stretch=true;entry.areaId=curSetup.areaId||null;if(curSetup.routine==='morning'||curSetup.morning)entry.morning=true;if(curSetup.routine==='evening')entry.evening=true;}
   window._isStretchSession=false;
@@ -5040,6 +5060,8 @@ function saveWorkout(){
   // Snapshot challenge completion before adding this workout
   const _chBefore={};loadChallenges().forEach(ch=>{_chBefore[ch.id]=calcChallengeProgress(ch).pct>=100;});
   log.push(entry);persist();
+  // Update personal-workout records (best rounds / best reps for same signature)
+  try{const beaten=updateWorkoutRecords(entry);if(beaten.length)setTimeout(()=>showErr('🏆 Neuer Rekord: '+beaten.map(b=>b.title+' — '+b.val+' '+b.unit+(b.old?(' (vorher '+b.old+')'):'')).join(' · ')),1300);}catch{}
   // Grow the library with whatever was actually trained
   try{
     const _added=adoptExercisesToLibrary([...(curExercises||[]),...(wuExercises||[])]);
@@ -5070,7 +5092,11 @@ function saveWorkout(){
   if(newPRs.length){
     setTimeout(()=>{showErr('🏆 Neuer Rekord! '+newPRs.map(p=>p.name+': '+p.reps+' Wdh'+(p.old>0?' (vorher: '+p.old+')':'')).join(' · '));},600);
   }
-  if(plan?.weeks?.length){showPlanLinkModal(entry);}else{show('s-home');}
+  // Offer to save this workout to the portfolio (not if it came from one, not for stretch)
+  const _offerSave=!curSetup.fromMyWorkout&&!entry.stretch&&(curExercises||[]).length>=2;
+  if(plan?.weeks?.length){showPlanLinkModal(entry);}
+  else if(_offerSave){offerSaveWorkout(entry);}
+  else{show('s-home');}
   if(!entry.stretch)setTimeout(()=>{try{offerCooldown(entry.muscles);}catch(e){}},900);
 }
 function showPlanLinkModal(entry){
@@ -5212,7 +5238,26 @@ function renderHistory(){
       }
     }
   }else hw.style.display='none';
-  const escN=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.entries(w.repLog||{}).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${w.stretch?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:'')):(mainMuscles(w.muscles,3).join(', ')||'Workout')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${w.amrap&&w.amrapRounds!=null?' '+mkT('🔄 '+w.amrapRounds+' Runden','var(--am)'):''}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{const per=repsPerExercise(w).filter(p=>p.reps>0||p.secs>0);if(!per.length)return'';return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${per.map(p=>`<div onclick="openExerciseDetail('${(p.name||'').replace(/'/g,"\\'")}')" style="display:flex;justify-content:space-between;font-size:12px;cursor:pointer;padding:2px 0"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''} <span style="color:var(--br)">›</span></span><span style="color:var(--su);font-weight:600;margin-left:8px">${p.isHold?p.secs+'s':p.reps+' Wdh'}</span></div>`).join('')}</div>`;})()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${escN(w.note)}</div>`:''}</div>`;}).join('');}
+  const escN=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.entries(w.repLog||{}).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${w.stretch?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:'')):(mainMuscles(w.muscles,3).join(', ')||'Workout')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${w.amrap&&w.amrapRounds!=null?' '+mkT('🔄 '+w.amrapRounds+' Runden','var(--am)'):''}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{
+      const isAmrap=w.amrap;
+      const per=repsPerExercise(w);
+      // AMRAP: show every exercise as "one round" (planned reps/secs + weight).
+      // Normal: only exercises with logged work.
+      const rows=isAmrap?per:per.filter(p=>p.reps>0||p.secs>0);
+      if(!rows.length)return'';
+      const fmtVal=p=>{
+        if(isAmrap){
+          const base=p.isHold?((p.plannedDur||0)+'s'):((p.plannedReps||0)+' Wdh'+(p.bilateral?'/S':''));
+          const wt=p.plannedWeight?(' @ '+p.plannedWeight+' kg'):'';
+          return base+wt;
+        }
+        const base=p.isHold?(p.secs+'s'):(p.reps+' Wdh');
+        const wt=(!p.isHold&&p.weight)?(' @ '+p.weight+' kg'):'';
+        return base+wt;
+      };
+      const head=isAmrap?`<div style="font-size:11px;color:var(--am);font-weight:700;margin-bottom:6px">🔄 ${w.amrapRounds!=null?w.amrapRounds+' Runden':'AMRAP'}${w.capMin?' · '+w.capMin+' Min':''} · pro Runde:</div>`:'';
+      return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${head}${rows.map(p=>`<div onclick="openExerciseDetail('${(p.name||'').replace(/'/g,"\\'")}')" style="display:flex;justify-content:space-between;font-size:12px;cursor:pointer;padding:2px 0"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''} <span style="color:var(--br)">›</span></span><span style="color:var(--su);font-weight:600;margin-left:8px;white-space:nowrap">${fmtVal(p)}</span></div>`).join('')}</div>`;
+    })()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${escN(w.note)}</div>`:''}</div>`;}).join('');}
 function showHistory(){show('s-history');}
 async function delW(idx){const ok=await appConfirm('Training löschen?','Diese Aktion kann nicht rückgängig gemacht werden.');if(!ok)return;log.splice(idx,1);persist();updateHome();showHistory();}
 async function delLastWorkout(){if(!log.length)return;const last=log[log.length-1];const ok=await appConfirm('Letztes Training löschen?','RPE '+(last.rpe||'?')+'/10 · '+fmtD(last.date));if(!ok)return;log.pop();persist();updateHome();}
@@ -5245,12 +5290,20 @@ function repsPerExercise(w){
     plannedSets:ex.sets||1,
     isHold:isHoldEx(ex),
     reps:0,
-    secs:0
+    secs:0,
+    weight:0,
+    // For AMRAP (no per-exercise logging): the planned reps/duration = one round
+    plannedReps:ex.reps||0,
+    plannedDur:ex.duration||0,
+    plannedWeight:ex.defaultWeight||ex.weight||0
   }));
   Object.entries(w.repLog||{}).forEach(([k,v])=>{
     // Held-seconds keys: "<round>_<ex>_s<set>_sec" (optionally _L/_R)
     const hm=k.match(/^\d+_(\d+)_s\d+_sec(?:_[LR])?$/);
     if(hm){const ei=+hm[1];if(out[ei])out[ei].secs+=(v||0);return;}
+    // Weight keys: "<round>_<ex>_s<set>_w" → keep the heaviest logged
+    const wm=k.match(/^\d+_(\d+)_s\d+_w$/);
+    if(wm){const ei=+wm[1];if(out[ei])out[ei].weight=Math.max(out[ei].weight,v||0);return;}
     const p=parseRepKey(k);
     if(!p||!out[p.ex])return;
     out[p.ex].reps+=(v||0);
@@ -6587,7 +6640,28 @@ const PRESET_WORKOUTS=[
 ];
 function openPresetWorkouts(){
   const el=document.getElementById('preset-list');
+  const mine=loadMyWorkouts();
+  const mineHtml=mine.length?(
+    '<div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin:4px 0 8px">Meine Workouts</div>'+
+    mine.map(mw=>{
+      const rec=mw.capMin?((mw.recordRounds||0)+' Runden'):((mw.recordReps||0)+' Wdh');
+      const modeTxt=mw.capMin?('AMRAP · '+mw.capMin+' Min'):(mw.trainingMode==='circuit'?('Zirkel · '+(mw.rounds||1)+' Runden'):'Sätze');
+      return `<div style="background:var(--card);border:1px solid var(--br);border-radius:13px;padding:14px;margin-bottom:9px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div onclick="startMyWorkout('${mw.id}')" style="flex:1;min-width:0;cursor:pointer">
+            <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:3px">${mw.title}</div>
+            <div style="font-size:11px;color:var(--mu)">${modeTxt} · ${mw.exercises.length} Übungen</div>
+            <div style="font-size:11px;color:var(--co);font-weight:600;margin-top:4px">🏆 Rekord: ${rec}</div>
+          </div>
+          <button onclick="deleteMyWorkout('${mw.id}')" aria-label="Löschen" style="flex-shrink:0;width:28px;height:28px;border-radius:8px;background:rgba(var(--hotRGB),.1);border:1px solid rgba(var(--hotRGB),.24);color:var(--hot);font-size:12px">✕</button>
+        </div>
+        <div onclick="startMyWorkout('${mw.id}')" style="margin-top:10px;font-size:12px;font-weight:700;color:var(--am);cursor:pointer">⚡ Starten →</div>
+      </div>`;
+    }).join('')+
+    '<div style="height:8px"></div><div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin:4px 0 8px">Vorlagen</div>'
+  ):'';
   el.innerHTML='<button onclick="closeModal(\'modal-presets\');openImportWorkout()" style="width:100%;padding:13px;border-radius:12px;background:rgba(var(--acRGB),.12);border:1px solid rgba(var(--acRGB),.3);color:var(--ac);font-size:13px;font-weight:600;font-family:var(--f);margin-bottom:12px">📥 Workout aus Text importieren (TikTok & Co.)</button>'+
+    mineHtml+
     PRESET_WORKOUTS.map((p,i)=>`<div onclick="startPreset('${p.id}')" style="background:var(--card);border:1px solid var(--br);border-radius:13px;padding:14px;margin-bottom:9px;cursor:pointer">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px"><span style="font-size:20px">${p.icon}</span><div style="font-size:15px;font-weight:700;color:var(--tx)">${p.name}</div></div>
     <div style="font-size:12px;color:var(--mu);line-height:1.5;margin-bottom:8px">${p.sub}</div>
@@ -6609,7 +6683,112 @@ function startPreset(id){
   pendingPlanSession=null;
   showReview();
 }
+// ─── "Meine Workouts" — personal portfolio of saved, re-runnable workouts ─────
+function loadMyWorkouts(){try{return JSON.parse(localStorage.getItem('coach_myworkouts'))||[];}catch{return[];}}
+function saveMyWorkouts(a){safeSet('coach_myworkouts',JSON.stringify(a));}
+// Strict signature: same only if exercises + reps/duration + weight + mode + time/rounds match.
+function workoutSignature(exs,setup){
+  const parts=(exs||[]).map(e=>{
+    const w=e.defaultWeight||e.weight||0;
+    const load=isHoldEx(e)?('h'+(e.duration||0)):('r'+(e.reps||0));
+    return _normExName(e.name)+':'+load+':w'+w+(e.bilateral?':bi':'');
+  });
+  const mode=setup?.trainingMode||'sets';
+  const tail=mode==='circuit'?(setup.capMin?('amrap'+setup.capMin):('rnd'+(setup.rounds||1))):'sets';
+  return parts.join('|')+'||'+tail;
+}
+// Build a portfolio entry from the current workout
+function _currentWorkoutSnapshot(title){
+  return {
+    id:'my_'+Date.now(),
+    title:title||'Mein Workout',
+    exercises:curExercises.map(e=>({...e})),
+    trainingMode:curSetup.trainingMode||'sets',
+    rounds:curSetup.rounds||1,capMin:curSetup.capMin||0,
+    exRest:!!curSetup.exRest,roundRest:!!curSetup.roundRest,
+    muscles:[...(curSetup.muscles||[])],durationMin:curSetup.durationMin||20,
+    signature:workoutSignature(curExercises,curSetup),
+    recordRounds:0,recordReps:0,createdAt:Date.now()
+  };
+}
+// After a finished workout, update the record of any saved workout with the
+// same signature (best rounds for AMRAP, best total reps otherwise).
+function updateWorkoutRecords(entry){
+  const sig=workoutSignature(entry.exercises,{trainingMode:entry.amrap?'circuit':(entry._mode||'sets'),capMin:entry.capMin||0,rounds:entry._rounds||1});
+  const mine=loadMyWorkouts();let changed=false;const beaten=[];
+  mine.forEach(mw=>{
+    if(mw.signature!==sig)return;
+    if(entry.amrap){const r=entry.amrapRounds||0;if(r>(mw.recordRounds||0)){beaten.push({title:mw.title,old:mw.recordRounds||0,val:r,unit:'Runden'});mw.recordRounds=r;changed=true;}}
+    else{const tot=repTotal(entry.repLog);if(tot>(mw.recordReps||0)){beaten.push({title:mw.title,old:mw.recordReps||0,val:tot,unit:'Wdh'});mw.recordReps=tot;changed=true;}}
+  });
+  if(changed)saveMyWorkouts(mine);
+  return beaten;
+}
+// Best record for the current workout's signature (shown in the timer/preview)
+function currentWorkoutRecord(){
+  const sig=workoutSignature(curExercises,curSetup);
+  const mine=loadMyWorkouts().filter(mw=>mw.signature===sig);
+  if(!mine.length)return null;
+  if(curSetup.capMin)return {rounds:Math.max(...mine.map(m=>m.recordRounds||0))};
+  return {reps:Math.max(...mine.map(m=>m.recordReps||0))};
+}
+
+// Offer to save the just-finished workout to the portfolio
+let _pendingSaveEntry=null;
+function offerSaveWorkout(entry){
+  _pendingSaveEntry=entry;
+  // default title from focus
+  const def=(mainMuscles(entry.muscles,3).join(', ')||'Mein Workout')+(entry.amrap?' (AMRAP)':'');
+  const inp=document.getElementById('savewk-title');if(inp)inp.value=def;
+  const st=document.getElementById('savewk-status');if(st)st.textContent='';
+  document.getElementById('modal-savewk').classList.add('open');
+}
+function confirmSaveWorkout(){
+  const title=(document.getElementById('savewk-title').value||'Mein Workout').trim();
+  // snapshot from the entry we just saved (curExercises/curSetup still hold it)
+  const snap=_currentWorkoutSnapshot(title);
+  // seed the record from this very session
+  if(_pendingSaveEntry){
+    if(_pendingSaveEntry.amrap)snap.recordRounds=_pendingSaveEntry.amrapRounds||0;
+    else snap.recordReps=repTotal(_pendingSaveEntry.repLog);
+  }
+  const mine=loadMyWorkouts();mine.unshift(snap);saveMyWorkouts(mine);
+  closeModal('modal-savewk');
+  showErr('✓ „'+title+'" in „Meine Workouts" gespeichert.');
+  show('s-home');
+}
+async function aiTitleForWorkout(){
+  if(!loadKey()){showErr('Für KI-Titel brauchst du einen API-Key (Einstellungen).');return;}
+  const btn=document.getElementById('savewk-ai');if(btn){btn.textContent='…';btn.disabled=true;}
+  try{
+    const list=curExercises.map(e=>e.name+(isHoldEx(e)?(' '+(e.duration||0)+'s'):(' '+(e.reps||0)+'x'))).join(', ');
+    const mode=curSetup.capMin?('AMRAP '+curSetup.capMin+' Min'):(curSetup.trainingMode==='circuit'?('Zirkel '+(curSetup.rounds||1)+' Runden'):'Sätze');
+    const prompt='Finde einen kurzen, knackigen Workout-Titel (max 4 Wörter, Deutsch, kein Emoji, keine Anführungszeichen). Modus: '+mode+'. Übungen: '+list+'. Antworte NUR mit dem Titel.';
+    const raw=await callAPI([{role:'user',content:prompt}],40);
+    const title=String(raw||'').replace(/["'\n]/g,'').trim().slice(0,48);
+    if(title){document.getElementById('savewk-title').value=title;}
+  }catch(e){document.getElementById('savewk-status').textContent='KI-Titel fehlgeschlagen.';}
+  finally{if(btn){btn.textContent='✦ KI-Titel';btn.disabled=false;}}
+}
+// Start a saved workout from the portfolio
+function startMyWorkout(id){
+  const mw=loadMyWorkouts().find(x=>x.id===id);if(!mw)return;
+  closeModal('modal-presets');
+  const dw=kbDefaultWeight();
+  curExercises=mw.exercises.map(e=>{const c={...e,icon:getExIcon(e.name)};if(c.trackWeight&&dw&&!c.defaultWeight)c.defaultWeight=dw;return c;});
+  wuExercises=[];
+  curSetup={muscles:[...(mw.muscles||[])],durationMin:mw.durationMin||20,
+    trainingMode:mw.trainingMode||'sets',rounds:mw.rounds||1,capMin:mw.capMin||0,
+    exRest:!!mw.exRest,roundRest:!!mw.roundRest,fromMyWorkout:mw.id};
+  pendingPlanSession=null;
+  showReview();
+}
+function deleteMyWorkout(id){
+  const mine=loadMyWorkouts().filter(x=>x.id!==id);saveMyWorkouts(mine);openPresetWorkouts();
+}
+
 function loadTemplates(){try{return JSON.parse(localStorage.getItem('coach_templates'))||[];}catch{return[];}}
+
 
 function saveTemplates(t){safeSet('coach_templates',JSON.stringify(t));}
 function saveAsTemplate(){const name=prompt('Name für diese Vorlage:',curSetup.muscles?.map(m=>MUSCLE_DE_SHORT[m]||m).join(', ')||'Mein Workout');if(!name)return;const templates=loadTemplates();templates.push({id:Date.now(),name,muscles:curSetup.muscles||[],exercises:[...curExercises],warmup:[...wuExercises],createdAt:todayIso()});saveTemplates(templates);const btn=document.querySelector('button[onclick="saveAsTemplate()"]');if(btn){btn.textContent='✓ Gespeichert';setTimeout(()=>btn.textContent='💾 Als Vorlage speichern',2000);}document.getElementById('tpl-btn').style.display='block';}
