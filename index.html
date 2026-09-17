@@ -4645,6 +4645,19 @@ function _syncKbDetail(equipList){
 function isHoldEx(ex){return !!ex&&ex.type!=='reps'&&(ex.type==='hold'||ex.type==='time'||ex.stretch||(!!ex.duration&&!ex.reps));}
 // Sum only actual repetitions, never held-seconds keys (which end in _sec).
 function repTotal(repLog){return Object.entries(repLog||{}).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+(v||0),0);}
+// Reps in ONE round of a circuit (holds don't add rep-volume; bilateral counts both sides)
+function _perRoundReps(exs){return (exs||[]).reduce((s,e)=>s+(isHoldEx(e)?0:((e.reps||0)*(e.bilateral?2:1))),0);}
+// Total rep-volume actually done. For AMRAP = rounds × per-round reps; else the logged sum.
+function workoutVolume(entry){
+  if(entry&&entry.amrap&&entry.amrapRounds!=null)return (entry.amrapRounds||0)*_perRoundReps(entry.exercises);
+  return repTotal(entry?.repLog);
+}
+// Reps per minute — the time-fair intensity measure for AMRAP
+function workoutIntensity(entry){
+  const mins=entry&&entry.capMin?entry.capMin:(entry?.durationMin||0);
+  const vol=workoutVolume(entry);
+  return mins>0?Math.round(vol/mins*10)/10:0;
+}
 
 // Circuit with the "pause between exercises" toggle OFF: no rest countdown,
 // nothing auto-advances — the user confirms "Weiter" after each exercise.
@@ -5196,7 +5209,7 @@ function renderHistory(){
   // Chart: strength sessions only — stretch RPE is not comparable and adds noise
   const strength=log.filter(w=>!w.stretch);
   const rd=strength.slice(-8).map(w=>{
-    const reps=repTotal(w.repLog);
+    const reps=workoutVolume(w);
     return{l:fmtDW(w.date),v:w.rpe,c:rpc(w.rpe),sub:reps>0?reps+' Wdh':''};
   });
   const hw=document.getElementById('hist-chart');
@@ -5238,24 +5251,29 @@ function renderHistory(){
       }
     }
   }else hw.style.display='none';
-  const escN=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=Object.entries(w.repLog||{}).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${w.stretch?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:'')):(mainMuscles(w.muscles,3).join(', ')||'Workout')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${w.amrap&&w.amrapRounds!=null?' '+mkT('🔄 '+w.amrapRounds+' Runden','var(--am)'):''}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{
+  const escN=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');document.getElementById('hist-list').innerHTML=[...log].reverse().map((w,i)=>{const idx=log.length-1-i,rc=rpc(w.rpe),tot=w.amrap?workoutVolume(w):Object.entries(w.repLog||{}).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+v,0);return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:6px">${w.stretch?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:'')):(mainMuscles(w.muscles,3).join(', ')||'Workout')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${mkT(fmtD(w.date),'var(--mu)')} ${mkT((w.durationMin||'?')+' min','var(--mu)')}${w.amrap&&w.amrapRounds!=null?' '+mkT('🔄 '+w.amrapRounds+' Runden','var(--am)'):''}${tot>0?' '+mkT(tot+' Wdh','var(--co)'):''}${w.note?' '+mkT('📝','var(--mu)'):''}</div></div><div style="display:flex;align-items:center;gap:6px;margin-left:10px"><div style="font-size:19px;font-weight:500;color:${rc}">${w.rpe}<span style="font-size:10px;color:var(--mu);font-weight:400">/10</span></div><button onclick="openEdit(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:11px;display:flex;align-items:center;justify-content:center">✏</button><button onclick="delW(${idx})" style="width:26px;height:26px;border-radius:7px;background:rgba(var(--hotRGB),.13);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:11px;display:flex;align-items:center;justify-content:center">✕</button></div></div>${(()=>{
       const isAmrap=w.amrap;
       const per=repsPerExercise(w);
       // AMRAP: show every exercise as "one round" (planned reps/secs + weight).
       // Normal: only exercises with logged work.
       const rows=isAmrap?per:per.filter(p=>p.reps>0||p.secs>0);
       if(!rows.length)return'';
+      const rounds=isAmrap?(w.amrapRounds||0):0;
       const fmtVal=p=>{
         if(isAmrap){
-          const base=p.isHold?((p.plannedDur||0)+'s'):((p.plannedReps||0)+' Wdh'+(p.bilateral?'/S':''));
           const wt=p.plannedWeight?(' @ '+p.plannedWeight+' kg'):'';
-          return base+wt;
+          if(p.isHold)return (p.plannedDur||0)+'s'+wt;
+          const perSide=p.bilateral?2:1;
+          const perRound=(p.plannedReps||0)*perSide;
+          const total=rounds*perRound;
+          // "6 × 5 = 30 Wdh" (bilateral: per-round shown as both sides)
+          return rounds+' × '+(p.plannedReps||0)+(p.bilateral?'/S':'')+' = '+total+' Wdh'+wt;
         }
         const base=p.isHold?(p.secs+'s'):(p.reps+' Wdh');
         const wt=(!p.isHold&&p.weight)?(' @ '+p.weight+' kg'):'';
         return base+wt;
       };
-      const head=isAmrap?`<div style="font-size:11px;color:var(--am);font-weight:700;margin-bottom:6px">🔄 ${w.amrapRounds!=null?w.amrapRounds+' Runden':'AMRAP'}${w.capMin?' · '+w.capMin+' Min':''} · pro Runde:</div>`:'';
+      const head=isAmrap?`<div style="font-size:11px;color:var(--am);font-weight:700;margin-bottom:6px">🔄 ${w.amrapRounds!=null?w.amrapRounds+' Runden':'AMRAP'}${w.capMin?' · '+w.capMin+' Min':''} · ${workoutVolume(w)} Wdh gesamt:</div>`:'';
       return`<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:9px;display:flex;flex-direction:column;gap:4px">${head}${rows.map(p=>`<div onclick="openExerciseDetail('${(p.name||'').replace(/'/g,"\\'")}')" style="display:flex;justify-content:space-between;font-size:12px;cursor:pointer;padding:2px 0"><span style="color:var(--mu);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}${p.bilateral?' ↔':''} <span style="color:var(--br)">›</span></span><span style="color:var(--su);font-weight:600;margin-left:8px;white-space:nowrap">${fmtVal(p)}</span></div>`).join('')}</div>`;
     })()}${w.note?`<div style="font-size:12px;color:var(--mu);font-style:italic;border-top:1px solid var(--br);padding-top:7px;margin-top:8px">📝 ${escN(w.note)}</div>`:''}</div>`;}).join('');}
 function showHistory(){show('s-history');}
@@ -6644,14 +6662,18 @@ function openPresetWorkouts(){
   const mineHtml=mine.length?(
     '<div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin:4px 0 8px">Meine Workouts</div>'+
     mine.map(mw=>{
-      const rec=mw.capMin?((mw.recordRounds||0)+' Runden'):((mw.recordReps||0)+' Wdh');
+      const recBits=[];
+      if(mw.capMin){recBits.push('🏆 '+(mw.recordRounds||0)+' Runden');}
+      if(mw.recordVolume||mw.recordReps)recBits.push('💪 '+(mw.recordVolume||mw.recordReps||0)+' Wdh');
+      if(mw.recordIntensity)recBits.push('⚡ '+mw.recordIntensity+' Wdh/min');
+      const rec=recBits.join(' · ')||'noch kein Rekord';
       const modeTxt=mw.capMin?('AMRAP · '+mw.capMin+' Min'):(mw.trainingMode==='circuit'?('Zirkel · '+(mw.rounds||1)+' Runden'):'Sätze');
       return `<div style="background:var(--card);border:1px solid var(--br);border-radius:13px;padding:14px;margin-bottom:9px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div onclick="startMyWorkout('${mw.id}')" style="flex:1;min-width:0;cursor:pointer">
             <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:3px">${mw.title}</div>
             <div style="font-size:11px;color:var(--mu)">${modeTxt} · ${mw.exercises.length} Übungen</div>
-            <div style="font-size:11px;color:var(--co);font-weight:600;margin-top:4px">🏆 Rekord: ${rec}</div>
+            <div style="font-size:11px;color:var(--co);font-weight:600;margin-top:4px">${rec}</div>
           </div>
           <button onclick="deleteMyWorkout('${mw.id}')" aria-label="Löschen" style="flex-shrink:0;width:28px;height:28px;border-radius:8px;background:rgba(var(--hotRGB),.1);border:1px solid rgba(var(--hotRGB),.24);color:var(--hot);font-size:12px">✕</button>
         </div>
@@ -6686,16 +6708,23 @@ function startPreset(id){
 // ─── "Meine Workouts" — personal portfolio of saved, re-runnable workouts ─────
 function loadMyWorkouts(){try{return JSON.parse(localStorage.getItem('coach_myworkouts'))||[];}catch{return[];}}
 function saveMyWorkouts(a){safeSet('coach_myworkouts',JSON.stringify(a));}
-// Strict signature: same only if exercises + reps/duration + weight + mode + time/rounds match.
-function workoutSignature(exs,setup){
-  const parts=(exs||[]).map(e=>{
-    const w=e.defaultWeight||e.weight||0;
-    const load=isHoldEx(e)?('h'+(e.duration||0)):('r'+(e.reps||0));
-    return _normExName(e.name)+':'+load+':w'+w+(e.bilateral?':bi':'');
-  });
-  const mode=setup?.trainingMode||'sets';
-  const tail=mode==='circuit'?(setup.capMin?('amrap'+setup.capMin):('rnd'+(setup.rounds||1))):'sets';
-  return parts.join('|')+'||'+tail;
+// Workout identity is the SET of exercises (order/reps/weight/time are performance
+// variables, not identity). Two workouts are the "same" if identical exercises,
+// a "variant" if 1–2 differ, and different if 3+ differ.
+function exerciseSet(exs){return [...new Set((exs||[]).map(e=>_normExName(e.name)))];}
+function workoutSignature(exs,setup){return exerciseSet(exs).sort().join('|');}
+// Number of swapped exercises: max(added, removed). Replacing 2 exercises = 2.
+function _exSetDiff(a,b){
+  const A=new Set(a),B=new Set(b);let onlyA=0,onlyB=0;
+  A.forEach(x=>{if(!B.has(x))onlyA++;});B.forEach(x=>{if(!A.has(x))onlyB++;});
+  return Math.max(onlyA,onlyB);
+}
+// Match kind vs a saved workout: 'same' (0 diff), 'variant' (1–2), or null (3+)
+function _matchKind(exsA,exsB){
+  const d=_exSetDiff(exerciseSet(exsA),exerciseSet(exsB));
+  if(d===0)return 'same';
+  if(d<=2)return 'variant';
+  return null;
 }
 // Build a portfolio entry from the current workout
 function _currentWorkoutSnapshot(title){
@@ -6708,31 +6737,41 @@ function _currentWorkoutSnapshot(title){
     exRest:!!curSetup.exRest,roundRest:!!curSetup.roundRest,
     muscles:[...(curSetup.muscles||[])],durationMin:curSetup.durationMin||20,
     signature:workoutSignature(curExercises,curSetup),
-    recordRounds:0,recordReps:0,createdAt:Date.now()
+    exSet:exerciseSet(curExercises),
+    recordRounds:0,recordReps:0,recordVolume:0,recordIntensity:0,createdAt:Date.now()
   };
 }
-// After a finished workout, update the record of any saved workout with the
-// same signature (best rounds for AMRAP, best total reps otherwise).
+// After a finished workout, update the records of any saved workout it matches
+// (same or variant). Three records: rounds, volume (reps), intensity (reps/min).
 function updateWorkoutRecords(entry){
-  const sig=workoutSignature(entry.exercises,{trainingMode:entry.amrap?'circuit':(entry._mode||'sets'),capMin:entry.capMin||0,rounds:entry._rounds||1});
+  const exs=entry.exercises||[];
   const mine=loadMyWorkouts();let changed=false;const beaten=[];
+  const vol=workoutVolume(entry),inten=workoutIntensity(entry),rounds=entry.amrap?(entry.amrapRounds||0):0;
   mine.forEach(mw=>{
-    if(mw.signature!==sig)return;
-    if(entry.amrap){const r=entry.amrapRounds||0;if(r>(mw.recordRounds||0)){beaten.push({title:mw.title,old:mw.recordRounds||0,val:r,unit:'Runden'});mw.recordRounds=r;changed=true;}}
-    else{const tot=repTotal(entry.repLog);if(tot>(mw.recordReps||0)){beaten.push({title:mw.title,old:mw.recordReps||0,val:tot,unit:'Wdh'});mw.recordReps=tot;changed=true;}}
+    const kind=_matchKind(exs,mw.exercises||[]);
+    if(!kind)return; // 3+ different → not the same workout
+    const tag=kind==='variant'?' (Variante)':'';
+    if(rounds>(mw.recordRounds||0)){beaten.push({title:mw.title+tag,old:mw.recordRounds||0,val:rounds,unit:'Runden'});mw.recordRounds=rounds;changed=true;}
+    if(vol>(mw.recordVolume||0)){beaten.push({title:mw.title+tag,old:mw.recordVolume||0,val:vol,unit:'Wdh'});mw.recordVolume=vol;changed=true;}
+    if(inten>(mw.recordIntensity||0)){mw.recordIntensity=inten;changed=true;} // silent, shown on card
+    // keep legacy recordReps in sync with volume for older UI
+    if(vol>(mw.recordReps||0)){mw.recordReps=vol;}
   });
   if(changed)saveMyWorkouts(mine);
   return beaten;
 }
-// Best record for the current workout's signature (shown in the timer/preview)
+// Best records for the current workout (same or variant matches)
 function currentWorkoutRecord(){
-  const sig=workoutSignature(curExercises,curSetup);
-  const mine=loadMyWorkouts().filter(mw=>mw.signature===sig);
+  const mine=loadMyWorkouts().filter(mw=>_matchKind(curExercises,mw.exercises||[]));
   if(!mine.length)return null;
-  if(curSetup.capMin)return {rounds:Math.max(...mine.map(m=>m.recordRounds||0))};
-  return {reps:Math.max(...mine.map(m=>m.recordReps||0))};
+  return {
+    rounds:Math.max(0,...mine.map(m=>m.recordRounds||0)),
+    volume:Math.max(0,...mine.map(m=>m.recordVolume||m.recordReps||0)),
+    intensity:Math.max(0,...mine.map(m=>m.recordIntensity||0)),
+    reps:Math.max(0,...mine.map(m=>m.recordVolume||m.recordReps||0))
+  };
 }
-
+// ── unused legacy stub kept for safety ──
 // Offer to save the just-finished workout to the portfolio
 let _pendingSaveEntry=null;
 function offerSaveWorkout(entry){
@@ -6747,10 +6786,13 @@ function confirmSaveWorkout(){
   const title=(document.getElementById('savewk-title').value||'Mein Workout').trim();
   // snapshot from the entry we just saved (curExercises/curSetup still hold it)
   const snap=_currentWorkoutSnapshot(title);
-  // seed the record from this very session
+  // seed the records from this very session
   if(_pendingSaveEntry){
-    if(_pendingSaveEntry.amrap)snap.recordRounds=_pendingSaveEntry.amrapRounds||0;
-    else snap.recordReps=repTotal(_pendingSaveEntry.repLog);
+    const e=_pendingSaveEntry;
+    snap.recordRounds=e.amrap?(e.amrapRounds||0):0;
+    snap.recordVolume=workoutVolume(e);
+    snap.recordReps=snap.recordVolume;
+    snap.recordIntensity=workoutIntensity(e);
   }
   const mine=loadMyWorkouts();mine.unshift(snap);saveMyWorkouts(mine);
   closeModal('modal-savewk');
@@ -7643,7 +7685,7 @@ const BUILT_IN_ACH=[
 ];
 
 function calcAchProgress(ach){
-  const total_reps=log.reduce((s,w)=>s+repTotal(w.repLog),0);
+  const total_reps=log.reduce((s,w)=>s+workoutVolume(w),0);
   switch(ach.type){
     case 'workouts':return{cur:log.length,pct:Math.min(100,Math.round(log.length/ach.target*100))};
     case 'streak':return{cur:streak(),pct:Math.min(100,Math.round(streak()/ach.target*100))};
@@ -7668,7 +7710,7 @@ function calcChallengeProgress(ch){
   switch(ch.type){
     case 'reps':{let r=0;filtered.forEach(w=>{const exArr=w.exercises||[];exArr.forEach((ex,ei)=>{if(!ch.exercise||(ex.name||'').toLowerCase().includes(ch.exercise.toLowerCase())){const rk='1_'+ei;r+=(w.repLog?.[rk]||0)+(w.repLog?.[rk+'_L']||0)+(w.repLog?.[rk+'_R']||0);}});});return{cur:r,pct:Math.min(100,Math.round(r/ch.target*100))};}
     case 'workouts':return{cur:filtered.length,pct:Math.min(100,Math.round(filtered.length/ch.target*100))};
-    case 'total_reps':{const r=filtered.reduce((s,w)=>s+repTotal(w.repLog),0);return{cur:r,pct:Math.min(100,Math.round(r/ch.target*100))};}
+    case 'total_reps':{const r=filtered.reduce((s,w)=>s+workoutVolume(w),0);return{cur:r,pct:Math.min(100,Math.round(r/ch.target*100))};}
     case 'streak':{
       // Longest run of consecutive calendar days with a workout inside the window
       const dayset=new Set(filtered.map(w=>w.date.slice(0,10)));
@@ -7822,7 +7864,7 @@ function renderAnalytics(range){
 
   if(!filtered.length){document.getElementById('analytics-content').innerHTML=`<div style="text-align:center;padding:40px 0;color:var(--mu)"><div style="font-size:36px;margin-bottom:10px">📊</div><div style="font-size:14px">Noch keine Daten für diesen Zeitraum.</div></div>`;try{renderProgress();}catch(e){}return;}
 
-  const totalReps=filtered.reduce((s,w)=>s+repTotal(w.repLog),0);
+  const totalReps=filtered.reduce((s,w)=>s+workoutVolume(w),0);
   const avgRpe=filtered.length?Math.round(filtered.reduce((s,w)=>s+(w.rpe||0),0)/filtered.length*10)/10:0;
   const totalMin=filtered.reduce((s,w)=>s+(w.durationMin||0),0);
 
