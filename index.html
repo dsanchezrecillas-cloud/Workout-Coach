@@ -695,7 +695,7 @@ button:active:not(:disabled){transform:scale(.96)}
     <button onclick="saveCoachProfile()" class="btn btn-ac" id="prof-btn" style="padding:12px">Profil speichern</button>
     <button onclick="openOnboarding()" class="btn" style="padding:11px;margin-top:8px;border:1.5px solid var(--br);color:var(--tx)">🧬 Über dich (Alter, Größe, Status, Sportarten)</button>
   </div>
-  <div class="card"><div style="font-size:12px;color:var(--mu)">Schema v5 · claude-sonnet-4-6</div></div>
+  <div class="card"><div style="font-size:12px;color:var(--mu)">Schema v5 · KI: <span id="model-label"></span></div></div>
 </div>
 
 
@@ -1234,7 +1234,9 @@ button:active:not(:disabled){transform:scale(.96)}
 
 <script>
 // ─── Constants ────────────────────────────────────────────────────────────────
-const API='/.netlify/functions/proxy', MODEL='claude-sonnet-4-6';
+const API='/.netlify/functions/proxy', MODEL_NEW='claude-sonnet-5-5', MODEL_FALLBACK='claude-sonnet-4-6';
+// Use the newer model; if the proxy rejects it (unknown/blocked model), fall back once and remember that.
+let MODEL=(()=>{try{return localStorage.getItem('coach_model_fallback')==='1'?MODEL_FALLBACK:MODEL_NEW;}catch{return MODEL_NEW;}})();
 const SK='coach_v5', PK='coach_plan_v3', LK='coach_lib', AK='coach_api_key';
 const CIRC=2*Math.PI*100;
 const RPE_L=['','sehr leicht','leicht','moderat','moderat+','anstrengend','anstrengend+','sehr anstrengend','maximal schwer','fast alles','alles gegeben'];
@@ -1578,6 +1580,13 @@ async function callAPI(messages,maxT=800,system='',_retry=0){
       return callAPI(messages,maxT,system,_retry+1);
     }
     const e=await res.json().catch(()=>({}));
+    // Model not available through the proxy → switch to the fallback model and retry once
+    const msg=(e?.error?.message||'')+' '+(e?.error?.type||'');
+    if(MODEL!==MODEL_FALLBACK&&(res.status===400||res.status===404||res.status===403)&&/model|not_found/i.test(msg)){
+      MODEL=MODEL_FALLBACK;try{localStorage.setItem('coach_model_fallback','1');}catch{}
+      const ml=document.getElementById('model-label');if(ml)ml.textContent=MODEL;
+      return callAPI(messages,maxT,system,_retry);
+    }
     if(res.status===504)throw new Error('Zeitüberschreitung — bitte nochmal versuchen');
     throw new Error(e?.error?.message||'HTTP '+res.status);
   }
@@ -1856,59 +1865,6 @@ const DEFAULT_LIB=[
 ];
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-function renderWeekReport(){
-  const el=document.getElementById('week-report');if(!el)return;
-  const dow=new Date().getDay();
-  if(dow!==0&&dow!==1){el.style.display='none';return;} // nur So+Mo
-  // Woche = Mo-basiert. Betrachtet wird die zuletzt ABGESCHLOSSENE Woche (So: laufende Woche endet heute; Mo: Vorwoche)
-  const today=new Date(todayIso()+'T12:00:00');
-  const td=today.getDay();
-  const thisMon=new Date(today);thisMon.setDate(today.getDate()+(td===0?-6:1-td));
-  const refMon=dow===1?new Date(thisMon.getTime()-7*86400000):thisMon; // Mo: Vorwoche, So: aktuelle
-  const refEnd=new Date(refMon.getTime()+7*86400000);
-  const prevMon=new Date(refMon.getTime()-7*86400000);
-  const inRange=(d,a,b)=>d>=a&&d<b;
-  const vol=w=>Object.entries(w.repLog||{}).filter(([k])=>/^\d+_\d+_s\d+(_L|_R)?$/.test(k)).reduce((s,[,v])=>s+v,0);
-  const wk=[],prev=[];
-  log.forEach(w=>{
-    const d=new Date(w.date.slice(0,10)+'T12:00:00');
-    if(inRange(d,refMon,refEnd))wk.push(w);
-    else if(inRange(d,prevMon,refMon))prev.push(w);
-  });
-  if(!wk.length){el.style.display='none';return;}
-  const volNow=wk.reduce((s,w)=>s+vol(w),0);
-  const volPrev=prev.reduce((s,w)=>s+vol(w),0);
-  const avgRpe=Math.round(wk.reduce((s,w)=>s+(w.rpe||0),0)/wk.length*10)/10;
-  const volDiff=volPrev>0?Math.round((volNow-volPrev)/volPrev*100):null;
-  // Plan-Treue in der Referenzwoche
-  let adherence='';
-  if(plan?.weeks?.length){
-    let planned=0,done=0;
-    plan.weeks.forEach((pw,wi)=>{pw.sessions.forEach(s=>{
-      const d=getSessionDate(wi,s.dow);
-      if(d&&inRange(d,refMon,refEnd)){planned++;if(s.done)done++;}
-    });});
-    if(planned>0)adherence=done+'/'+planned+' Plan-Sessions';
-  }
-  // Regelbasierte Empfehlung
-  let rec;
-  if(avgRpe>=8.5)rec='Ø-RPE sehr hoch — plane diese Woche einen Deload (ca. halbes Volumen).';
-  else if(volDiff!==null&&volDiff>25)rec='Volumen +'+volDiff+'% ist ein großer Sprung. Diese Woche halten, nicht weiter steigern.';
-  else if(adherence&&adherence.startsWith('0'))rec='Keine Plan-Session geschafft — Frequenz im Plan reduzieren statt aufholen.';
-  else if(volDiff!==null&&volDiff>0)rec='Volumen steigt kontrolliert (+'+volDiff+'%). Weiter so, Ziel +5-10% pro Woche.';
-  else if(volDiff!==null&&volDiff<-15)rec='Volumen deutlich gefallen. Wenn kein Deload geplant war: diese Woche wieder anziehen.';
-  else rec='Solide Woche. Halte die Frequenz, steigere Wdh in den Hauptübungen leicht.';
-  el.innerHTML=`<div class="card" style="margin-bottom:12px;border-color:rgba(var(--coRGB),.26)">
-    <div style="font-size:10px;color:var(--co);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:9px">📈 Wochenrückblick</div>
-    <div style="display:flex;gap:14px;margin-bottom:9px;flex-wrap:wrap">
-      <div><span style="font-size:17px;font-weight:700;color:var(--tx)">${volNow}</span> <span style="font-size:11px;color:var(--mu)">Wdh${volDiff!==null?' ('+(volDiff>=0?'+':'')+volDiff+'%)':''}</span></div>
-      <div><span style="font-size:17px;font-weight:700;color:var(--tx)">${avgRpe}</span> <span style="font-size:11px;color:var(--mu)">Ø RPE</span></div>
-      ${adherence?`<div><span style="font-size:17px;font-weight:700;color:var(--tx)">${adherence.split(' ')[0]}</span> <span style="font-size:11px;color:var(--mu)">Plan</span></div>`:''}
-    </div>
-    <div style="font-size:12px;color:var(--su);line-height:1.55;border-top:1px solid var(--br);padding-top:8px">${rec}</div>
-  </div>`;
-  el.style.display='block';
-}
 
 // ─── Weekly goal ring ────────────────────────────────────────────────────────
 function updateWeekRing(){
@@ -4088,14 +4044,37 @@ function startAmrapRounds(){
   _amrapIv=setInterval(()=>{
     if(tStatus!=='amrap')return;
     updateAmrapBanner();updateAmrapCenter();
+    try{persistActive();}catch(e){}
     if(_amrapLeft()<=0)finishAmrap();
   },1000);
+  try{persistActive();}catch(e){}
 }
 function amrapRoundDone(){
   if(tStatus!=='amrap')return;
   if(_amrapLeft()<=0){finishAmrap();return;}
   tRound++;beep(1000,.18);
   updateAmrapBanner();updateAmrapCenter();
+  try{persistActive();}catch(e){}
+}
+// Restore an AMRAP that was interrupted (e.g. iOS closed the app). The clock is
+// wall-clock based, so time kept running; if it already ran out, finish it.
+function resumeAmrap(a){
+  curExercises=a.curExercises;wuExercises=[];curSetup=a.curSetup||{};isWU=false;
+  tReps=a.tReps||{};tRound=a.tRound||1;tIdx=0;tSet=1;_amrapStart=a.amrapStart;
+  window._amrapCompareRounds=_lastAmrapRounds();
+  const _rec=currentWorkoutRecord();window._amrapRecord=(_rec&&_rec.rounds)||0;
+  tStatus='amrap';tRun=true;
+  show('s-timer');initTimerScroll();requestWakeLock();
+  if(_amrapLeft()<=0){finishAmrap();showErr('⏱ Zeit war während der Pause abgelaufen — '+(window._amrapRoundsDone||0)+' Runden gezählt.');return;}
+  renderAmrap();
+  if(_amrapIv)clearInterval(_amrapIv);
+  _amrapIv=setInterval(()=>{
+    if(tStatus!=='amrap')return;
+    updateAmrapBanner();updateAmrapCenter();
+    try{persistActive();}catch(e){}
+    if(_amrapLeft()<=0)finishAmrap();
+  },1000);
+  showErr('▶ AMRAP wiederhergestellt — die Uhr lief weiter.');
 }
 function finishAmrap(){
   if(_amrapIv){clearInterval(_amrapIv);_amrapIv=null;}
@@ -4644,6 +4623,9 @@ function _syncKbDetail(equipList){
 // field — swap/add can leave a stale reps value, so we must not rely on !reps.
 function isHoldEx(ex){return !!ex&&ex.type!=='reps'&&(ex.type==='hold'||ex.type==='time'||ex.stretch||(!!ex.duration&&!ex.reps));}
 // Sum only actual repetitions, never held-seconds keys (which end in _sec).
+// Strip characters that would be interpreted as HTML when shown in the UI
+function _cleanTxt(s){return String(s==null?'':s).replace(/[<>]/g,'').trim();}
+function _cleanEx(e){if(!e)return e;['name','tip','details','mistakes'].forEach(k=>{if(typeof e[k]==='string')e[k]=_cleanTxt(e[k]);});return e;}
 function repTotal(repLog){return Object.entries(repLog||{}).filter(([k])=>!/_sec(_[LR])?$/.test(k)).reduce((s,[,v])=>s+(v||0),0);}
 // Reps in ONE round of a circuit (holds don't add rep-volume; bilateral counts both sides)
 function _perRoundReps(exs){return (exs||[]).reduce((s,e)=>s+(isHoldEx(e)?0:((e.reps||0)*(e.bilateral?2:1))),0);}
@@ -4697,8 +4679,6 @@ function startTimer(){
 function pauseTimer(){tRun=false;if(tIv){clearInterval(tIv);tIv=null;}updateTimer();}
 let _tickTs=0;
 function tick(){_tickTs=Date.now();
-  // Time-capped AMRAP: end the whole session when the global clock runs out
-  if(curSetup.capMin){updateAmrapBanner();if(_amrapLeft()<=0&&tStatus!=='done'){clearInterval(tIv);tIv=null;tRun=false;beep(1100,.5);tStatus='done';updateTimer();return;}}
   if(tLeft<=4&&tLeft>1)beep(660,.08);if(tLeft<=1){clearInterval(tIv);tIv=null;tRun=false;advance();return;}tLeft--;document.getElementById('t-disp').textContent=fmtT(tLeft);const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{};const mt=tStatus==='work'?(ex.duration||40):tStatus==='rest'?(ex.rest||20):RREST;document.getElementById('timer-arc').setAttribute('stroke-dashoffset',CIRC-((mt-tLeft)/mt)*CIRC);}
 // Single entry point for starting the countdown. Always clears any existing
 // interval first, so ticks can never stack and run the clock multiple times too fast.
@@ -4857,7 +4837,7 @@ function persistActive(){
   _lastActiveSig=sig;window._lastActiveTs=now;
   try{localStorage.setItem(ACTIVE_KEY,JSON.stringify({
     ts:now,curExercises,wuExercises,curSetup,isWU,
-    tStatus,tRound,tIdx,tSet,tLeft,tReps
+    tStatus,tRound,tIdx,tSet,tLeft,tReps,amrapStart:_amrapStart||0
   }));}catch{}
 }
 function clearActive(){try{localStorage.removeItem(ACTIVE_KEY);}catch{}_lastActiveSig='';}
@@ -4882,6 +4862,7 @@ function updateResumeCard(){
 }
 function resumeActive(){
   const a=loadActive();if(!a)return;
+  if(a.tStatus==='amrap'&&a.amrapStart){resumeAmrap(a);return;}
   curExercises=a.curExercises;wuExercises=a.wuExercises||[];curSetup=a.curSetup||{};
   isWU=!!a.isWU;tStatus=a.tStatus;tRound=a.tRound;tIdx=a.tIdx;tSet=a.tSet;tLeft=a.tLeft;tReps=a.tReps||{};
   tRun=false;clearInterval(tIv); // paused — user taps Weiter
@@ -5650,7 +5631,7 @@ function onDurSlider(which){
   document.getElementById('dur-max-val').textContent=mx+' min';
 }
 
-function buildPlanCreate(){const gc=document.getElementById('goal-cards');if(!gc){console.error('goal-cards missing');return;}gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<span style="font-size:22px">${g.icon}</span><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');if(wc){wc.innerHTML='';[4,6,8,12].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});}const fc=document.getElementById('freq-chips');if(fc){fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' co':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';};fc.appendChild(b);});}const dmS=document.getElementById('dur-min-slider'),dxS=document.getElementById('dur-max-slider');if(dmS){dmS.value=planOpts.durMin;document.getElementById('dur-min-val').textContent=planOpts.durMin+' min';}if(dxS){dxS.value=planOpts.durMax;document.getElementById('dur-max-val').textContent=planOpts.durMax+' min';}const bdp=document.getElementById('blocked-days-picker');if(bdp){bdp.innerHTML='';const dayOrder=[1,2,3,4,5,6,0];const dayLbl={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};dayOrder.forEach(d=>{const active=!planOpts.blockedDays.includes(d);const b=document.createElement('button');b.style.cssText=`flex:1;padding:11px 0;border-radius:9px;border:1.5px solid ${active?'var(--ac)':'var(--br)'};background:${active?'rgba(var(--acRGB),.15)':'var(--up)'};color:${active?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f);opacity:${active?1:.5}`;b.textContent=dayLbl[d];b.onclick=()=>{if(planOpts.blockedDays.includes(d))planOpts.blockedDays=planOpts.blockedDays.filter(x=>x!==d);else planOpts.blockedDays=[...planOpts.blockedDays,d];const on=!planOpts.blockedDays.includes(d);b.style.borderColor=on?'var(--ac)':'var(--br)';b.style.background=on?'rgba(var(--acRGB),.15)':'var(--up)';b.style.color=on?'var(--ac)':'var(--mu)';b.style.opacity=on?1:.5;};bdp.appendChild(b);});}const sc=document.getElementById('style-cards');if(sc){sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<span style="font-size:18px">${s.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}sc.appendChild(b);});}const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';const gri=document.getElementById('goal-reason-inp');if(gri)gri.value=planOpts.goalReason||'';
+function buildPlanCreate(){const gc=document.getElementById('goal-cards');if(!gc){console.error('goal-cards missing');return;}gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<span style="font-size:22px">${g.icon}</span><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');if(wc){wc.innerHTML='';[4,6,8,12,16].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});}const fc=document.getElementById('freq-chips');if(fc){fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' co':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip co';};fc.appendChild(b);});}const dmS=document.getElementById('dur-min-slider'),dxS=document.getElementById('dur-max-slider');if(dmS){dmS.value=planOpts.durMin;document.getElementById('dur-min-val').textContent=planOpts.durMin+' min';}if(dxS){dxS.value=planOpts.durMax;document.getElementById('dur-max-val').textContent=planOpts.durMax+' min';}const bdp=document.getElementById('blocked-days-picker');if(bdp){bdp.innerHTML='';const dayOrder=[1,2,3,4,5,6,0];const dayLbl={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};dayOrder.forEach(d=>{const active=!planOpts.blockedDays.includes(d);const b=document.createElement('button');b.style.cssText=`flex:1;padding:11px 0;border-radius:9px;border:1.5px solid ${active?'var(--ac)':'var(--br)'};background:${active?'rgba(var(--acRGB),.15)':'var(--up)'};color:${active?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f);opacity:${active?1:.5}`;b.textContent=dayLbl[d];b.onclick=()=>{if(planOpts.blockedDays.includes(d))planOpts.blockedDays=planOpts.blockedDays.filter(x=>x!==d);else planOpts.blockedDays=[...planOpts.blockedDays,d];const on=!planOpts.blockedDays.includes(d);b.style.borderColor=on?'var(--ac)':'var(--br)';b.style.background=on?'rgba(var(--acRGB),.15)':'var(--up)';b.style.color=on?'var(--ac)':'var(--mu)';b.style.opacity=on?1:.5;};bdp.appendChild(b);});}const sc=document.getElementById('style-cards');if(sc){sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<span style="font-size:18px">${s.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}sc.appendChild(b);});}const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';const gri=document.getElementById('goal-reason-inp');if(gri)gri.value=planOpts.goalReason||'';
   const cdb=document.getElementById('plan-cooldown');if(cdb)cdb.checked=!!planOpts.cooldown;
   const plp=document.getElementById('plan-loc-picker');
   if(plp){
@@ -5721,25 +5702,78 @@ function _lastTrainingPos(sessions){
   return Math.max(...sessions.map(s=>posOf(s.dow)));
 }
 
+// Template weeks for extension: the full weeks (never the partial first week).
+// Fixed snapshot — the plan array grows during extension, so indexing into it
+// directly always landed on week 1 (the bug that left weeks 4+ with 1 session).
+function _templateWeeks(weeks,freq){
+  const full=weeks.slice(1).filter(w=>(w.sessions||[]).length&&!/deload/i.test(w.theme||''));
+  const atFreq=full.filter(w=>w.sessions.length>=freq);
+  if(atFreq.length)return atFreq;
+  if(full.length)return full;
+  return weeks.filter(w=>(w.sessions||[]).length);
+}
+// Bring a session list up to the target count by cycling through its own sessions
+function _padSessions(sessions,freq){
+  const out=sessions.slice(0,Math.max(freq,0)||sessions.length);
+  let k=0;
+  while(out.length<freq&&sessions.length){out.push({...sessions[k%sessions.length]});k++;}
+  return out;
+}
+// One-time repair for plans built before the extension fix: future weeks that
+// ended up with fewer sessions than the plan frequency get refilled from a full
+// template week. Weeks with any done/merged/extra session are left untouched.
+function repairPlanWeeks(){
+  if(!plan?.weeks?.length||plan._extFixV1)return 0;
+  const freq=plan.freq||3;
+  const templates=_templateWeeks(plan.weeks,freq).filter(w=>w.sessions.length>=freq);
+  const cur=getCurrentWeekIdx();
+  const low=(typeof fitnessLevelLow==='function')&&fitnessLevelLow();
+  const expected=wi=>{if(!low||freq<3)return freq;if(freq>=4)return wi<2?Math.max(2,freq-2):wi<4?freq-1:freq;return wi<1?2:freq;};
+  const allowed=[1,2,3,4,5,6,0].filter(d=>!(plan.blockedDays||[]).includes(d));
+  const fullbody=plan.style==='fullbody';
+  let fixed=0;
+  if(templates.length&&allowed.length){
+    let ti=0;
+    plan.weeks.forEach((wk,wi)=>{
+      if(wi<=cur||wi===0)return;                       // only weeks still ahead
+      const ss=wk.sessions||[];
+      const want=Math.min(expected(wi),allowed.length);
+      if(ss.length>=want)return;
+      if(ss.some(s=>s.done||s.merged||s.extra||s.skipped))return;
+      const src=templates[ti++%templates.length];
+      const intensity=ss[0]?.intensity||src.sessions[0]?.intensity||'medium';
+      const dur=ss[0]?.durationMin||src.sessions[0]?.durationMin;
+      let fresh=_padSessions(src.sessions,want).map(s=>({...s,done:false,doneDate:undefined,skipped:undefined,merged:undefined,savedWorkout:undefined,generatedTitle:undefined,intensity,durationMin:dur||s.durationMin}));
+      fresh=redistributeWeek(fresh,allowed,fullbody?true:undefined,_lastTrainingPos(plan.weeks[wi-1]?.sessions));
+      wk.sessions=fresh;fixed++;
+    });
+  }
+  plan._extFixV1=true;savePlan();
+  return fixed;
+}
 function extendPlanWeeks(planData, targetWeeks, allowedDays, isFullbody){
-  const base=planData.weeks;
+  const freq=planData.freq||3;
+  const templates=_templateWeeks(planData.weeks,freq);
+  if(!templates.length)return;
   const dMin=planData.durMin||20, dMax=planData.durMax||50, dMid=Math.round((dMin+dMax)/2);
   const durFor=int=>int==='easy'?dMin:int==='hard'?dMax:dMid;
+  let ti=0;
   while(planData.weeks.length<targetWeeks){
     const wi=planData.weeks.length;
     const w=wi+1;
     const isDeload=w%4===0;
     const theme=isDeload?'Deload':w<=4?'Aufbau':w<=8?'Steigerung':'Maximierung';
     const intensity=isDeload?'easy':w<=4?'medium':'hard';
-    const srcWeek=base[wi%base.length];
-    let newSessions=srcWeek.sessions.map(s=>({
+    const srcWeek=templates[ti++%templates.length];
+    let newSessions=_padSessions(srcWeek.sessions,freq).map(s=>({
       ...s,
       done:false,
       doneDate:undefined,
+      skipped:undefined,merged:undefined,savedWorkout:undefined,
       intensity,
       durationMin:durFor(intensity)
     }));
-    if(allowedDays)newSessions=redistributeWeek(newSessions, allowedDays, undefined, _lastTrainingPos(planData.weeks[planData.weeks.length-1]?.sessions));
+    if(allowedDays)newSessions=redistributeWeek(newSessions, allowedDays, isFullbody?true:undefined, _lastTrainingPos(planData.weeks[planData.weeks.length-1]?.sessions));
     const NOTE_MAP={Deload:'Erholungswoche — bewusst leichter, Bewegungsqualität im Fokus.',Aufbau:'Grundlagen festigen, Technik sauber halten.',Steigerung:'Volumen und Intensität steigern.',Maximierung:'Ans Limit gehen, Fortschritt maximieren.'};
     planData.weeks.push({week:w,theme,note:NOTE_MAP[theme]||'',sessions:newSessions});
   }
@@ -5785,7 +5819,7 @@ async function generatePlan(){
     ? `ERHOLUNG (Ganzkörper): Nach jeder Ganzkörper-Session mindestens 1 Pausentag. NIE zwei Trainingstage direkt hintereinander. Verteile die Sessions gleichmäßig über die Woche (z.B. Mo/Mi/Fr).`
     : `ERHOLUNG (Split): Trainiere dieselbe Muskelgruppe frühestens nach 48h wieder. Aufeinanderfolgende Tage sind nur erlaubt, wenn sie KOMPLETT verschiedene Muskelgruppen treffen (z.B. Mo Rücken+Bizeps, Di Beine, Mi Brust+Trizeps). Nach einer harten Session bevorzugt ein leichterer Tag oder Pause. Beine brauchen ~48h Erholung.`;
   const GOAL_SYSTEM={fitness:'SYSTEM: Ausgewogen — Kraftbasis (Compound) + kurzer Konditions-Finisher, moderate Pausen.',strength:'SYSTEM: Kraft/Hypertrophie — Grundübungen zuerst, 8-15 Wdh bei Körpergewicht, längere Pausen, Volumen wochenweise steigern.',fatLoss:'SYSTEM: Körperfett — Ganzkörper-Dichteformate/Zirkel, kurze Pausen, hoher Energieumsatz, knieschonend ohne Sprünge.',endurance:'SYSTEM: Ausdauer — Zirkel mit kurzen Pausen (30-45s), Umfang vor Intensität.'};
-  const profP=profileTxt();const sys=`Erfahrener Trainingswissenschaftler. Erstelle kompakten ${aiWeeks}-Wochen-Trainingsplan. Ziel: ${goalObj.label}. ${planOpts.freq}×/Woche. ${styleRule} ${GOAL_SYSTEM[planOpts.goal]||''} Knieschonend.${profP?'\nNUTZER: '+profP+' — Einschränkungen strikt beachten, Fitness-Check zur Kalibrierung des Startniveaus nutzen.':''}
+  const profP=profileTxt();const sys=`Erfahrener Trainingswissenschaftler. Der Gesamtplan umfasst ${weeks} Wochen. Erstelle davon die ersten ${aiWeeks} Wochen im Detail — die übrigen Wochen werden automatisch nach demselben Muster fortgeschrieben. intro und Ausblick beziehen sich auf die GESAMTEN ${weeks} Wochen, nicht nur auf die ersten ${aiWeeks}. Ziel: ${goalObj.label}. ${planOpts.freq}×/Woche. ${styleRule} ${GOAL_SYSTEM[planOpts.goal]||''} Knieschonend.${profP?'\nNUTZER: '+profP+' — Einschränkungen strikt beachten, Fitness-Check zur Kalibrierung des Startniveaus nutzen.':''}
 ${freqStyleWarn?freqStyleWarn+"\n":""}PERIODISIERUNG: Lineare Progression — Volumen/Intensität wochenweise steigern, erst Umfang, dann Intensität. Woche 1 easy (Technik, RPE 5-6), Woche 2-3 medium bis hard (RPE 7-8,5), Woche 4 = Deload mit ~50-60% Volumen, alles easy (aktive Erholung, Bewegungsqualität). intensity easy=RPE 5-6, medium=RPE 7-8, hard=RPE 8-9.
 TRAININGSTAGE: Nutze NUR diese Wochentage: ${allowedDaysStr}. An anderen Tagen KEINE Session.
 ${regenRule}
@@ -5856,7 +5890,7 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
     }
     // Extend locally if more weeks requested than AI generated
     if(weeks>planData.weeks.length)extendPlanWeeks(planData,weeks,allowedTrainingDays,isFullbody);
-    planData.blockedDays=planOpts.blockedDays||[];planData.goalReason=goalReason;planData.defaultLocation=window._planLoc||'home';planData.cooldown=!!document.getElementById('plan-cooldown')?.checked;
+    planData._extFixV1=true;planData.blockedDays=planOpts.blockedDays||[];planData.goalReason=goalReason;planData.defaultLocation=window._planLoc||'home';planData.cooldown=!!document.getElementById('plan-cooldown')?.checked;
     // Frequency ramp: low fitness level + ambitious frequency -> build up over weeks
     let rampMsg='';
     if(fitnessLevelLow()&&planOpts.freq>=3&&planData.weeks.length>=3){
@@ -6463,7 +6497,7 @@ async function rebuildPlanWithFreq(newFreq){
   show('s-gen');document.getElementById('gen-text').textContent='Plan wird neu aufgebaut';
   const aiWeeks=Math.min(4,oldWeeks);
   const profR=profileTxt();const GOAL_SYSTEM2={fitness:'SYSTEM: Ausgewogen — Kraftbasis + Konditions-Finisher.',strength:'SYSTEM: Kraft/Hypertrophie — Compound zuerst, längere Pausen, Volumen steigern.',fatLoss:'SYSTEM: Dichteformate/Zirkel, kurze Pausen, knieschonend.',endurance:'SYSTEM: Zirkel, kurze Pausen, Umfang vor Intensität.'};
-  const sys=`Erfahrener Trainingswissenschaftler. Erstelle kompakten ${aiWeeks}-Wochen-Trainingsplan. Ziel: ${goalObj.label}. ${newFreq}×/Woche (genau ${newFreq} Sessions pro Woche). ${styleRule} ${GOAL_SYSTEM2[plan.goal]||''} Knieschonend.${profR?'\nNUTZER: '+profR+' — Einschränkungen strikt beachten.':''}
+  const sys=`Erfahrener Trainingswissenschaftler. Der Gesamtplan umfasst ${oldWeeks} Wochen. Erstelle davon die ersten ${aiWeeks} Wochen im Detail — die übrigen werden automatisch fortgeschrieben. intro und Ausblick beziehen sich auf die GESAMTEN ${oldWeeks} Wochen. Ziel: ${goalObj.label}. ${newFreq}×/Woche (genau ${newFreq} Sessions pro Woche). ${styleRule} ${GOAL_SYSTEM2[plan.goal]||''} Knieschonend.${profR?'\nNUTZER: '+profR+' — Einschränkungen strikt beachten.':''}
 PERIODISIERUNG: Lineare Progression, erst Umfang, dann Intensität. Woche 1 easy (RPE 5-6), Woche 2-3 medium bis hard (RPE 7-8,5), Woche 4 Deload ~50-60% Volumen, easy. intensity easy=RPE 5-6, medium=RPE 7-8, hard=RPE 8-9.
 TRAININGSTAGE: Nutze NUR diese Tage: ${allowedDaysStr}.
 ${rbRegen}
@@ -6576,7 +6610,7 @@ async function runImportWorkout(){
     const raw=await callAPI([{role:'user',content:'WORKOUT-TEXT:\n'+txt}],1400,sys);
     let obj;try{const m=raw.match(/\{[\s\S]*\}/);obj=JSON.parse(m?m[0]:raw);}catch{obj=extractJSON(raw)||{};}
     if(Array.isArray(obj))obj=obj[0]||{};
-    const exs=(obj.exercises||[]).filter(e=>e&&e.name);
+    const exs=(obj.exercises||[]).filter(e=>e&&e.name).map(_cleanEx);
     if(!exs.length){st.textContent='Keine Übungen erkannt. Prüf den Text oder tipp die Übungen einzeln ein.';return;}
     const known=new Set(Object.keys(MUSCLE_DE));
     const dw=kbDefaultWeight();
@@ -6783,7 +6817,7 @@ function offerSaveWorkout(entry){
   document.getElementById('modal-savewk').classList.add('open');
 }
 function confirmSaveWorkout(){
-  const title=(document.getElementById('savewk-title').value||'Mein Workout').trim();
+  const title=_cleanTxt(document.getElementById('savewk-title').value)||'Mein Workout';
   // snapshot from the entry we just saved (curExercises/curSetup still hold it)
   const snap=_currentWorkoutSnapshot(title);
   // seed the records from this very session
@@ -6807,7 +6841,7 @@ async function aiTitleForWorkout(){
     const mode=curSetup.capMin?('AMRAP '+curSetup.capMin+' Min'):(curSetup.trainingMode==='circuit'?('Zirkel '+(curSetup.rounds||1)+' Runden'):'Sätze');
     const prompt='Finde einen kurzen, knackigen Workout-Titel (max 4 Wörter, Deutsch, kein Emoji, keine Anführungszeichen). Modus: '+mode+'. Übungen: '+list+'. Antworte NUR mit dem Titel.';
     const raw=await callAPI([{role:'user',content:prompt}],40);
-    const title=String(raw||'').replace(/["'\n]/g,'').trim().slice(0,48);
+    const title=_cleanTxt(String(raw||'').replace(/["'\n]/g,'')).slice(0,48);
     if(title){document.getElementById('savewk-title').value=title;}
   }catch(e){document.getElementById('savewk-status').textContent='KI-Titel fehlgeschlagen.';}
   finally{if(btn){btn.textContent='✦ KI-Titel';btn.disabled=false;}}
@@ -6923,7 +6957,7 @@ function deleteLibEx(){
   showErr(ed.overrides?'✓ Änderung verworfen — Original wiederhergestellt.':'✓ Übung gelöscht.');
 }
 function saveCustomEx(){
-  const name=document.getElementById('add-ex-name').value.trim();
+  const name=_cleanTxt(document.getElementById('add-ex-name').value);
   if(!name){showErr('Name fehlt');return;}
   const ed=window._editingEx;
   const ex={
@@ -7285,7 +7319,7 @@ Antworte NUR mit JSON-Array, sonst nichts:
     // Drop muscle keys the app doesn't know, and flag exact duplicates
     const known=new Set(Object.keys(MUSCLE_DE));
     const haveLower=new Set([...DEFAULT_LIB,...library].map(e=>_normExName(e.name)));
-    _aiFindResults=arr.map(e=>({...e,muscles:e.muscles.filter(m=>known.has(m)),_dup:haveLower.has(_normExName(e.name))}))
+    _aiFindResults=arr.map(_cleanEx).map(e=>({...e,muscles:e.muscles.filter(m=>known.has(m)),_dup:haveLower.has(_normExName(e.name))}))
                       .filter(e=>e.muscles.length);
     renderAiFindResults();
   }catch(e){res.innerHTML='<div style="font-size:13px;color:var(--am);text-align:center;padding:14px">Fehler: '+e.message+'</div>';}
@@ -7559,7 +7593,8 @@ function doExport(){
     templates:JSON.parse(localStorage.getItem('coach_templates')||'[]'),
     challenges:JSON.parse(localStorage.getItem('coach_challenges')||'[]'),
     profile:JSON.parse(localStorage.getItem('coach_profile')||'null'),
-    journal:JSON.parse(localStorage.getItem('coach_journal')||'[]')};
+    journal:JSON.parse(localStorage.getItem('coach_journal')||'[]'),
+    myWorkouts:JSON.parse(localStorage.getItem('coach_myworkouts')||'[]')};
   const b=new Blob([JSON.stringify(full,null,2)],{type:'application/json'});
   const u=URL.createObjectURL(b),a=document.createElement('a');
   a.href=u;a.download='smart-gains-'+todayIso()+'.json';
@@ -7574,8 +7609,9 @@ function doImport(e){const f=e.target.files[0];if(!f)return;const r=new FileRead
   if(p.challenges)safeSet('coach_challenges',JSON.stringify(p.challenges));
   if(p.profile)safeSet('coach_profile',JSON.stringify(p.profile));
   if(p.journal)safeSet('coach_journal',JSON.stringify(p.journal));
+  if(Array.isArray(p.myWorkouts))safeSet('coach_myworkouts',JSON.stringify(p.myWorkouts));
   persist();savePlan();saveLibrary();updateHome();
-  showErr('✓ '+log.length+' Workouts importiert.');
+  showErr('✓ '+log.length+' Workouts importiert'+(Array.isArray(p.myWorkouts)&&p.myWorkouts.length?(' · '+p.myWorkouts.length+' eigene Workouts'):'')+'.');
 }catch{showErr('Ungültige Datei.');}};r.readAsText(f);e.target.value='';}
 
 
@@ -7986,8 +8022,11 @@ document.addEventListener('visibilitychange',()=>{
 document.addEventListener('DOMContentLoaded',()=>{
   try{
     log=loadLog();plan=loadPlan();library=loadLibrary();
+    try{const ml=document.getElementById('model-label');if(ml)ml.textContent=MODEL;}catch(e){}
+    try{const _rp=repairPlanWeeks();if(_rp)setTimeout(()=>showErr('🔧 Plan repariert: '+_rp+' Woche'+(_rp>1?'n':'')+' auf '+(plan.freq||3)+'× aufgefüllt.'),1200);}catch(e){}
     backfillLibraryFromLog();
     dedupLibrary();
+    try{if(!localStorage.getItem('coach_clean_v1')){let ch=false;library.forEach(e=>{const before=JSON.stringify(e);_cleanEx(e);if(JSON.stringify(e)!==before)ch=true;});if(ch)saveLibrary();const mw=loadMyWorkouts();mw.forEach(m=>{m.title=_cleanTxt(m.title);(m.exercises||[]).forEach(_cleanEx);});saveMyWorkouts(mw);localStorage.setItem('coach_clean_v1','1');}}catch(e){}
     updateHome();
     if(loadKey()&&log.length>=1)setTimeout(fetchCoach,800);
     document.querySelectorAll('.modal-ov').forEach(el=>el.addEventListener('click',e=>{
