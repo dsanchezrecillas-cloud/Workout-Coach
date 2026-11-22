@@ -401,6 +401,18 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
 #greeting{font-size:23px!important;letter-spacing:-.02em}
 .hero-title{letter-spacing:-.02em}
 #t-disp{font-weight:700!important;letter-spacing:-.03em}
+.rev-tune{margin:4px 0 16px;padding:13px;border-radius:14px;background:rgba(var(--acRGB),.06);border:1px solid rgba(var(--acRGB),.18)}
+.rev-tune-h{font-size:12px;font-weight:600;color:var(--su);margin-bottom:9px}
+.rt-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border-radius:11px;background:var(--up);border:1px solid var(--br);color:var(--tx);font-size:13px;font-weight:600;font-family:var(--f)}
+.rt-undo{width:100%;margin-top:8px;justify-content:center;padding:9px;border-radius:10px;border:1px dashed var(--br);background:transparent;color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f)}
+.pref-mk{color:var(--am);font-size:11px;margin-left:3px}
+.pref-grp{margin-bottom:10px}.pref-gh{font-size:11px;font-weight:600;color:var(--su);margin-bottom:6px}
+.pref-chips{display:flex;gap:6px;flex-wrap:wrap}.pref-empty{font-size:12px;color:var(--mu)}
+.pref-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 6px 5px 10px;border-radius:9px;font-size:12px;font-weight:600;background:var(--up);border:1px solid var(--br);color:var(--tx)}
+.pref-chip.pc-core{border-color:rgba(var(--amRGB),.4);background:rgba(var(--amRGB),.1)}
+.pref-chip.pc-like{border-color:rgba(var(--acRGB),.35);background:rgba(var(--acRGB),.09)}
+.pref-chip.pc-avoid{color:var(--mu)}
+.pref-chip button{color:var(--mu);font-size:11px;width:20px;height:20px;display:flex;align-items:center;justify-content:center}
 .gen-orb{--lc:var(--ac);position:relative;width:132px;height:132px;margin-bottom:26px}
 .gen-glow{position:absolute;inset:-18px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--lc) 38%,transparent),transparent 68%);animation:genPulse 2.4s ease-in-out infinite}
 .gen-ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 35%,color-mix(in srgb,var(--lc) 25%,transparent) 55%,var(--lc) 100%);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px));animation:spin 1.15s linear infinite}
@@ -706,6 +718,14 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
     <span style="font-size:18px;line-height:1">＋</span> Übung hinzufügen
     </button>
     <button onclick="smartSortExercises()" title="Übungen sinnvoll anordnen" style="flex-shrink:0;padding:12px 14px;border-radius:12px;border:1.5px dashed rgba(var(--acRGB),.4);background:transparent;color:var(--ac);font-size:13px;font-weight:600;font-family:var(--f);display:flex;align-items:center;gap:6px">Anordnen</button>
+  </div>
+  <div class="rev-tune">
+    <div class="rev-tune-h">Nicht ganz dein Ding?</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="revRegenerate()" class="rt-btn"><i data-ic="refresh" data-s="15"></i>Neu generieren</button>
+      <button onclick="openRevTune()" class="rt-btn"><i data-ic="pen" data-s="15"></i>Wunsch angeben</button>
+    </div>
+    <button id="rev-undo" onclick="revUndo()" class="rt-undo" style="display:none">↶ Vorherige Version</button>
   </div>
   <div style="display:flex;gap:8px">
     <button onclick="startWorkout()" class="btn btn-ac" style="flex:2">Training starten →</button>
@@ -1050,6 +1070,14 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
     <div class="set-row-t">Meine Kettlebells</div><div class="set-row-s" style="margin-bottom:10px">Gilt für alle Workouts und den Plan.</div>
     <div id="kb-list-set" style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px"></div>
     <button onclick="addKb()" class="chip">+ Kettlebell hinzufügen</button>
+  </div>
+  <div class="card set-card">
+    <div class="set-row-t">Meine Vorlieben</div><div class="set-row-s" style="margin-bottom:12px">Fließt in jedes Workout und jeden Plan ein. Auch über ★ ♥ ⊘ bei jeder Übung setzbar.</div>
+    <div id="prefs-set"></div>
+    <div style="display:flex;gap:7px;margin:12px 0 8px"><input id="prefs-add" class="inp" placeholder="Übung, z. B. Kettlebell Swing" style="flex:1;margin:0"></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px"><button class="chip" onclick="addPrefFromInput('core')">★ Stammübung</button><button class="chip" onclick="addPrefFromInput('like')">♥ Mag ich</button><button class="chip" onclick="addPrefFromInput('avoid')">⊘ Lieber nicht</button></div>
+    <div class="set-row-s" style="margin-bottom:6px">Allgemeine Wünsche</div>
+    <textarea id="prefs-notes" class="inp" onblur="savePrefNotes()" placeholder="z. B. lieber Kettlebell als Kurzhantel, Core gern am Ende" style="resize:none;height:64px;margin:0"></textarea>
   </div>
   <div class="set-h">Stimme & Ansagen</div>
   <div class="card" style="margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><div><div style="font-size:13px;font-weight:600;color:var(--tx)">Tipps anzeigen</div><div style="font-size:11px;color:var(--mu);margin-top:2px">Kurze Hinweise beim ersten Besuch eines Bereichs</div></div><button id="tips-setting" class="sw on" onclick="toggleTips()" aria-label="Tipps anzeigen"><i></i></button></div>
@@ -1521,6 +1549,27 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
   </div>
 </div>
 <!-- MODAL: Exercise Info -->
+<div class="modal-ov" id="modal-revtune">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700">Workout anpassen</div>
+      <button aria-label="Schließen" onclick="closeModal('modal-revtune')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--mu);margin-bottom:12px;line-height:1.5">Was soll anders sein? Was passt, bleibt erhalten.</div>
+    <textarea id="rt-text" class="inp" placeholder="z. B. Swings und Klimmzüge rein, keine Liegestütze" style="resize:none;height:84px;margin-bottom:10px"></textarea>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="chip" onclick="rtChip('mehr Kettlebell')">Mehr Kettlebell</button>
+      <button class="chip" onclick="rtChip('Klimmzüge rein')">Klimmzüge rein</button>
+      <button class="chip" onclick="rtChip('mehr Core')">Mehr Core</button>
+      <button class="chip" onclick="rtChip('kein Springen')">Kein Springen</button>
+      <button class="chip" onclick="rtChip('kürzer')">Kürzer</button>
+      <button class="chip" onclick="rtChip('schwerer')">Schwerer</button>
+      <button class="chip" onclick="rtChip('leichter')">Leichter</button>
+    </div>
+    <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--tx);margin-bottom:16px;cursor:pointer"><input type="checkbox" id="rt-remember" style="width:18px;height:18px;margin-top:1px;accent-color:var(--ac)"><span>Für künftige Workouts merken<span style="display:block;font-size:11px;color:var(--mu);margin-top:2px">Dauerhafte Wünsche landen unter „Meine Vorlieben“.</span></span></label>
+    <button class="btn btn-ac" onclick="submitRevTune()">Anpassen</button>
+  </div>
+</div>
 <div class="modal-ov" id="modal-info">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px">
@@ -1530,6 +1579,7 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
         <button aria-label="Schließen" onclick="closeModal('modal-info')" class="t-hbtn"><i data-ic="close" data-s="16"></i></button>
       </div>
     </div>
+    <div id="mi-prefs" style="display:flex;gap:7px;flex-wrap:wrap;margin:4px 0 14px"></div>
     <div id="mi-body"></div>
     <button id="mi-jump" onclick="jumpToPeeked()" style="display:none;width:100%;margin-top:14px;padding:12px;border-radius:11px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.3);color:var(--ac);font-size:13px;font-weight:600;font-family:var(--f)">Zu dieser Übung springen</button>
   </div>
@@ -1931,7 +1981,7 @@ function histTxt(){
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
 function show(id){
-  try{closeTipBubble();if(id==='s-gen')_genLoaderStart();else _genLoaderStop();setTimeout(()=>_maybeTip(id),900);}catch(e){}
+  try{closeTipBubble();if(id==='s-gen')_genLoaderStart();else _genLoaderStop();setTimeout(()=>_maybeTip(id),900);if(id==='s-home'&&_tourDone())setTimeout(()=>{if(!document.querySelector('.modal-ov.open')&&document.getElementById('s-home').classList.contains('active'))maybeSuggestCore();},1600);}catch(e){}
   // Leaving the timer: let the screen sleep again and reset the compact bar
   if(id!=='s-timer'){releaseWakeLock();const tw=document.getElementById('timer-wrap');if(tw)tw.classList.remove('compact');if(_amrapIv){clearInterval(_amrapIv);_amrapIv=null;}const td=document.getElementById('t-disp');if(td)td.style.fontSize='76px';}
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -1946,6 +1996,7 @@ function show(id){
     else if(id==='s-library'){libSelected.clear();renderLibrary();}
     else if(id==='s-home')updateHome();
     else if(id==='s-journal')renderJournal();
+    else if(id==='s-settings'){try{renderPrefsSettings();}catch(e){}}
     else if(id==='s-settings'){applyTheme(loadTheme());setAutoAdvance(autoAdvanceOn());try{renderKbList();}catch(e){}}
   else if(id==='s-history'){if(typeof renderHistory==='function')renderHistory();try{renderHistCalendar();groupHistoryByWeek();}catch(e){console.error(e);}}
     else if(id==='s-analytics'){if(typeof analyticsRange==='function')analyticsRange(typeof currentAnalyticsRange!=='undefined'?currentAnalyticsRange:'week');}
@@ -3766,6 +3817,7 @@ function openInfoModal(ex){
   _currentInfoEx=ex;
   const _mj=document.getElementById('mi-jump');if(_mj&&window._peekIdx===undefined)_mj.style.display='none';
   document.getElementById('mi-name').textContent=ex.name;
+  try{_renderInfoPrefs(ex.name);}catch(e){}
   _renderInfoBody(ex);
   document.getElementById('modal-info').classList.add('open');
   if(!getExInfo(ex)&&loadKey())enrichExerciseInfo(ex);
@@ -3916,6 +3968,119 @@ function _complexWeightHint(){
   return `Kugel für den ganzen Komplex: <b>${low.w} kg</b> — richtet sich nach der schwächsten Übung (${low.n}).`;
 }
 
+// ─── Exercise preferences (Stammübung / Mag ich / Lieber nicht) ──────────────
+const PREF_KEY='coach_prefs';
+function loadPrefs(){let p=null;try{p=JSON.parse(localStorage.getItem(PREF_KEY)||'null');}catch(e){}p=p&&typeof p==='object'?p:{};
+  ['core','like','avoid'].forEach(k=>{if(!Array.isArray(p[k]))p[k]=[];});p.notes=typeof p.notes==='string'?p.notes:'';
+  p.swapOut=p.swapOut||{};p.added=p.added||{};p.asked=p.asked||{};return p;}
+function savePrefs(p){safeSet(PREF_KEY,JSON.stringify(p));}
+function _pk(n){try{return _normExName(n);}catch(e){return String(n||'').toLowerCase();}}
+function prefOf(name){const p=loadPrefs(),k=_pk(name);for(const c of ['core','like','avoid'])if(p[c].some(x=>_pk(x)===k))return c;return null;}
+function setPref(name,cat){
+  const p=loadPrefs(),k=_pk(name);['core','like','avoid'].forEach(c=>{p[c]=p[c].filter(x=>_pk(x)!==k);});
+  if(cat&&p[cat])p[cat].push(String(name).replace(/\s*\([^)]*\)\s*/g,' ').trim());
+  savePrefs(p);try{renderPrefsSettings();}catch(e){}
+}
+const PREF_DE={core:'Stammübung',like:'Mag ich',avoid:'Lieber nicht'};
+const PREF_IC={core:'★',like:'♥',avoid:'⊘'};
+function _prefMark(name){const c=prefOf(name);return c==='core'?' <span class="pref-mk" title="Stammübung">★</span>':c==='like'?' <span class="pref-mk" title="Mag ich">♥</span>':'';}
+function _prefsTxt(){
+  const p=loadPrefs();const out=[];
+  if(p.core.length)out.push(`STAMMÜBUNGEN (in JEDE Session einbauen, zu deren Fokus sie passen und deren Equipment verfügbar ist; bei unpassendem Fokus weglassen): ${p.core.join(', ')}`);
+  if(p.like.length)out.push(`BEVORZUGT (öfter einbauen, wenn passend — nicht alle auf einmal, Abwechslung behalten): ${p.like.join(', ')}`);
+  if(p.avoid.length)out.push(`VERMEIDEN (nicht vorschlagen, auch keine nahen Varianten): ${p.avoid.join(', ')}`);
+  if(p.notes.trim())out.push(`WÜNSCHE DES NUTZERS: ${p.notes.trim()}`);
+  return out.length?'\n\nVORLIEBEN DES NUTZERS:\n'+out.join('\n'):'';
+}
+// Learning from behaviour — only ever suggests, the user confirms
+function _prefCount(kind,name){
+  const p=loadPrefs(),k=_pk(name);if(!k)return;
+  p[kind][k]=(p[kind][k]||0)+1;const n=p[kind][k];savePrefs(p);
+  if(n<3||prefOf(name)||p.asked[kind+':'+k])return;
+  setTimeout(async()=>{
+    const q=kind==='swapOut'
+      ?[`${name} hast du jetzt ${n}× rausgenommen. Künftig weglassen?`,'Landet unter „Lieber nicht“. Ändern kannst du das in den Einstellungen unter „Meine Vorlieben“.','Weglassen','avoid']
+      :[`${name} holst du dir oft selbst dazu. Öfter einbauen?`,'Landet unter „Mag ich“. Ändern kannst du das in den Einstellungen unter „Meine Vorlieben“.','Öfter einbauen','like'];
+    const ok=await appConfirm(q[0],q[1],q[2]);
+    const p2=loadPrefs();p2.asked[kind+':'+k]=true;savePrefs(p2);
+    if(ok){setPref(name,q[3]);showNote(`${PREF_IC[q[3]]} ${name}: ${PREF_DE[q[3]]}`);try{showReview();}catch(e){}}
+  },450);
+}
+// One-time: suggest Stammübungen from the history
+async function maybeSuggestCore(){
+  const p=loadPrefs();if(p.coreSuggested)return;
+  const ws=(log||[]).filter(w=>!w.stretch&&Array.isArray(w.exercises)).slice(-15);
+  if(ws.length<5)return;
+  const cnt={},names={};
+  ws.forEach(w=>{const seen=new Set();w.exercises.forEach(e=>{if(!e||!e.name||e.warmup)return;const k=_pk(e.name);if(seen.has(k))return;seen.add(k);cnt[k]=(cnt[k]||0)+1;names[k]=names[k]||{};names[k][e.name]=(names[k][e.name]||0)+1;});});
+  const cand=Object.keys(cnt).filter(k=>cnt[k]/ws.length>=0.5&&!prefOf(Object.keys(names[k])[0])).sort((a,b)=>cnt[b]-cnt[a]).slice(0,4)
+    .map(k=>Object.entries(names[k]).sort((a,b)=>b[1]-a[1])[0][0]);
+  p.coreSuggested=true;savePrefs(p);
+  if(!cand.length)return;
+  const list=cand.length===1?cand[0]:cand.slice(0,-1).join(', ')+' und '+cand[cand.length-1];
+  const ok=await appConfirm(`${list} ${cand.length===1?'ist':'sind'} in den meisten deiner Workouts. Als Stammübungen festlegen?`,'Dann kommen sie in jede Session, zu der sie passen. Ändern kannst du das in den Einstellungen unter „Meine Vorlieben“.','Festlegen');
+  if(ok){cand.forEach(n=>setPref(n,'core'));showNote('★ Stammübungen gespeichert');}
+}
+// Settings: Meine Vorlieben
+function renderPrefsSettings(){
+  const el=document.getElementById('prefs-set');if(!el)return;const p=loadPrefs();
+  const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const grp=c=>`<div class="pref-grp"><div class="pref-gh">${PREF_IC[c]} ${PREF_DE[c]}</div><div class="pref-chips">${p[c].length?p[c].map(n=>`<span class="pref-chip pc-${c}">${esc(n)}<button aria-label="${esc(n)} entfernen" onclick="setPref(decodeURIComponent('${encodeURIComponent(n)}'),null)">✕</button></span>`).join(''):'<span class="pref-empty">noch nichts</span>'}</div></div>`;
+  el.innerHTML=grp('core')+grp('like')+grp('avoid');
+  const nt=document.getElementById('prefs-notes');if(nt&&document.activeElement!==nt)nt.value=p.notes;
+}
+function addPrefFromInput(cat){const i=document.getElementById('prefs-add');const v=(i?.value||'').trim();if(!v)return;setPref(v,cat);i.value='';showNote(`${PREF_IC[cat]} ${v}: ${PREF_DE[cat]}`);}
+function savePrefNotes(){const p=loadPrefs();p.notes=(document.getElementById('prefs-notes')?.value||'').slice(0,500);savePrefs(p);}
+// Info modal: preference chips
+function _renderInfoPrefs(name){
+  const el=document.getElementById('mi-prefs');if(!el)return;const cur=prefOf(name);
+  el.innerHTML=['core','like','avoid'].map(c=>`<button class="chip${cur===c?' ac':''}" onclick="setPref(decodeURIComponent('${encodeURIComponent(name)}'),${cur===c?'null':`'${c}'`});_renderInfoPrefs(decodeURIComponent('${encodeURIComponent(name)}'));try{if(document.getElementById('s-review').classList.contains('active'))showReview();}catch(e){}">${PREF_IC[c]} ${PREF_DE[c]}</button>`).join('');
+}
+
+// ─── Review tuning: regenerate / adjust with comment / undo ──────────────────
+let _revUndo=[];
+function _revSnap(){return JSON.parse(JSON.stringify({ex:curExercises,wu:wuExercises,setup:curSetup}));}
+function _syncRevUndo(){const b=document.getElementById('rev-undo');if(b)b.style.display=_revUndo.length?'flex':'none';}
+function revUndo(){const s=_revUndo.pop();if(!s)return;curExercises=s.ex;wuExercises=s.wu;curSetup=s.setup;showReview();showNote('Vorherige Version wiederhergestellt');}
+function _revListTxt(){return curExercises.filter(e=>!e.warmup).map(e=>`${e.name} — ${e.sets||1}×${(e.type||'reps')==='reps'?(e.reps||10)+' Wdh':(e.duration||40)+'s'}`).join('; ');}
+function _revRun(extra){
+  _revUndo.push(_revSnap());if(_revUndo.length>5)_revUndo.shift();
+  window._genExtra=extra;window._keepUndo=true;window._genFromReview=true;
+  const inPlan=window._planCtx&&pendingPlanSession&&plan?.weeks?.[pendingPlanSession.wi]?.sessions?.[pendingPlanSession.si];
+  if(inPlan){const sess=plan.weeks[pendingPlanSession.wi].sessions[pendingPlanSession.si];if(sess.savedWorkout){delete sess.savedWorkout;savePlan();}startPlanSession();return;}
+  let sum=window._lastGenSummary;
+  if(!sum){const m=(curSetup.muscles||[]).slice(0,4).join(', ');sum=`${m||'Ganzkörper'}, ${curSetup.durationMin||30} Minuten, genau ${curExercises.length} Hauptübungen`;}
+  generateWorkout(sum);
+}
+function revRegenerate(){
+  const p=loadPrefs();const keep=p.core.length?` Ausnahme: Stammübungen (${p.core.join(', ')}) dürfen bleiben.`:'';
+  _revRun(`NEUE VARIANTE: Der Nutzer möchte eine andere Übungsauswahl. Aktuell: ${_revListTxt()}. Wähle überwiegend ANDERE Übungen (mindestens die Hälfte neu), bei gleichem Fokus, Format und gleicher Dauer.${keep}`);
+}
+function openRevTune(){
+  const m=document.getElementById('modal-revtune');if(!m)return;
+  document.getElementById('rt-text').value='';document.getElementById('rt-remember').checked=false;
+  m.classList.add('open');setTimeout(()=>document.getElementById('rt-text').focus(),250);
+}
+function rtChip(t){const i=document.getElementById('rt-text');i.value=(i.value.trim()?i.value.trim().replace(/[,.]$/,'')+', ':'')+t;i.focus();}
+async function submitRevTune(){
+  const txt=(document.getElementById('rt-text').value||'').trim();if(!txt){showErr('Schreib kurz, was anders sein soll.');return;}
+  const remember=document.getElementById('rt-remember').checked;closeModal('modal-revtune');
+  if(remember)_rememberFromComment(txt);
+  _revRun(`ÜBERARBEITUNG eines bestehenden Workouts. Aktuelle Hauptübungen: ${_revListTxt()}.
+WUNSCH DES NUTZERS: "${txt.replace(/"/g,"'")}"
+Setze den Wunsch um. Übungen, die der Wunsch nicht betrifft, bleiben mit ihren Werten erhalten. Die Übungszahl darf sich um höchstens 1 ändern, wenn der Wunsch es verlangt. Der Wunsch hat Vorrang vor den übrigen Vorgaben (Sicherheit ausgenommen). Nennt der Nutzer ausdrücklich eine Übung mit Gerät (z. B. Klimmzüge, Swings), gilt dieses Gerät als vorhanden.`);
+}
+// Turn a comment into lasting preferences (runs alongside the regeneration)
+async function _rememberFromComment(txt){
+  try{
+    const raw=await callAPI([{role:'user',content:`Ein Nutzer hat zu seinem Workout geschrieben: "${txt.replace(/"/g,"'")}". Extrahiere NUR dauerhafte Vorlieben zu konkreten Übungen bzw. allgemeine Trainingswünsche. Einmalige Wünsche (kürzer, heute leichter) ignorieren. Antworte NUR mit JSON: {"core":[],"like":[],"avoid":[],"note":""} — core = soll immer dabei sein, like = gern öfter, avoid = nicht mehr, note = allgemeiner Wunsch in max 12 Wörtern oder leer. Übungsnamen auf Deutsch, kurz.`}],300);
+    const o=extractObj(raw);if(!o)return;const got=[];
+    ['core','like','avoid'].forEach(c=>(Array.isArray(o[c])?o[c]:[]).filter(Boolean).slice(0,5).forEach(n=>{setPref(n,c);got.push(PREF_IC[c]+' '+n);}));
+    if(o.note&&String(o.note).trim()){const p=loadPrefs();const nn=String(o.note).trim();if(!p.notes.includes(nn)){p.notes=(p.notes?p.notes.trim()+'; ':'')+nn;savePrefs(p);got.push('Notiz');}}
+    if(got.length)showNote('Gemerkt: '+got.join(' · '));
+  }catch(e){}
+}
+
 // ─── Loader: context icon, status steps, training tips ───────────────────────
 const GEN_KINDS={kb:{ic:'kettlebell',c:'var(--or)',steps:['Trainingsdaten auswerten','Kettlebell-Übungen auswählen','Gewichte anpassen','Format und Pausen planen','Feinschliff']},
   zap:{ic:'zap',c:'var(--ac)',steps:['Trainingsdaten auswerten','Übungen auswählen','Belastung anpassen','Pausen berechnen','Feinschliff']},
@@ -3996,7 +4161,7 @@ function openTour(){
 function _tourIdx(){const tr=document.getElementById('tour-track');return tr?Math.round(tr.scrollLeft/Math.max(1,tr.clientWidth)):0;}
 function _tourPaint(i,n){document.querySelectorAll('#tour-dots i').forEach((d,k)=>d.className=k===i?'on':'');const nx=document.getElementById('tour-next');if(nx)nx.textContent=i>=n-1?'Los geht’s':'Weiter';const sk=document.getElementById('tour-skip');if(sk)sk.style.visibility=i>=n-1?'hidden':'visible';}
 function tourNext(){const tr=document.getElementById('tour-track');if(!tr)return;const n=tr.children.length,i=_tourIdx();if(i>=n-1){closeTour();return;}tr.scrollTo({left:(i+1)*tr.clientWidth,behavior:'smooth'});_tourPaint(i+1,n);}
-function closeTour(){try{localStorage.setItem('coach_tour_done','1');}catch(e){}const o=document.getElementById('tour');if(o)o.classList.remove('on');setTimeout(()=>{const a=document.querySelector('.screen.active');if(a)_maybeTip(a.id);},700);}
+function closeTour(){try{localStorage.setItem('coach_tour_done','1');}catch(e){}setTimeout(()=>{if(!document.querySelector('.modal-ov.open'))maybeSuggestCore();},2500);const o=document.getElementById('tour');if(o)o.classList.remove('on');setTimeout(()=>{const a=document.querySelector('.screen.active');if(a)_maybeTip(a.id);},700);}
 function _tourDone(){try{return !!localStorage.getItem('coach_tour_done');}catch(e){return true;}}
 
 // ─── Context tips: one per screen, each shown at most twice ─────────────────
@@ -4516,7 +4681,7 @@ async function sendChatMsg(msg){
   const typing=document.createElement('div');typing.className='msg ai';typing.style.cssText='color:var(--mu);font-size:20px;letter-spacing:3px';typing.textContent='···';
   document.getElementById('chat-msgs').appendChild(typing);document.getElementById('chat-msgs').scrollTop=9999;
   const prof=profileTxt();
-  const jctx=journalCtx();const sys=`Du bist ein intelligenter persönlicher Fitness-Coach. ${prof?'Nutzer-Profil: '+prof+'. ':''}Letztes Training: ${histTxt().split('\n')[0]||'keines'}.${jctx?' Tagebuch: '+jctx+' — berücksichtige das bei Vorschlägen.':''}
+  const jctx=journalCtx();const _pt=_prefsTxt();const sys=`Du bist ein intelligenter persönlicher Fitness-Coach.${_pt?' '+_pt.trim().replace(/\n/g,' · ')+' ':' '}${prof?'Nutzer-Profil: '+prof+'. ':''}Letztes Training: ${histTxt().split('\n')[0]||'keines'}.${jctx?' Tagebuch: '+jctx+' — berücksichtige das bei Vorschlägen.':''}
 
 WICHTIG: Verstehe die ABSICHT des Nutzers — nicht immer will er trainieren.
 - Wenn er ein Workout plant: Frage kurz nach (max 3 Fragen): Fokus/Ziel, Zeit, Intensität. Dann ready:true.
@@ -5145,8 +5310,12 @@ Bekannte Dehnübungen als Orientierung: ${STRETCH_LIB.slice(0,14).map(e=>e.name)
 }
 
 async function generateWorkout(summaryOverride){
+  if(!window._keepUndo){_revUndo=[];}window._keepUndo=false;
+  const _fromReview=!!window._genFromReview;window._genFromReview=false;
+  const _extraTxt=window._genExtra?'\n\n'+window._genExtra:'';window._genExtra=null;
   show('s-gen');document.getElementById('gen-text').textContent='Workout wird erstellt';
   const summary=summaryOverride||chatCtx.summary||'Ganzkörper, 30 Minuten, Körpergewicht, mittlere Intensität';
+  window._lastGenSummary=summary;
   // Progression context: last performance + PR of recently trained exercises
   const seen=new Set();const perfLines=[];
   [...log].reverse().some(w=>{
@@ -5191,7 +5360,7 @@ TRAININGSWISSENSCHAFTLICHE REGELN:
 - Warmup nach RAMP-Prinzip: 1 Übung Puls anheben (z.B. Hampelmann leicht), 1-2 Übungen Zielmuskulatur aktivieren/mobilisieren (dynamisch, keine statischen Dehnungen).
 
 Typen: type:"time" zeitbasiert, type:"reps" zählbar (dann reps:N), type:"hold" Halten, type:"amrap" max Wdh in Zeit. 5-7 Hauptübungen + 2-3 Warmup.
-${_coachContext()}
+${_coachContext()}${_prefsTxt()}${_extraTxt}
 ${BRIEF_RULES}
 Antworte NUR mit JSON-Objekt: {"briefing":{"focus":"...","why":"...","structure":"...","goal":"..."},"exercises":[ÜBUNGEN]} — ÜBUNGEN ist ein Array aus Objekten wie: [{"name":"...","why":"max 8 Wörter","type":"time","duration":40,"reps":null,"rest":20,"sets":3,"group":null,"icon":"◈","tip":"max 8 Wörter","muscles":["chest"],"bilateral":false,"details":"max 12 Wörter","mistakes":"max 8 Wörter","warmup":false,"cooldown":false}]
 Halte tip/details/mistakes SEHR kurz (Stichworte, keine Sätze).
@@ -5275,6 +5444,7 @@ WANN Supersatz: antagonistische Paare (Drücken+Ziehen, Quads+Hamstrings) — sp
     if(/intensität:\s*leicht|deload/i.test(summary))curSetup.reserve=true;
     showReview();
   }catch(e){
+    if(_fromReview&&_revUndo.length){const s0=_revUndo.pop();curExercises=s0.ex;wuExercises=s0.wu;curSetup=s0.setup;showReview();showErr('Anpassen fehlgeschlagen: '+e.message+'. Dein Workout ist unverändert.');return;}
     showErr('Fehler: '+e.message);show('s-chat');
     addAIMsg('Generierung fehlgeschlagen. Nochmal?',['Nochmal versuchen','Ganzkörper']);
     const btn=document.createElement('button');btn.className='btn btn-ac';btn.style.cssText='margin:6px 0;width:100%';btn.textContent='Nochmal versuchen';btn.onclick=()=>{btn.remove();generateWorkout(summaryOverride);};document.getElementById('chat-msgs').appendChild(btn);
@@ -5314,12 +5484,13 @@ function toggleSuperset(i){
 function showReview(){
   if(wuVisible===undefined)wuVisible=true;
   try{renderBriefing();}catch(e){}
+  try{_syncRevUndo();}catch(e){}
   document.getElementById('rev-meta').textContent=curExercises.length+' Übungen'+(wuExercises.length?' + '+wuExercises.length+' Warmup':'');
   // Show "regenerate" only when viewing a plan session that has a saved workout
   const _rb=document.getElementById('rev-regen-bar');
   if(_rb){
     const _s=pendingPlanSession&&plan?.weeks[pendingPlanSession.wi]?.sessions[pendingPlanSession.si];
-    _rb.style.display=(_s&&_s.savedWorkout)?'flex':'none';
+    _rb.style.display='none';void _s;
   }
   const ws=document.getElementById('wu-sec');
   if(wuExercises.length){ws.style.display='block';
@@ -5344,7 +5515,7 @@ function showReview(){
       <div class="drag-handle" onpointerdown="dragExStart(event,${i})" aria-label="Übung verschieben" style="width:22px;align-self:stretch;display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:15px;flex-shrink:0;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none">⠿</div>
       <button onclick="openInfoModal(curExercises[${i}])" style="width:34px;height:34px;border-radius:8px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.20);font-size:13px;color:var(--ac);flex-shrink:0">${ex.icon||'ℹ'}</button>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}${ex.bilateral?' ↔':''}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}${ex.bilateral?' ↔':''}${_prefMark(ex.name)}</div>
         ${ex.why?`<div class="ex-why">${ex.why}</div>`:''}<div style="font-size:11px;color:var(--mu)">${ex.tip||''}</div>
       </div>
       <button onclick="openSwapModal(${i})" style="padding:5px 9px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:11px;font-weight:600;font-family:var(--f);flex-shrink:0;display:flex;align-items:center">${ic('refresh',14)}</button>
@@ -5399,7 +5570,7 @@ function showReview(){
 function toggleWarmup(){wuVisible=!wuVisible;const list=document.getElementById('wu-list');list.style.display=wuVisible?'flex':'none';if(wuVisible)list.style.flexDirection='column';const btn=document.getElementById('wu-toggle');btn.textContent=wuVisible?'✕ Überspringen':'✓ Einschließen';btn.style.background=wuVisible?'rgba(var(--amRGB),.14)':'rgba(var(--coRGB),.14)';btn.style.borderColor=wuVisible?'rgba(var(--amRGB),.26)':'rgba(var(--coRGB),.26)';btn.style.color=wuVisible?'var(--am)':'var(--co)';}
 function cycleAlt(idx){const ex=curExercises[idx];const muscles=ex.muscles||[];const candidates=[...DEFAULT_LIB,...library].filter(e=>_exOk(e)&&e.name!==ex.name&&(e.muscles||[]).some(m=>muscles.includes(m)));if(!candidates.length){showErr('Keine lokalen Alternativen.');return;}ex._altIdx=((ex._altIdx||0)+1)%candidates.length;const alt=candidates[ex._altIdx];const info=document.getElementById('alt-info-'+idx);info.style.display='block';info.innerHTML=`<b style="color:var(--tx)">${alt.name}</b>${alt.bilateral?' ↔':''} — ${alt.tip||''} <button onclick="applyAlt(${idx})" style="color:var(--ac);font-weight:600;font-size:12px;background:none;border:none;cursor:pointer;font-family:var(--f);margin-left:6px">Annehmen →</button>`;}
 function applyAlt(idx){const ex=curExercises[idx];const muscles=ex.muscles||[];const candidates=[...DEFAULT_LIB,...library].filter(e=>_exOk(e)&&e.name!==ex.name&&(e.muscles||[]).some(m=>muscles.includes(m)));const alt=candidates[ex._altIdx%candidates.length]||candidates[0];if(!alt)return;curExercises[idx]={...ex,name:alt.name,tip:alt.tip||'',details:alt.details||'',mistakes:alt.mistakes||'',muscles:alt.muscles,bilateral:alt.bilateral||false,icon:getExIcon(alt.name),_altIdx:ex._altIdx};showReview();}
-function deleteEx(idx){curExercises.splice(idx,1);showReview();}
+function deleteEx(idx){const _o=curExercises[idx];curExercises.splice(idx,1);showReview();try{if(_o&&_o.name)_prefCount('swapOut',_o.name);}catch(e){}}
 
 // ─── Smart ordering ──────────────────────────────────────────────────────────
 // Stretches: head → toe. Strength: big compounds first, isolation/core last.
@@ -6124,7 +6295,7 @@ function _revCardHTML(ex,i){
       <div class="drag-handle" onpointerdown="dragExStart(event,${i})" aria-label="Übung verschieben" style="width:22px;align-self:stretch;display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:15px;flex-shrink:0;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none">⠿</div>
       <button onclick="openInfoModal(curExercises[${i}])" style="width:34px;height:34px;border-radius:8px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.20);font-size:13px;color:var(--ac);flex-shrink:0">${ex.icon||'ℹ'}</button>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}${ex.bilateral?' ↔':''}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}${ex.bilateral?' ↔':''}${_prefMark(ex.name)}</div>
         ${ex.why?`<div class="ex-why">${ex.why}</div>`:''}<div style="font-size:11px;color:var(--mu)">${ex.tip||''}</div>
       </div>
       <button onclick="openSwapModal(${i})" style="padding:5px 9px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:11px;font-weight:600;font-family:var(--f);flex-shrink:0;display:flex;align-items:center">${ic('refresh',14)}</button>
@@ -6391,6 +6562,7 @@ function applySwap(ex){
   }
   curExercises[swapIdx]=merged;
   closeModal('modal-swap');showReview();
+  try{if(old&&old.name&&_pk(old.name)!==_pk(ex.name))_prefCount('swapOut',old.name);}catch(e){}
   if(last&&merged._fromHistory){
     const bits=[];if(merged.sets)bits.push(merged.sets+' Sätze');if(!isHold&&merged.reps)bits.push(merged.reps+' Wdh');if(isHold&&merged.duration)bits.push(merged.duration+'s');
     showErr('Aus deinem Verlauf übernommen: '+bits.join(' × '));
@@ -6422,7 +6594,7 @@ function lastPerformance(exName){
   const reps=recent?Math.max(...recent.sets,0)||0:0;
   return {sets,reps,secs};
 }
-async function getAISwap(){if(!loadKey()){showErr('API Key fehlt');return;}const ex=curExercises[swapIdx];const muscles=ex.muscles||[];document.getElementById('swap-ai-result').textContent='Lädt...';try{const raw=await callAPI([{role:'user',content:`3 Alternativen für "${ex.name}" (Muskeln: ${muscles.join(',')}). Kein Equipment, knieschonend. NUR JSON-Array: [{"name":"...","tip":"DE","muscles":["core"],"bilateral":false}]`}],400);const parsed=extractJSON(raw);const arr=Array.isArray(parsed)?parsed:[parsed];document.getElementById('swap-ai-result').innerHTML='';arr.filter(e=>e&&e.name).forEach(e=>{const b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;cursor:pointer;font-family:var(--f)';b.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx)">${e.name}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${e.tip||''}</div>`;b.onclick=()=>applySwap({...e,icon:getExIcon(e.name)});document.getElementById('swap-ai-result').appendChild(b);});}catch(err){document.getElementById('swap-ai-result').textContent='Fehler: '+err.message;}}
+async function getAISwap(){if(!loadKey()){showErr('API Key fehlt');return;}const ex=curExercises[swapIdx];const muscles=ex.muscles||[];document.getElementById('swap-ai-result').textContent='Lädt...';try{const raw=await callAPI([{role:'user',content:`3 Alternativen für "${ex.name}" (Muskeln: ${muscles.join(',')}). Kein Equipment, knieschonend.${(()=>{const a=loadPrefs().avoid;return a.length?' Nicht vorschlagen: '+a.join(', ')+'.':'';})()} NUR JSON-Array: [{"name":"...","tip":"DE","muscles":["core"],"bilateral":false}]`}],400);const parsed=extractJSON(raw);const arr=Array.isArray(parsed)?parsed:[parsed];document.getElementById('swap-ai-result').innerHTML='';arr.filter(e=>e&&e.name).forEach(e=>{const b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;cursor:pointer;font-family:var(--f)';b.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx)">${e.name}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${e.tip||''}</div>`;b.onclick=()=>applySwap({...e,icon:getExIcon(e.name)});document.getElementById('swap-ai-result').appendChild(b);});}catch(err){document.getElementById('swap-ai-result').textContent='Fehler: '+err.message;}}
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
 const RREST=60;let isWU=false;
@@ -8045,7 +8217,7 @@ ${regenRule}
 DAUER: Jede Session zwischen ${planOpts.durMin} und ${planOpts.durMax} Minuten, NIE darüber oder darunter. Koppel die Dauer an die Intensität: easy≈${planOpts.durMin} min, medium≈${durMid} min, hard≈${planOpts.durMax} min.
 WICHTIG Woche 1: Plan startet am ${dayNamesDe[startDow]} (${startDateVal}). Verwende in Woche 1 NUR: ${week1DaysStr||allowedDaysStr}. Woche 1 hat nur ${week1Count} Session(s). Ab Woche 2 volle ${planOpts.freq} Sessions, verteilt mit Erholung.
 ${jrecent?"\nAKTUELLES BEFINDEN (Tagebuch): "+jrecent+(acuteFlag?"\nWICHTIG: Nutzer ist aktuell krank/angeschlagen. Starte Woche 1 SEHR moderat (nur leichte Sessions, weniger Umfang, Mobilität/Technik). Intensität erst ab Woche 2 aufbauen. Erwähne das kurz im intro.":"\nBeim Einstieg berücksichtigen."):""}intro: 2 kurze motivierende Sätze.${goalReason?" Nutzer trainiert für: "+goalReason+" — beziehe dich konkret darauf.":""} note je Woche: 1 kurzer Satz zum Wochenziel.
-${_kbFocusTxt(_kbMode(planOpts))}
+${_kbFocusTxt(_kbMode(planOpts))}${_prefsTxt()}
 NUR minifiziertes JSON ohne Leerzeichen: {"title":"Kurzname","goal":"${planOpts.goal}","intro":"...","weeks":[{"week":1,"theme":"Start","note":"...","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.durMin},"done":false}]}]}
 dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
 
@@ -8732,7 +8904,7 @@ PERIODISIERUNG: Lineare Progression, erst Umfang, dann Intensität. Woche 1 easy
 TRAININGSTAGE: Nutze NUR diese Tage: ${allowedDaysStr}.
 ${rbRegen}
 WICHTIG Woche 1: Start am ${dayNamesDe[startDow]}. Woche 1 NUR: ${week1DaysStr} (nur ${week1Count} Session(s)). Ab Woche 2 volle ${newFreq} Sessions mit Erholung.
-${_kbFocusTxt(_kbMode(plan))}
+${_kbFocusTxt(_kbMode(plan))}${_prefsTxt()}
 NUR minifiziertes JSON: {"title":"${(plan.title||'Plan').replace(/"/g,'')}","goal":"${plan.goal}","weeks":[{"week":1,"theme":"Start","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${plan.durMin||30},"done":false}]}]}
 dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
   try{
@@ -9574,7 +9746,7 @@ function renderAddExList(query){
     return`<div style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:11px;border:1px solid ${already?'var(--co)':'var(--br)'};background:${already?'rgba(var(--coRGB),.10)':'var(--card)'};opacity:${already?'.7':'1'}">
       <div style="width:34px;height:34px;border-radius:9px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.17);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--ac);flex-shrink:0">${ex.stretch?'🧘':getExIcon(ex.name)}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}${ex.bilateral?' ↔':''}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">${ex.name}${ex.bilateral?' ↔':''}${_prefMark(ex.name)}</div>
         <div style="font-size:11px;color:var(--mu)">${ex.stretch?'Dehnung · ':''}${(ex.muscles||[]).map(m=>MUSCLE_DE[m]||m).join(', ')}</div>
       </div>
       ${already
@@ -9588,6 +9760,7 @@ function renderAddExList(query){
 
 function addExToWorkout(exOrStr){
   let ex;try{ex=typeof exOrStr==='object'?exOrStr:JSON.parse(exOrStr);}catch{return;}
+  try{if(ex&&ex.name)_prefCount('added',ex.name);}catch(e){}
   const n=(ex.name||'').toLowerCase();
   let type='time',dur=40,rest=20;
   if(ex.stretch){type='hold';dur=ex.hold||40;rest=10;}
@@ -9644,7 +9817,8 @@ function doExport(){
     challenges:JSON.parse(localStorage.getItem('coach_challenges')||'[]'),
     profile:JSON.parse(localStorage.getItem('coach_profile')||'null'),
     journal:JSON.parse(localStorage.getItem('coach_journal')||'[]'),
-    myWorkouts:JSON.parse(localStorage.getItem('coach_myworkouts')||'[]')};
+    myWorkouts:JSON.parse(localStorage.getItem('coach_myworkouts')||'[]'),
+    prefs:loadPrefs()};
   const b=new Blob([JSON.stringify(full,null,2)],{type:'application/json'});
   const u=URL.createObjectURL(b),a=document.createElement('a');
   a.href=u;a.download='smart-gains-'+todayIso()+'.json';
@@ -9660,6 +9834,7 @@ function doImport(e){const f=e.target.files[0];if(!f)return;const r=new FileRead
   if(p.profile)safeSet('coach_profile',JSON.stringify(p.profile));
   if(p.journal)safeSet('coach_journal',JSON.stringify(p.journal));
   if(Array.isArray(p.myWorkouts))safeSet('coach_myworkouts',JSON.stringify(p.myWorkouts));
+  if(p.prefs&&typeof p.prefs==='object')safeSet('coach_prefs',JSON.stringify(p.prefs));
   persist();savePlan();saveLibrary();updateHome();
   showErr('✓ '+log.length+' Workouts importiert'+(Array.isArray(p.myWorkouts)&&p.myWorkouts.length?(' · '+p.myWorkouts.length+' eigene Workouts'):'')+'.');
 }catch{showErr('Ungültige Datei.');}};r.readAsText(f);e.target.value='';}
@@ -10105,7 +10280,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     // s-plan-create init handled in show()
   }catch(e){console.error('Init error:',e);}
   try{_bindReviewFmtInfo();}catch(e){}
-  try{_syncTipsSetting();if(!_tourDone())setTimeout(openTour,700);}catch(e){}
+  try{_syncTipsSetting();if(!_tourDone())setTimeout(openTour,700);else setTimeout(()=>{if(!document.querySelector('.modal-ov.open'))maybeSuggestCore();},2000);}catch(e){}
 });
 </script>
 </body>
