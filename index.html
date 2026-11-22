@@ -905,6 +905,9 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Kettlebell-Anteil</div>
   <div id="pc-kb" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px"></div>
   <div id="pc-kb-desc" style="font-size:12px;color:var(--mu);margin-bottom:20px;line-height:1.45"></div>
+  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px">Dein Equipment</div>
+  <div style="font-size:12px;color:var(--mu);margin-bottom:10px;line-height:1.45">Was du zuhause hast. Gilt als Standard für alle Sessions — einzelne Sessions kannst du weiter anpassen.</div>
+  <div id="pc-equip" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px"></div>
 
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Session-Dauer</div>
   <div style="font-size:12px;color:var(--mu);margin-bottom:14px">Bereich frei einstellbar — Dauer richtet sich nach Intensität</div>
@@ -1114,6 +1117,10 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
       <button onclick="addPlanWeek()" style="flex:1;padding:12px;border-radius:10px;background:rgba(var(--coRGB),.1);border:1px solid rgba(var(--coRGB),.3);color:var(--co);font-size:13px;font-weight:600;font-family:var(--f)">+ 1 Woche</button>
       <button onclick="removePlanWeek()" style="flex:1;padding:12px;border-radius:10px;background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.3);color:var(--hot);font-size:13px;font-weight:600;font-family:var(--f)">− 1 Woche</button>
     </div>
+    <!-- Default equipment -->
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px">Standard-Equipment</div>
+    <div style="font-size:12px;color:var(--mu);margin-bottom:10px;line-height:1.4">Gilt für alle Sessions, die du nicht einzeln angepasst hast. Wird sofort gespeichert.</div>
+    <div id="edit-equip" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px"></div>
     <!-- Freq change -->
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Sessions/Woche</div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px" id="edit-freq-chips"></div>
@@ -1548,6 +1555,8 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
     <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap" id="sess-day-picker"></div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Intensität</div>
     <div style="display:flex;gap:8px;margin-bottom:18px" id="sess-int-picker"></div>
+    <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Format</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px" id="sess-fmt-picker"></div>
     <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px">Fokus heute</div>
     <div style="font-size:11px;color:var(--mu);margin-bottom:10px">Weicht nur für diese Session vom Plan ab — z.B. Push, wenn die Beine noch Muskelkater haben.</div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px" id="sess-focus-picker"></div>
@@ -1616,6 +1625,13 @@ const EQUIPMENT=[
   {id:'kettlebell',label:'Kettlebell',icon:'⚫'},
   {id:'bench',label:'Bank / Sofa',icon:'🛋️'},
 ];
+// Standard-Equipment: plan default → profile → KB if weights are known
+function _homeEquip(){const p=loadProfile()||{};if(Array.isArray(p.homeEquip)&&p.homeEquip.length)return [...p.homeEquip];const d=['bodyweight'];try{if(kbWeights().length)d.push('kettlebell');}catch(e){}return d;}
+function _planEquip(pl){return (pl&&Array.isArray(pl.defaultEquip)&&pl.defaultEquip.length)?[...pl.defaultEquip]:_homeEquip();}
+function _isKbFmt(f){return !!f&&f!=='sets';}
+function _sessEquip(sess,pl){const pp=pl||(typeof plan!=='undefined'?plan:null);const e=(sess&&Array.isArray(sess.equipment)&&sess.equipment.length)?[...sess.equipment]:_planEquip(pp);if(_isKbFmt(sess&&sess.format)&&!e.includes('kettlebell'))e.push('kettlebell');if(!e.includes('bodyweight'))e.unshift('bodyweight');return e;}
+// Chip picker for equipment (bodyweight always on)
+function _equipChips(el,arr,onChange){if(!el)return;el.innerHTML='';EQUIPMENT.forEach(eq=>{const b=document.createElement('button');const fixed=eq.id==='bodyweight';b.className='chip'+(arr.includes(eq.id)?' ac':'');b.innerHTML=`${eq.icon} ${eq.label}`;b.onclick=()=>{if(fixed)return;const i=arr.indexOf(eq.id);if(i>=0)arr.splice(i,1);else arr.push(eq.id);b.className='chip'+(arr.includes(eq.id)?' ac':'');onChange&&onChange(arr);};el.appendChild(b);});}
 const EQUIP_LABELS={'bodyweight':'Körpergewicht','bar':'Klimmzugstange','dumbbells':'Kurzhanteln','resistance_band':'Widerstandsband','kettlebell':'Kettlebell','bench':'Bank/Sofa'};
 // Kettlebell inventory lives in the profile (gear doesn't change per session).
 // {count:1|2, weight:10}. Used to tell the generator what's actually available.
@@ -7612,7 +7628,7 @@ function startPlanSession(){
   const isGym=loc==='gym';
   const equip=isGym
     ? 'Fitnessstudio — Maschinen, Kabelzug, Langhantel, SZ-Stange, Kurzhanteln, Squat Rack, verstellbare Bänke'
-    : equipSummary(sess.equipment);
+    : equipSummary(_sessEquip(sess));
   const rec=recommendExercises(sess.durationMin||30,sess.focus,plan.goal,sess.intensity);
   const count=sess.exerciseCount||rec.count;
   const avoidTxt=(sess.refocused&&sess.avoidMuscles?.length)
@@ -7651,7 +7667,7 @@ function onDurSlider(which){
   document.getElementById('dur-max-val').textContent=mx+' min';
 }
 
-function buildPlanCreate(){try{_syncKbFocus();}catch(e){}const gc=document.getElementById('goal-cards');if(!gc){console.error('goal-cards missing');return;}gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<div class="ic-badge" style="--c:var(--ac)">${ic(g.ik||'zap',18)}</div><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');if(wc){wc.innerHTML='';[4,6,8,12,16].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});}const fc=document.getElementById('freq-chips');if(fc){fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' ac':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};fc.appendChild(b);});}const dmS=document.getElementById('dur-min-slider'),dxS=document.getElementById('dur-max-slider');if(dmS){dmS.value=planOpts.durMin;document.getElementById('dur-min-val').textContent=planOpts.durMin+' min';}if(dxS){dxS.value=planOpts.durMax;document.getElementById('dur-max-val').textContent=planOpts.durMax+' min';}const bdp=document.getElementById('blocked-days-picker');if(bdp){bdp.innerHTML='';const dayOrder=[1,2,3,4,5,6,0];const dayLbl={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};dayOrder.forEach(d=>{const active=!planOpts.blockedDays.includes(d);const b=document.createElement('button');b.style.cssText=`flex:1;padding:11px 0;border-radius:9px;border:1.5px solid ${active?'var(--ac)':'var(--br)'};background:${active?'rgba(var(--acRGB),.15)':'var(--up)'};color:${active?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f);opacity:${active?1:.5}`;b.textContent=dayLbl[d];b.onclick=()=>{if(planOpts.blockedDays.includes(d))planOpts.blockedDays=planOpts.blockedDays.filter(x=>x!==d);else planOpts.blockedDays=[...planOpts.blockedDays,d];const on=!planOpts.blockedDays.includes(d);b.style.borderColor=on?'var(--ac)':'var(--br)';b.style.background=on?'rgba(var(--acRGB),.15)':'var(--up)';b.style.color=on?'var(--ac)':'var(--mu)';b.style.opacity=on?1:.5;};bdp.appendChild(b);});}const sc=document.getElementById('style-cards');if(sc){sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<div class="ic-badge" style="--c:var(--ac);width:30px;height:30px">${ic(s.ik||'zap',16)}</div><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}sc.appendChild(b);});}const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';const gri=document.getElementById('goal-reason-inp');if(gri)gri.value=planOpts.goalReason||'';
+function buildPlanCreate(){try{_syncKbFocus();}catch(e){}try{planOpts.equip=planOpts.equip||_homeEquip();_equipChips(document.getElementById('pc-equip'),planOpts.equip);}catch(e){}const gc=document.getElementById('goal-cards');if(!gc){console.error('goal-cards missing');return;}gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<div class="ic-badge" style="--c:var(--ac)">${ic(g.ik||'zap',18)}</div><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');if(wc){wc.innerHTML='';[4,6,8,12,16].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});}const fc=document.getElementById('freq-chips');if(fc){fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' ac':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};fc.appendChild(b);});}const dmS=document.getElementById('dur-min-slider'),dxS=document.getElementById('dur-max-slider');if(dmS){dmS.value=planOpts.durMin;document.getElementById('dur-min-val').textContent=planOpts.durMin+' min';}if(dxS){dxS.value=planOpts.durMax;document.getElementById('dur-max-val').textContent=planOpts.durMax+' min';}const bdp=document.getElementById('blocked-days-picker');if(bdp){bdp.innerHTML='';const dayOrder=[1,2,3,4,5,6,0];const dayLbl={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};dayOrder.forEach(d=>{const active=!planOpts.blockedDays.includes(d);const b=document.createElement('button');b.style.cssText=`flex:1;padding:11px 0;border-radius:9px;border:1.5px solid ${active?'var(--ac)':'var(--br)'};background:${active?'rgba(var(--acRGB),.15)':'var(--up)'};color:${active?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f);opacity:${active?1:.5}`;b.textContent=dayLbl[d];b.onclick=()=>{if(planOpts.blockedDays.includes(d))planOpts.blockedDays=planOpts.blockedDays.filter(x=>x!==d);else planOpts.blockedDays=[...planOpts.blockedDays,d];const on=!planOpts.blockedDays.includes(d);b.style.borderColor=on?'var(--ac)':'var(--br)';b.style.background=on?'rgba(var(--acRGB),.15)':'var(--up)';b.style.color=on?'var(--ac)':'var(--mu)';b.style.opacity=on?1:.5;};bdp.appendChild(b);});}const sc=document.getElementById('style-cards');if(sc){sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<div class="ic-badge" style="--c:var(--ac);width:30px;height:30px">${ic(s.ik||'zap',16)}</div><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}sc.appendChild(b);});}const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';const gri=document.getElementById('goal-reason-inp');if(gri)gri.value=planOpts.goalReason||'';
   const cdb=document.getElementById('plan-cooldown');if(cdb)cdb.checked=!!planOpts.cooldown;
   const plp=document.getElementById('plan-loc-picker');
   if(plp){
@@ -7862,6 +7878,7 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
     }
     if(!planData?.weeks?.length)throw new Error('Kein gültiger Plan — bitte nochmal versuchen');
     try{_normalizeKbFormats(planData,_kbMode(planOpts));}catch(e){}
+    if(planOpts.equip?.length){planData.defaultEquip=[...planOpts.equip];const _p=loadProfile()||{};_p.homeEquip=[...planOpts.equip];saveProfile(_p);}
     // Clamp every session duration into the chosen range, coupled to intensity
     {
       const dMin=planOpts.durMin, dMax=planOpts.durMax, dMid=Math.round((dMin+dMax)/2);
@@ -8241,7 +8258,7 @@ async function regenPlanSession(){
 }
 function _startSessAt_legacy(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;
-  const equip=equipSummary(sess.equipment);const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);
+  const equip=equipSummary(_sessEquip(sess));const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);
 }
 
 // Leave the review without starting the workout. Goes back to the plan when the
@@ -8267,7 +8284,7 @@ function reviewBackToChat(){
 function chatFromPlan(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;pendingPlanSession={wi,si};chatHistory=[];chatCtx={};
   const week=plan.weeks[wi];
-  const equip=equipSummary(sess.equipment);
+  const equip=equipSummary(_sessEquip(sess));
   show('s-chat');document.getElementById('chat-msgs').innerHTML='';
   const focusClean=sess.focus.split('&').map(p=>p.trim()).map(p=>MUSCLE_DE[p]||MUSCLE_DE_SHORT[p]||p).join(' & ');
   addAIMsg(`Bereit für "${focusClean}"! ${sess.durationMin||30} Minuten, ${INT_LABELS[sess.intensity||'medium']}, ${equip}. Direkt starten oder noch Wünsche?`,['Direkt erstellen','Ich hab noch Wünsche']);
@@ -8286,12 +8303,12 @@ function chatFromPlan(wi,si){
   chatHistory.push({role:'assistant',content:`Bereit für "${sess.focus}"!`});
 }
 
-let sessEditWi=0,sessEditSi=0,sessEditDow2=1,sessEditInt2='medium',sessEditEquip=['bodyweight'],sessEditCount=5,sessEditFocus=null;
+let sessEditWi=0,sessEditSi=0,sessEditDow2=1,sessEditInt2='medium',sessEditEquip=['bodyweight'],sessEditCount=5,sessEditFocus=null,sessEditFmt='sets';
 let sessEditTargetWi=-1; // -1 = no week change
 function openSessEdit(wi,si){
   sessEditWi=wi;sessEditSi=si;sessEditTargetWi=wi;
   const sess=plan.weeks[wi].sessions[si];
-  sessEditDow2=sess.dow;sessEditInt2=sess.intensity||'medium';sessEditEquip=sess.equipment?[...sess.equipment]:['bodyweight'];sessEditCount=sess.autoCount?null:(sess.exerciseCount||null);
+  sessEditDow2=sess.dow;sessEditInt2=sess.intensity||'medium';sessEditEquip=_sessEquip(sess);sessEditFmt=sess.format||'sets';sessEditCount=sess.autoCount?null:(sess.exerciseCount||null);
   sessEditFocus=sess.focus; // start from the plan's focus for this session
   document.getElementById('sess-wi').value=wi;document.getElementById('sess-si').value=si;document.getElementById('sess-modal-title').textContent=sess.focus;
   // Focus picker: quick presets + "Plan" to keep the original. Only changes THIS session.
@@ -8322,6 +8339,10 @@ function openSessEdit(wi,si){
   const ip=document.getElementById('sess-int-picker');ip.innerHTML='';['easy','medium','hard'].forEach(int=>{const b=document.createElement('button');b.className='chip'+(int===sessEditInt2?' '+(int==='easy'?'co':int==='medium'?'am':'hot'):'');b.textContent=INT_LABELS[int];b.onclick=()=>{sessEditInt2=int;ip.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip '+(int==='easy'?'co':int==='medium'?'am':'hot');};ip.appendChild(b);});
   const ep=document.getElementById('sess-equip-picker');ep.innerHTML='';EQUIPMENT.forEach(eq=>{const b=document.createElement('button');const active=sessEditEquip.includes(eq.id);b.className='chip'+(active?' ac':'');b.innerHTML=`${eq.icon} ${eq.label}`;b.onclick=()=>{if(sessEditEquip.includes(eq.id)){if(sessEditEquip.length===1)return;sessEditEquip=sessEditEquip.filter(e=>e!==eq.id);b.className='chip';}else{sessEditEquip=[...sessEditEquip,eq.id];b.className='chip ac';};_syncKbDetail(sessEditEquip);};ep.appendChild(b);});
   _syncKbDetail(sessEditEquip);
+  // Format picker — KB formats switch the kettlebell on
+  const fmp=document.getElementById('sess-fmt-picker');
+  if(fmp){fmp.innerHTML='';const paintEq=()=>{ep.querySelectorAll('button').forEach((b,i)=>{b.className='chip'+(sessEditEquip.includes(EQUIPMENT[i].id)?' ac':'');});_syncKbDetail(sessEditEquip);};
+    ['sets','emom','complex','ladder','amrap','tabata'].forEach(f=>{const b=document.createElement('button');b.className='chip'+(f===sessEditFmt?' ac':'');b.textContent=f==='sets'?'Klassisch':(FORMAT_DE[f]||f);b.onclick=()=>{sessEditFmt=f;fmp.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';if(_isKbFmt(f)&&!sessEditEquip.includes('kettlebell')){sessEditEquip=[...sessEditEquip,'kettlebell'];paintEq();}};fmp.appendChild(b);});}
   // Location picker — decides which exercise pool and progression style is used
   const lp=document.getElementById('sess-loc-picker');
   if(lp){
@@ -8377,7 +8398,8 @@ function saveSessEdit(){
     // Reset any generated title so it reflects the new focus next time
     delete s.generatedTitle;
   }
-  s.dow=sessEditDow2;s.intensity=sessEditInt2;s.equipment=[...sessEditEquip];s.location=window._sessLoc||'home';s.exerciseCount=sessEditCount||recommendExercises(s.durationMin||30,s.focus,plan?.goal,s.intensity).count;s.autoCount=!sessEditCount;
+  s.dow=sessEditDow2;s.intensity=sessEditInt2;s.equipment=[...sessEditEquip];if(sessEditFmt){if(sessEditFmt!==(s.format||'sets')){s.format=sessEditFmt;if(_isKbFmt(sessEditFmt)&&!/kb|kettlebell/i.test(s.focus||''))s.focus='KB '+s.focus;if(!_isKbFmt(sessEditFmt))s.focus=(s.focus||'').replace(/^KB\s+/i,'');delete s.generatedTitle;}}
+  {const _def=_sessEquip({format:s.format});const k=a=>[...a].sort().join();if(k(s.equipment)===k(_def))delete s.equipment;}s.location=window._sessLoc||'home';s.exerciseCount=sessEditCount||recommendExercises(s.durationMin||30,s.focus,plan?.goal,s.intensity).count;s.autoCount=!sessEditCount;
   // Manual count -> re-estimate duration so the badge stays honest
   if(sessEditCount){
     const _r=recommendExercises(s.durationMin||30,s.focus,plan?.goal,s.intensity);
@@ -8435,7 +8457,7 @@ async function redistributePlanDays(){
   showErr('✓ Trainingstage neu verteilt.');
 }
 
-function openPlanEdit(){if(!plan)return;let editFreqLocal=plan.freq||3;const endDate=new Date(plan.startDate+'T12:00:00');endDate.setDate(endDate.getDate()+plan.weeks.length*7);document.getElementById('edit-end-date').value=endDate.toISOString().slice(0,10);document.getElementById('edit-start-date').value=plan.startDate||todayIso();updateEditDateCalc();const fc=document.getElementById('edit-freq-chips');fc.innerHTML='';
+function openPlanEdit(){if(!plan)return;try{const _eq=_planEquip(plan);_equipChips(document.getElementById('edit-equip'),_eq,a=>{plan.defaultEquip=[...a];const _p=loadProfile()||{};_p.homeEquip=[...a];saveProfile(_p);savePlan();});}catch(e){}let editFreqLocal=plan.freq||3;const endDate=new Date(plan.startDate+'T12:00:00');endDate.setDate(endDate.getDate()+plan.weeks.length*7);document.getElementById('edit-end-date').value=endDate.toISOString().slice(0,10);document.getElementById('edit-start-date').value=plan.startDate||todayIso();updateEditDateCalc();const fc=document.getElementById('edit-freq-chips');fc.innerHTML='';
   window._editFreq=plan.freq;
   [2,3,4,5].forEach(n=>{
     const b=document.createElement('button');
@@ -8537,7 +8559,7 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
     try{_normalizeKbFormats(planData,_kbMode(plan));}catch(e){}
     // Preserve plan metadata
     planData.title=plan.title;planData.goal=plan.goal;planData.freq=newFreq;
-    planData.durMin=plan.durMin;planData.durMax=plan.durMax;planData.style=plan.style;planData.kbMode=_kbMode(plan);planData.kbFocus=planData.kbMode!=='off';
+    planData.durMin=plan.durMin;planData.durMax=plan.durMax;planData.style=plan.style;planData.kbMode=_kbMode(plan);planData.kbFocus=planData.kbMode!=='off';if(plan.defaultEquip)planData.defaultEquip=[...plan.defaultEquip];
     planData.startDate=rebuildStart;
     // Clamp durations to range, coupled to intensity
     {
