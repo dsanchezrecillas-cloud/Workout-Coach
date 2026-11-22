@@ -24,12 +24,12 @@ try{
 html[data-theme="dark"]{color-scheme:dark;--bg:#0e0b1a;--card:#181330;--up:#221a3d;--br:#332a52;--ac:#a78bfa;--hot:#fb7185;--co:#34d399;--am:#fbbf24;--tx:#ece9f5;--mu:#8a7fb0;--su:#b8afd6;
   --acRGB:167,139,250;--hotRGB:251,113,133;--coRGB:52,211,153;--amRGB:251,191,36;--or:#fb923c;--orRGB:251,146,60;--st:#38bdf8;--stRGB:56,189,248;
   --grad1:#231b42;--gradAm:#2a2312;--ring:#2b2348;--toastBg:#2d1520;--warnBg:#2a2312;
-  --bodyOff:#2b2348;--bodySkin:#3a3355;--bodySkinD:#4a4270;--bodyLine:#4a4270;--chartLbl:#8a7fb0;--shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.22)}
+  --bodyOff:#1e1b2b;--bodySkin:#2c2840;--figGap:#13101d;--w1:#4c3a85;--w2:#7c5ce0;--w3:#c4b5fd;--bodySkinD:#4a4270;--bodyLine:#4a4270;--chartLbl:#8a7fb0;--shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.22)}
 /* Light */
 html[data-theme="light"]{color-scheme:light;--bg:#f7f4ff;--card:#ffffff;--up:#efe9ff;--br:#ddd5f7;--ac:#7c3aed;--hot:#f43f5e;--co:#059669;--am:#d97706;--tx:#1e1740;--mu:#9181b4;--su:#5c4f82;
   --acRGB:124,58,237;--hotRGB:244,63,94;--coRGB:5,150,105;--amRGB:217,119,6;--or:#ea580c;--orRGB:234,88,12;--st:#0284c7;--stRGB:2,132,199;
   --grad1:#f5f0ff;--gradAm:#fffbeb;--ring:#ede9ff;--toastBg:#fff0f3;--warnBg:#fffbeb;
-  --bodyOff:#e8e4f8;--bodySkin:#f0e6d6;--bodySkinD:#ddd0be;--bodyLine:#d8d0ee;--chartLbl:#64748b;--shadow:0 1px 4px rgba(124,58,237,.06)}
+  --bodyOff:#efebf8;--bodySkin:#e1dbf2;--figGap:#ffffff;--w1:#d9ccfb;--w2:#a78bfa;--w3:#6d28d9;--bodySkinD:#ddd0be;--bodyLine:#d8d0ee;--chartLbl:#64748b;--shadow:0 1px 4px rgba(124,58,237,.06)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 button,input,a{touch-action:manipulation}
 html,body{background:var(--bg);min-height:100%}
@@ -266,6 +266,11 @@ html[data-theme="dark"] #bnav .bnav-main{color:#160f2e}
 .tag{font-size:12px}
 /* ── Exercise sheet + figure ── */
 .mfig{display:flex;gap:6px;justify-content:center}
+.m-glow{filter:drop-shadow(0 0 2.5px color-mix(in srgb,var(--ac) 70%,transparent))}
+#plan-wkfig summary::-webkit-details-marker{display:none}
+.wk-leg{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:center;font-size:11px;color:var(--mu);margin-top:8px}
+.wk-leg .sc{display:flex;gap:2px}.wk-leg .sc i{width:14px;height:8px;border-radius:2px;display:block}
+.wk-leg .pl{display:flex;align-items:center;gap:4px}.wk-leg .pl i{width:14px;height:8px;border:1.2px dashed var(--or);border-radius:2px;display:block}
 .mfig>div{display:flex;flex-direction:column;align-items:center;gap:2px}
 .mfig span{font-size:11px;color:var(--mu);font-weight:600}
 .mchip{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:8px;margin:0 4px 4px 0}
@@ -355,7 +360,7 @@ html[data-theme="dark"] #bnav .bnav-main{color:#160f2e}
 .sw i{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .sw.on i{left:25px}
 /* ══ Liquid Glass theme ══════════════════════════════════════════════════════ */
-html[data-theme="dark"]{--bg:#06050b;--card:rgba(255,255,255,.06);--up:rgba(255,255,255,.07);--br:rgba(255,255,255,.13);--grad1:rgba(255,255,255,.05);--mu:#a29abf;--su:#d0c9e8;--bodySkin:rgba(255,255,255,.17);--bodyOff:rgba(255,255,255,.07);
+html[data-theme="dark"]{--bg:#06050b;--card:rgba(255,255,255,.06);--up:rgba(255,255,255,.07);--br:rgba(255,255,255,.13);--grad1:rgba(255,255,255,.05);--mu:#a29abf;--su:#d0c9e8;--bodySkin:#2c2840;--bodyOff:#1e1b2b;--figGap:#13101d;--w1:#4c3a85;--w2:#7c5ce0;--w3:#c4b5fd;
   --gl-bg:linear-gradient(140deg,rgba(255,255,255,.13),rgba(255,255,255,.035) 45%,rgba(255,255,255,.07));--gl-br:rgba(255,255,255,.16);--gl-hi:rgba(255,255,255,.32);--gl-lo:rgba(255,255,255,.07);--gl-sh:0 18px 44px rgba(0,0,0,.42);
   --gl-btn:linear-gradient(140deg,rgba(255,255,255,.14),rgba(255,255,255,.04));--gl-nav:rgba(22,16,40,.38);--gl-sheet:rgba(22,16,40,.55);
   --blobs:radial-gradient(55% 30% at 6% 3%,rgba(124,58,237,.85),transparent 72%),radial-gradient(42% 26% at 102% 30%,rgba(56,189,248,.45),transparent 72%),radial-gradient(50% 26% at 30% 62%,rgba(168,85,247,.35),transparent 72%),radial-gradient(55% 30% at 85% 100%,rgba(99,102,241,.45),transparent 72%)}
@@ -933,6 +938,12 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
     </div>
     <div style="height:5px;background:var(--br);border-radius:3px"><div id="plan-prog-bar" style="height:100%;background:linear-gradient(90deg,#7c3aed,#a855f7);border-radius:3px;transition:width .5s;width:0"></div></div>
   </div>
+
+  <!-- Muscles this week (collapsible) -->
+  <details id="plan-wkfig" class="card" style="margin-bottom:12px;padding:12px 14px">
+    <summary style="font-size:13px;font-weight:600;color:var(--tx);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center">Muskeln diese Woche<span style="font-size:11px;color:var(--ac);font-weight:600">anzeigen</span></summary>
+    <div id="plan-wkfig-body" style="margin-top:10px"></div>
+  </details>
 
   <!-- View toggle -->
   <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--up);border-radius:10px;padding:4px">
@@ -2831,13 +2842,14 @@ function muscleBalance(days){
 function _balColor(v){return v<3?'hot':v<6?'am':v<=20?'co':'am';}
 function renderMuscleBalance(){
   const el=document.getElementById('muscle-balance');if(!el)return;
-  const recent=(log||[]).filter(w=>!w.stretch&&Date.now()-new Date(w.date).getTime()<7*864e5);
-  const b=muscleBalance(7);const mx=Math.max(20,...Object.values(b));
-  let h='<div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin:20px 0 10px">Muskel-Bilanz · letzte 7 Tage</div><div class="card">';
+  const mon=_weekStart();const days=(Date.now()-mon.getTime())/864e5;
+  const recent=(log||[]).filter(w=>!w.stretch&&new Date(w.date)>=mon);
+  const b=muscleBalance(days);const mx=Math.max(20,...Object.values(b));
+  let h='<div style="font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin:20px 0 10px">Muskeln · diese Woche</div><div class="card">';
+  h+='<div style="margin:-2px 0 12px">'+weekFigureHTML(210)+'</div>';
   if(!recent.length){h+='<div style="font-size:12px;color:var(--mu)">Diese Woche noch kein Krafttraining.</div></div>';el.innerHTML=h;return;}
-  h+='<div style="margin:-4px 0 10px">'+balanceBodySVG(b)+'</div>';
-  h+=BAL_GROUPS.map(g=>{const v=b[g],c=_balColor(v);return `<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div style="width:70px;font-size:12px;color:var(--su);flex-shrink:0">${g}</div><div style="flex:1;height:8px;border-radius:5px;background:var(--up);overflow:hidden"><div style="height:100%;width:${Math.min(100,v/mx*100)}%;background:var(--${c});border-radius:5px"></div></div><div style="width:58px;text-align:right;font-size:11px;font-weight:600;color:var(--${c})">${String(v).replace('.',',')} Sätze</div></div>`;}).join('');
-  h+='<div style="font-size:11px;color:var(--mu);margin-top:6px;line-height:1.5">Ziel: etwa 6–20 Sätze pro Woche je Gruppe. Rot = kaum trainiert, Gelb = wenig. Nebenmuskeln zählen halb.</div></div>';
+  h+=BAL_GROUPS.map(g=>{const v=b[g];return `<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div style="width:70px;font-size:12px;color:var(--su);flex-shrink:0">${g}</div><div style="flex:1;height:8px;border-radius:5px;background:var(--up);overflow:hidden;position:relative"><div style="height:100%;width:${Math.min(100,v/mx*100)}%;background:var(--ac);opacity:${v>=6?1:.55};border-radius:5px"></div><i style="position:absolute;top:0;bottom:0;left:${6/mx*100}%;width:1.5px;background:var(--mu);opacity:.6"></i></div><div style="width:58px;text-align:right;font-size:11px;font-weight:600;color:var(--su)">${String(v).replace('.',',')} Sätze</div></div>`;}).join('');
+  h+='<div style="font-size:11px;color:var(--mu);margin-top:6px;line-height:1.5">Richtwert: etwa 6–20 Sätze pro Woche je Gruppe (Strich = 6). Nebenmuskeln zählen halb.</div></div>';
   el.innerHTML=h;
 }
 function updateBalanceCard(){
@@ -3848,40 +3860,29 @@ function exRegions(ex){
   ms.slice(1).forEach(m=>(MUSCLE_REGIONS[m]||[]).forEach(r=>{if(!p.has(r))s.add(r);}));
   return {p,s};
 }
-// Figure: left-half paths, mirrored for the right half. viewBox 100×205.
+// Figure: gender-neutral athletic silhouette. Left-half paths, mirrored. viewBox 100×205.
+const _SIL='M50 25 L46 25.5 Q45.5 29.5 45 30.5 Q38 31.5 33 33.2 Q25.5 35 24.2 43 Q22.6 52 22.4 60 Q22 66 21.6 70 Q20.6 80 20.6 89 Q19.4 92 19.6 97 Q20.8 100 23.4 98.6 Q25 94 25.8 89.5 Q27.8 80 28.6 70 Q29.6 62 31 53 Q32.4 58 33.4 64 Q35.2 78 34.6 90 Q33 97 33 104 Q32.4 118 33.6 132 Q34.6 141 35.4 147 Q33.8 158 35.4 170 Q36.6 182 37.2 192 Q35.4 196.5 37.6 198 L44.6 198 Q45.6 196 44.8 192 Q45.4 182 46 170 Q47.2 158 46.4 147 Q47 138 47.6 128 Q48.6 116 50 108 Z';
 const _FIG={
-  front:{mid:[['abs','M43 55 L57 55 L57 91 Q50 96 43 91 Z']],
-    side:[['traps','M44 27 L35 32.5 L44 33.5 Z'],['delt_s','M30 33 Q23.5 35 23.5 45 L27.5 47 Q28.5 38.5 33 34.2 Z'],['delt_f','M33 34.2 Q28.5 38.5 27.5 47 L32.5 48 Q35 40.5 38.5 35 Z'],
-      ['chest','M38.5 35 Q44 33.6 49.2 35.5 L49.2 52 Q42 55.5 34.5 51.5 Q32.5 45.5 33.2 41 Z'],['biceps','M24.6 48.5 L31.8 49.5 Q31.8 58.5 30 66.5 L23.8 65.5 Q22.8 56.5 24.6 48.5 Z'],
-      ['forearms','M23.6 67.5 L29.8 68.5 Q29 80 27 90 L21.8 89 Q20.8 78 23.6 67.5 Z'],['obliques','M34.6 53.5 L42.2 56 L42.2 90 L37.5 92.5 Q35.4 75 34.6 53.5 Z'],
-      ['hipflex','M37.5 94.5 L43 95.5 L47.5 104.5 L40 104.5 Z'],['quads','M33.4 98 L40 105.5 L44.4 107.5 L44.4 145.5 L36.2 146.5 Q32 122 33.4 98 Z'],
-      ['adductors','M44.8 107.5 L49.2 108.5 L49.2 128 L44.8 138.5 Z'],['calves','M36.2 156 L43.8 156 Q44.4 175 42 191.5 L38.2 191.5 Q35 175 36.2 156 Z']],
-    skin:'<ellipse cx="50" cy="14.5" rx="9" ry="11"/><rect x="45.5" y="24" width="9" height="8" rx="3"/><ellipse cx="23.6" cy="95" rx="3.2" ry="5"/><ellipse cx="76.4" cy="95" rx="3.2" ry="5"/><ellipse cx="40.2" cy="151" rx="4.4" ry="4"/><ellipse cx="59.8" cy="151" rx="4.4" ry="4"/><ellipse cx="40" cy="197" rx="4.2" ry="3"/><ellipse cx="60" cy="197" rx="4.2" ry="3"/>'},
-  back:{mid:[['traps','M50 25.5 L41 31 L35.5 33.8 L44 36.8 L50 52 L56 36.8 L64.5 33.8 L59 31 Z']],
-    side:[['delt_r','M30 33 Q23.5 35 23.5 45.5 L28.5 47.5 Q30.5 39 36.5 35 Z'],['triceps','M24.6 48.5 L31.2 49.5 Q31.2 58.5 30 66.5 L23.8 65.5 Q22.8 56.5 24.6 48.5 Z'],
-      ['forearms','M23.6 67.5 L29.8 68.5 Q29 80 27 90 L21.8 89 Q20.8 78 23.6 67.5 Z'],['midback','M44 37.6 L49.3 52.6 L49.3 62 L41.2 58.2 L38.2 44 Z'],
-      ['lats','M36.8 41.5 L41 59 L49.3 64.2 L49.3 70 Q42.2 77.5 37 84 Q33.8 66 33 50 Z'],['lowback','M43 74.5 L49.3 70.8 L49.3 92 L42 92 Z'],
-      ['glutes','M34 92.5 L49.3 94 L49.3 112 Q42 118.5 35 113.5 Q32 102 34 92.5 Z'],['hams','M34 116.5 L44.2 118.5 L44.2 146 L36.2 146.5 Q33 130 34 116.5 Z'],
-      ['adductors','M44.6 118.5 L49.3 116.5 L49.3 130 L44.6 138.5 Z'],['calves','M35.8 154 L44.2 154 Q46.5 166 43.2 179 L38 179 Q34 166 35.8 154 Z']],
-    skin:'<ellipse cx="50" cy="14.5" rx="9" ry="11"/><rect x="45.5" y="24" width="9" height="8" rx="3"/><ellipse cx="23.6" cy="95" rx="3.2" ry="5"/><ellipse cx="76.4" cy="95" rx="3.2" ry="5"/><path d="M38 180 L43 180 L42 192 L38.5 192 Z"/><path d="M62 180 L57 180 L58 192 L61.5 192 Z"/><ellipse cx="40" cy="197" rx="4.2" ry="3"/><ellipse cx="60" cy="197" rx="4.2" ry="3"/>'}
+  front:{mid:[['abs','M44.2 55 Q50 53.4 55.8 55 L55.4 88 Q50 95.4 44.6 88 Z']],side:[['traps','M46.2 29.5 Q40 31.6 34.6 33.6 Q40.5 34.4 45.4 34.2 Z'],['delt_s','M33.4 33.8 Q26.4 35.2 24.9 42.6 Q24.9 47 26.5 48.8 Q27.6 41.2 31.6 36.6 Z'],['delt_f','M31.6 36.6 Q27.6 41.2 26.5 48.8 Q29.2 49.6 31.2 47.8 Q32.4 41.6 35.6 35.4 Z'],['chest','M36.4 35.3 Q43.4 34 49.4 35.8 L49.4 49.4 Q42.6 53.4 36.6 50.4 Q32.8 47.6 33 42.6 Q34 38 36.4 35.3 Z'],['biceps','M26.9 50.6 Q30.1 50.4 31 52.8 Q31 59.6 29.1 65 Q26.1 65.8 24.4 64.4 Q23.7 56.2 26.9 50.6 Z'],['forearms','M23.9 67.4 Q27 66.8 28.3 68.2 Q27.8 78.6 25.5 87.6 Q23.3 88.4 21.7 87.4 Q21.1 77.2 23.9 67.4 Z'],['obliques','M36.6 54 Q40.4 55.2 43 56.2 L43.4 87.8 Q40.2 90.2 37.6 89.4 Q35.4 72 36.6 54 Z'],['quads','M35 98 Q42 99.6 46 106.4 Q47.6 125 45.6 142.6 Q41.2 145.4 37.2 143.4 Q33.2 125 35 98 Z'],['adductors','M46.6 107.4 Q49 108.6 49.4 112 L49.4 127.6 Q47.8 132.6 46.8 130.6 Q47.6 118 46.6 107.4 Z'],['calves','M36.6 152 Q40.2 149.8 43.6 152.4 Q44.2 170 42.2 186 Q39.6 187.2 38.4 186 Q35.6 168 36.6 152 Z'],['hipflex','M37.8 91.6 Q41.4 93.2 44.6 96.6 Q41.8 99.6 37.6 97.4 Q37.2 94.2 37.8 91.6 Z']]},
+  back:{mid:[['traps','M50 26.6 Q44.4 29.4 36.4 33.6 Q42 36 46 40 L50 55 L54 40 Q58 36 63.6 33.6 Q55.6 29.4 50 26.6 Z']],side:[['delt_r','M33.6 33.8 Q26.4 35.2 24.9 42.8 Q25 47.4 26.8 48.8 Q29.2 40.6 35.8 36.4 Z'],['triceps','M26.9 50.6 Q30.3 50.4 31 52.8 Q31 59.6 29.1 65 Q26.1 65.8 24.4 64.4 Q23.7 56.2 26.9 50.6 Z'],['forearms','M23.9 67.4 Q27 66.8 28.3 68.2 Q27.8 78.6 25.5 87.6 Q23.3 88.4 21.7 87.4 Q21.1 77.2 23.9 67.4 Z'],['midback','M44.6 40.4 L49.4 54 L49.4 62 Q44 60 40.6 56 Q39.8 47.4 44.6 40.4 Z'],['lats','M37.2 42 Q39.4 52 40.8 57.4 Q45 61.6 49.4 64 L49.4 70 Q43 76 38.2 82 Q34.6 66 33.8 52 Q34.6 46 37.2 42 Z'],['lowback','M43.6 73 Q46.6 70.6 49.4 70.2 L49.4 91 L43.6 91 Q42.6 82 43.6 73 Z'],['glutes','M35.4 92.4 Q42 90.8 49.4 92.6 L49.4 110 Q43 115.6 36.6 111.6 Q33.6 102 35.4 92.4 Z'],['hams','M35.6 115 Q41 116.6 46 115 Q47 130 45 143 Q41 145 37.4 143.6 Q34 129 35.6 115 Z'],['adductors','M46.6 115 Q49 114 49.4 117 L49.4 128 Q47.6 132 46.4 130 Z'],['calves','M35.8 150 Q40.6 147 44.6 150.6 Q46.6 160 43.6 172 Q40.6 176 37.6 172 Q34 160 35.8 150 Z']]}
 };
 function _mirrorPath(d){let i=0;return d.replace(/-?\d+(\.\d+)?/g,n=>{const v=(i++%2===0)?(100-parseFloat(n)):parseFloat(n);return String(Math.round(v*10)/10);});}
-const _BASE_TORSO='M29 32 Q50 27 71 32 L73 47 L66 94 L67.5 106 L50 108 L32.5 106 L34 94 L27 47 Z';
-function muscleFigureSVG(fillFor,size){
-  const H=size||170,W=Math.round(H*100/205);
-  const off='var(--bodySkin)',base='var(--bodyOff)';
+function muscleFigureSVG(fillFor,size,opts){
+  const H=size||170,W=Math.round(H*100/205);const planned=opts&&opts.planned;const primSet=opts&&opts.prim;
   const side=v=>{
     const f=_FIG[v];
-    const shape=(r,d)=>{const c=fillFor(r);return `<path d="${d}" fill="${c||off}" stroke="var(--card)" stroke-width=".7" stroke-linejoin="round"/>`;};
+    const shape=(r,d)=>{const c=fillFor(r);const pl=planned&&planned.has(r);
+      const glow=c&&primSet&&primSet.has(r)?' class="m-glow"':'';
+      return `<path d="${d}" fill="${c||'var(--bodySkin)'}"${glow} stroke="${pl?'var(--or)':'var(--figGap)'}" stroke-width="${pl?1.1:.6}"${pl?' stroke-dasharray="2.2 1.6"':''} stroke-linejoin="round"/>`;};
     const parts=[...f.mid.map(([r,d])=>shape(r,d)),...f.side.map(([r,d])=>shape(r,d)+shape(r,_mirrorPath(d)))].join('');
-    const legs=`<path d="M33 98 L49.3 108 L49.3 146 L44 192 L36 192 L32 120 Z" /><path d="${_mirrorPath('M33 98 L49.3 108 L49.3 146 L44 192 L36 192 L32 120 Z')}"/>`;
-    return `<svg viewBox="0 0 100 205" width="${W}" height="${H}" aria-hidden="true"><g fill="${base}">${f.skin}<path d="${_BASE_TORSO}"/>${legs}<path d="M22 47 L32 48 L30 90 L20 89 Z"/><path d="${_mirrorPath('M22 47 L32 48 L30 90 L20 89 Z')}"/></g>${parts}</svg>`;
+    const center=v==='front'?'<path d="M50 57 L50 91" stroke="var(--figGap)" stroke-width=".5" fill="none" opacity=".7"/>':'';
+    return `<svg viewBox="0 0 100 205" width="${W}" height="${H}" aria-hidden="true"><g fill="var(--bodyOff)"><ellipse cx="50" cy="14.6" rx="8.2" ry="10"/><path d="${_SIL}"/><path d="${_mirrorPath(_SIL)}"/></g>${parts}${center}</svg>`;
   };
   return `<div class="mfig"><div>${side('front')}<span>Vorne</span></div><div>${side('back')}<span>Hinten</span></div></div>`;
 }
 function exFigureSVG(ex,size){
   const {p,s}=exRegions(ex);const col=ex.stretch?'var(--st)':'var(--ac)';
-  return muscleFigureSVG(r=>p.has(r)?col:s.has(r)?`color-mix(in srgb,${col} 42%,var(--bodySkin))`:null,size);
+  return muscleFigureSVG(r=>p.has(r)?col:s.has(r)?`color-mix(in srgb,${col} 45%,var(--bodySkin))`:null,size,{prim:p});
 }
 // Legacy entry point (review list, plan, etc.) now draws the detailed figure
 function bodyMapSVG(muscles,isStretch,fillFor){
@@ -3889,7 +3890,42 @@ function bodyMapSVG(muscles,isStretch,fillFor){
   const rs=new Set();(muscles||[]).forEach(m=>(MUSCLE_REGIONS[m]||[]).forEach(r=>rs.add(r)));
   const col=isStretch?'var(--st)':'var(--ac)';
   const labels=[...new Set((muscles||[]).map(k=>MUSCLE_DE[k]||k))];
-  return muscleFigureSVG(r=>rs.has(r)?col:null,150)+(labels.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:7px">${labels.map(l=>`<span class="mchip p">${l}</span>`).join('')}</div>`:'');
+  return muscleFigureSVG(r=>rs.has(r)?col:null,170,{prim:rs})+(labels.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:7px">${labels.map(l=>`<span class="mchip p">${l}</span>`).join('')}</div>`:'');
+}
+// ─── Week view: trained (intensity) + still planned (dashed) ─────────────────
+function _weekStart(){const t=new Date();const m=new Date(t);m.setHours(0,0,0,0);m.setDate(t.getDate()-((t.getDay()+6)%7));return m;}
+function weekMuscleLoad(){
+  const mon=_weekStart();const load={};
+  const addR=(rs,v)=>rs.forEach(r=>load[r]=(load[r]||0)+v);
+  (log||[]).forEach(w=>{
+    if(w.stretch||new Date(w.date)<mon)return;
+    const f=Math.max(.6,Math.min(1.5,(w.rpe||6)/6));
+    (w.exercises||[]).forEach((ex,i)=>{
+      if(ex.warmup||ex.stretch)return;
+      const done=new Set();Object.entries(w.repLog||{}).forEach(([k,v])=>{const m=k.match(/^(\d+)_(\d+)_s(\d+)/);if(m&&+m[2]===i&&v>0)done.add(m[1]+'_'+m[3]);});
+      const n=done.size||(w.amrap?(w.amrapRounds||0):0)||(+ex.sets||0);if(!n)return;
+      const {p,s:sec}=exRegions(ex);addR([...p],n*f);addR([...sec],n*f*.5);
+    });
+  });
+  try{loadActs().forEach(a=>{if(new Date(a.date)<mon)return;const v=a.effort==='hard'?2:a.effort==='medium'?1:0;if(v)addR(['quads','hams','glutes','calves'],v);});}catch(e){}
+  return load;
+}
+function weekPlannedRegions(){
+  const out=new Set();if(!plan?.weeks?.length)return out;
+  const today=new Date();today.setHours(0,0,0,0);
+  try{planSessionsThisWeek().forEach(s=>{
+    if(s.done||s.skipped)return;
+    const grp=_focusMuscles(s.focus);if(_isKbFmt(s.format)||/\bkb\b|kettlebell/i.test(s.focus||''))grp.push('glutes','hamstrings','core');
+    grp.forEach(m=>(MUSCLE_REGIONS[m]||[]).forEach(r=>out.add(r)));
+  });}catch(e){}
+  return out;
+}
+function weekFigureHTML(size){
+  const load=weekMuscleLoad();const planned=weekPlannedRegions();
+  const lvl=v=>!v?0:v<=3?1:v<=8?2:3;
+  const fig=muscleFigureSVG(r=>{const l=lvl(load[r]);return l?`var(--w${l})`:null;},size||200,{planned});
+  const leg=`<div class="wk-leg"><span class="sc"><i style="background:var(--w1)"></i><i style="background:var(--w2)"></i><i style="background:var(--w3)"></i></span><span>wenig → viel trainiert</span>${planned.size?'<span class="pl"><i></i>noch geplant (geschätzt)</span>':''}</div>`;
+  return fig+leg;
 }
 function balanceBodySVG(b){
   const G={chest:'Brust',lats:'Rücken',midback:'Rücken',lowback:'Rücken',traps:'Rücken',delt_f:'Schultern',delt_s:'Schultern',delt_r:'Schultern',biceps:'Arme',triceps:'Arme',forearms:'Arme',abs:'Core',obliques:'Core',glutes:'Gesäß',quads:'Beine',hams:'Beine',adductors:'Beine',calves:'Beine',hipflex:'Beine'};
@@ -8778,6 +8814,7 @@ async function deleteCalSession(){
 }
 
 function renderPlanView(wi=0){
+  try{const d=document.getElementById('plan-wkfig');if(d){const fill=()=>{document.getElementById('plan-wkfig-body').innerHTML=weekFigureHTML(170);};if(d.open)fill();d.ontoggle=()=>{if(d.open)fill();d.querySelector('summary span').textContent=d.open?'ausblenden':'anzeigen';};}}catch(e){}
   if(!plan?.weeks?.length){show('s-plan-create');return;}
   currentViewWeek=wi;
   const _live=s=>!s.skipped; // merged/dropped sessions no longer show or count
