@@ -2400,8 +2400,8 @@ function updateWeekRing(){
   const wrap=document.getElementById('week-ring-wrap');if(!wrap)return;
   let done=0,target=0;
   if(plan?.weeks?.length){
-    const wk=plan.weeks[getCurrentWeekIdx()];
-    if(wk){target=wk.sessions.length;done=wk.sessions.filter(s=>s.done).length;}
+    const tw=planSessionsThisWeek();
+    target=tw.length;done=tw.filter(s=>s.done).length;
   }else{
     // No plan: count this calendar week's strength workouts against a default of 3
     target=3;
@@ -2494,10 +2494,9 @@ function renderJournal(){
 }
 async function applyJournalShift(ts,days){
   if(!plan?.weeks?.length)return;
-  const wi=getCurrentWeekIdx();const wk=plan.weeks[wi];
-  const todayDow=new Date().getDay();
-  const si=wk.sessions.findIndex(s=>s.dow===todayDow&&!s.done);
-  if(si<0){showErr('Heute ist keine offene Session im Plan.');return;}
+  const _t=_todayPlanSession();
+  if(!_t){showErr('Heute ist keine offene Session im Plan.');return;}
+  const wi=_t.wi;const wk=plan.weeks[wi];const si=_t.si;const todayDow=new Date().getDay();
   // Next free day: skip blocked days and days that already hold an open session
   const blocked=new Set(plan.blockedDays||[]);
   const occupied=new Set(wk.sessions.filter((s,i)=>i!==si&&!s.done).map(s=>s.dow));
@@ -2659,7 +2658,7 @@ async function fetchCoach(force){
     var raw='';
     const h=new Date().getHours(),timeOfDay=h<12?'Morgen':h<18?'Mittag':'Abend';
     const profCtx=profileTxt();
-    const planCtx=plan?`Aktiver Plan: ${plan.title||''}, Woche ${getCurrentWeekIdx()+1}/${plan.weeks.length}, ${plan.weeks.flatMap(w=>w.sessions).filter(s=>s.done).length} Sessions abgeschlossen.`:'Kein aktiver Trainingsplan.';
+    const planCtx=plan?`Aktiver Plan: ${plan.title||''}, ${planNotStarted()?'startet am '+plan.startDate+' (noch nicht begonnen)':'Woche '+(getCurrentWeekIdx()+1)+'/'+plan.weeks.length}, ${plan.weeks.flatMap(w=>w.sessions).filter(s=>s.done).length} Sessions abgeschlossen.`:'Kein aktiver Trainingsplan.';
     /*COACH*/raw=await callAPI([{role:'user',content:`Heute ist ${todayIso()}, ${timeOfDay}. Du bist Trainingswissenschaftler und persönlicher Coach.${profCtx?'\n\nNutzer-Profil: '+profCtx:''}\n\nAktiver Trainingsplan: ${planCtx}\n\nSTATUS HEUTE: ${todayStatusTxt()}\n\nTrainingsverlauf (neueste zuerst):\n${histTxt()}${journalCtx()?'\n\nTagebuch des Nutzers (neueste Einträge): '+journalCtx():''}\n\nGib eine kurze, persönliche Empfehlung für heute. Wende diese Regeln an: Letztes RPE >=9 -> heute leicht oder Pause. Gleiche Muskelgruppe vor <48h trainiert -> andere Muskelgruppe oder Erholung. 3+ Trainingstage in Folge -> Pausentag empfehlen. Mehr als 5 Tage Pause -> sanfter Wiedereinstieg, nicht ueberkompensieren. Notizen und Tagebucheinträge zu Schmerzen, Schlafmangel oder Stress ernst nehmen und die Empfehlung daran anpassen (Schmerz -> betroffene Region schonen; schlechter Schlaf -> Intensität runter). Wenn laut STATUS HEUTE bereits trainiert wurde: NICHT zu einem weiteren Workout raten, sondern Erholung/Ernährung/Ausblick. Ist heute ein geplanter Trainingstag und noch offen, beziehe dich darauf. Ernährungstipps MÜSSEN zur angegebenen Ernährungsform passen (bei vegetarisch keine Fleisch-/Fischempfehlung, bei vegan zusätzlich keine Milch/Ei). Ohne Angabe zur Ernährung keine spezifischen Lebensmittel-Empfehlungen. Sei konkret, keine Floskeln. LÄNGE: message MAXIMAL 2 kurze Sätze (zusammen unter 30 Wörtern). tip MAXIMAL 1 Satz unter 15 Wörtern. Keine Wiederholungen, keine Einleitungen wie 'dein Körper sendet ein Signal'.\n\nNUR JSON: {"message":"2-3 persönliche Sätze DE","tip":"1 konkreter Tipp DE"}`}],900);
     let obj;
     try{const s=extractJSON(raw);obj=Array.isArray(s)?s[0]:s;}catch(pe){obj=null;}
@@ -3147,9 +3146,9 @@ function navGo(id){
 }
 function _todayPlanSession(){
   if(!plan?.weeks?.length)return null;
-  const wi=getCurrentWeekIdx(),wk=plan.weeks[wi];if(!wk)return null;
-  const s=wk.sessions.find(x=>x.dow===new Date().getDay()&&!x.done);
-  return s?{wi,si:wk.sessions.indexOf(s),s}:null;
+  const today=_ymd(new Date());
+  for(let wi=0;wi<plan.weeks.length;wi++){const wk=plan.weeks[wi];const s=(wk.sessions||[]).find(x=>{if(x.done||x.skipped)return false;try{return _ymd(sessionDate(wi,x))===today;}catch(e){return false;}});if(s)return {wi,si:wk.sessions.indexOf(s),s};}
+  return null;
 }
 function openStartSheet(){
   const t=_todayPlanSession();
@@ -3190,10 +3189,11 @@ function renderWeekStrip(){
     return `<div class="ws-day${k===today?' today':''}"><div class="ws-lbl">${lbl}</div><div class="${cls}">${inner}</div></div>`;
   }).join('');
   let target=3;
-  if(plan?.weeks?.length){const wk=plan.weeks[getCurrentWeekIdx()];if(wk)target=wk.sessions.length||3;}
+  let _startTxt='';
+  if(plan?.weeks?.length){const tw=planSessionsThisWeek();if(tw.length)target=tw.length;else if(planNotStarted()){_startTxt='Plan startet '+_startWhen();}}
   const st=weekStreak(),tot=log.filter(w=>!w.stretch).length;
   window._popDay=null;
-  el.innerHTML=`<div class="ws-row">${cells}</div><div class="ws-foot"><span><b>${done}/${target}</b> diese Woche</span>${st>0?`<span><b style="color:var(--or)">${st}</b> ${st===1?'Woche':'Wochen'} in Folge</span>`:''}<span><b>${tot}</b> gesamt</span></div>`;
+  el.innerHTML=`<div class="ws-row">${cells}</div><div class="ws-foot">${_startTxt?`<span><b>${done}</b> diese Woche</span>`:`<span><b>${done}/${target}</b> diese Woche</span>`}${st>0?`<span><b style="color:var(--or)">${st}</b> ${st===1?'Woche':'Wochen'} in Folge</span>`:''}<span><b>${tot}</b> gesamt</span></div>`;
 }
 
 // ─── Today hero (replaces the old "Heute geplant" card) ─────────────────────
@@ -3231,6 +3231,14 @@ function updatePlanHome(){
       <div class="hero-title" style="display:flex;align-items:center;gap:8px"><span style="color:var(--co);display:flex">${ic('check',24,2.6)}</span>Erledigt</div>
       <div class="hero-meta">${nextTxt||'Gute Arbeit — jetzt erholen.'}</div>
       <div class="hero-row" style="margin-top:14px">${sec('stretch','Dehnen','openStretchModal()')}${sec('plus','Trainieren','openStartSheet()')}</div></div>`;
+    return;
+  }
+  if(plan?.weeks?.length&&planNotStarted()&&nx){
+    const s=nx.s,_when=_startWhen();
+    el.innerHTML=`<div class="hero calm"><div class="hero-eye"><span>Plan startet ${_when}</span><span style="color:var(--mu)">${plan.weeks.length} Wochen</span></div>
+      <div class="hero-title">${focusLabel(s.focus)}</div>
+      <div class="hero-meta"><span>${s.durationMin||30} min</span><span class="hero-pill">${INT_LABELS[s.intensity||'medium']||''}</span>${s.format&&s.format!=='sets'&&FORMAT_DE[s.format]?`<span class="hero-pill" style="background:rgba(var(--orRGB),.16);color:var(--or);cursor:pointer" onclick="showFmtInfo('${s.format}',event)">${FORMAT_DE[s.format]}</span>`:''}</div>
+      <div class="hero-row" style="margin-top:14px">${sec('calendar','Plan ansehen','showPlan()')}${sec('plus','Trotzdem trainieren','openStartSheet()')}</div></div>`;
     return;
   }
   if(plan?.weeks?.length){
@@ -3530,7 +3538,7 @@ function renderPlanTimeline(wi){
     const row=document.createElement('div');row.className='tl-item '+state+(i===wi?' open':'')+(deload?' deload':'');
     row.innerHTML=`<div class="tl-dot">${state==='done'?ic('check',12,3):''}</div>
       <button class="tl-head" onclick="renderPlanView(${i})"><div style="flex:1;min-width:0;text-align:left">
-        <div class="tl-t">Woche ${i+1}${i===cur?' <span class="tl-badge">Jetzt</span>':''}${deload?' <span class="tl-badge co">Erholung</span>':''}</div>
+        <div class="tl-t">Woche ${i+1}${i===cur?` <span class="tl-badge">${planNotStarted()?'Ab '+_startWhen():'Jetzt'}</span>`:''}${deload?' <span class="tl-badge co">Erholung</span>':''}</div>
         <div class="tl-s">${w.theme?w.theme.replace(/</g,'&lt;')+' · ':''}${range}</div></div>
         <div class="tl-prog"><span>${dn}/${live.length}</span><div class="tl-bar"><i style="width:${live.length?dn/live.length*100:0}%"></i></div></div>
         <span class="tl-chev">${ic('chevD',16)}</span></button>`;
@@ -7504,8 +7512,8 @@ function saveWorkout(){
   if(!entry.stretch)setTimeout(()=>{try{offerCooldown(entry.muscles);}catch(e){}},900);
 }
 function showPlanLinkModal(entry){
-  const wi=getCurrentWeekIdx();const week=plan?.weeks[wi];const todayDow=new Date().getDay();
-  const todaySessions=week?.sessions.filter(s=>!s.done)||[];const todayMatch=todaySessions.find(s=>s.dow===todayDow);
+  const _ns=planNotStarted();const wi=getCurrentWeekIdx();const week=plan?.weeks[wi];const _tp=_todayPlanSession();
+  const todaySessions=_ns?[]:(week?.sessions.filter(s=>!s.done)||[]);const todayMatch=_tp&&_tp.wi===wi?_tp.s:null;
   let html='';
   if(todayMatch){html+=`<div class="card" style="margin-bottom:10px;border-color:rgba(var(--acRGB),.35);background:rgba(var(--acRGB),.07)"><div style="font-size:10px;color:var(--ac);letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Heute geplant</div><div style="font-size:14px;font-weight:600;color:var(--tx);margin-bottom:2px">${todayMatch.focus}</div><div style="font-size:12px;color:var(--mu);margin-bottom:12px">${todayMatch.durationMin||30} min · ${INT_LABELS[todayMatch.intensity||'medium']}</div><button onclick="linkToSession(${wi},${week.sessions.indexOf(todayMatch)});closeModal('modal-plan-link')" class="btn btn-ac" style="padding:11px;font-size:13px;text-transform:none">✓ Als diese Session markieren</button></div>`;}
   const otherSessions=todaySessions.filter(s=>s!==todayMatch);
@@ -7839,6 +7847,15 @@ function missedSessions(){
   }));
   return out;
 }
+// Monday of the plan's first week, and whether today is still before it
+function planStartMonday(){if(!plan?.startDate)return null;const start=new Date(plan.startDate+'T12:00:00');const sd=start.getDay();const m=new Date(start);m.setDate(start.getDate()+(sd===0?-6:1-sd));m.setHours(0,0,0,0);return m;}
+function planNotStarted(){if(!plan?.weeks?.length)return false;const m=planStartMonday();if(!m)return false;const t=new Date();t.setHours(0,0,0,0);
+  // a plan may also start mid-week
+  return t<m||(!!plan.startDate&&t<new Date(plan.startDate+'T00:00:00'));}
+// Plan sessions dated inside the current calendar week
+function planSessionsThisWeek(){if(!plan?.weeks?.length)return [];const t=new Date();const mon=new Date(t);mon.setHours(0,0,0,0);mon.setDate(t.getDate()-((t.getDay()+6)%7));const sun=new Date(mon);sun.setDate(mon.getDate()+7);
+  const out=[];plan.weeks.forEach((wk,wi)=>(wk.sessions||[]).forEach(s=>{let d;try{d=sessionDate(wi,s);}catch(e){return;}if(d>=mon&&d<sun)out.push(s);}));return out;}
+function _startWhen(){const f=_nextPlanSession();if(!f)return 'bald';const w=_whenTxt(f.d);return w==='Morgen'?'morgen':(w.length<=2?w+', '+f.d.getDate()+'.'+(f.d.getMonth()+1)+'.':w);}
 function getCurrentWeekIdx(){if(!plan?.weeks?.length)return 0;const start=new Date(plan.startDate+'T12:00:00');const sd=start.getDay();const monday=new Date(start);monday.setDate(start.getDate()+(sd===0?-6:1-sd));const today=new Date(todayIso()+'T12:00:00');const daysDiff=Math.max(0,Math.floor((today-monday)/86400000));return Math.min(Math.floor(daysDiff/7),plan.weeks.length-1);}
 
 function renderWeekReport(){
