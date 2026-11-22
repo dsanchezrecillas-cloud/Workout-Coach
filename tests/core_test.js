@@ -1,0 +1,15 @@
+const __APP=require('path').resolve(__dirname,'..','index.html');const __URL='file://'+__APP;const __TMP=require('os').tmpdir();
+const {chromium}=require('playwright');
+(async()=>{const b=await chromium.launch();const p=await b.newPage({viewport:{width:390,height:844},deviceScaleFactor:2});
+const errs=[];p.on('pageerror',e=>errs.push(e.message));
+const now=Date.now();const hist=[5,5,6,6,7,8].map((r,i)=>({date:new Date(now-(20-i*3)*86400000).toISOString(),exercises:[{name:i%2?'Klimmzug':'Klimmzüge'},{name:'Liegestütze'}],muscles:['back'],rpe:6,repLog:{['1_0_s1']:r,['1_0_s2']:r-1,['1_0_s3']:r-1,['1_1_s1']:12+i,['1_1_s2']:11}}));
+await p.addInitScript(h=>{localStorage.setItem('coach_tour_done','1');localStorage.setItem('coach_tips_off','1');localStorage.setItem('coach_prefs',JSON.stringify({coreSuggested:true,core:['Klimmzüge','Liegestütze','Dips']}));localStorage.setItem('coach_v5',JSON.stringify({version:5,data:h}));},hist);
+await p.goto(__URL);await p.waitForTimeout(900);
+const E=f=>p.evaluate(f);const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)errs.push(m)};
+ok(await E(()=>coreHistory('Klimmzüge').length===6&&coreHistory('Klimmzüge').at(-1).best===8),'history matches name variants');
+await E(()=>show('s-analytics'));await p.waitForTimeout(500);
+ok(await E(()=>/5 → 8/.test(document.getElementById('ana-core').textContent)&&/\(\+3\)/.test(document.getElementById('ana-core').textContent)),'klimmzüge 5→8 +3');
+ok(await E(()=>/Dips[\s\S]*noch keine Daten/.test(document.getElementById('ana-core').textContent)),'no data row');
+ok(await E(()=>document.querySelectorAll('#ana-core svg').length===2),'sparklines');
+await E(()=>document.getElementById('ana-core').scrollIntoView({block:'start'}));await p.screenshot({path:require('path').join(__TMP,'core.png'),clip:{x:0,y:0,width:390,height:420}});
+console.log(errs.length?'ERRORS: '+errs.join(' | '):'ALL OK');await b.close();})();

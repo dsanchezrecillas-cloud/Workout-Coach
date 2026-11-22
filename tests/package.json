@@ -1,0 +1,7 @@
+{
+  "name": "smart-gains-tests",
+  "private": true,
+  "description": "Automatische Tests für Smart Gains (index.html)",
+  "scripts": { "test": "node run-all.js" },
+  "devDependencies": { "playwright": "^1.47.0", "jsdom": "^24.0.0" }
+}

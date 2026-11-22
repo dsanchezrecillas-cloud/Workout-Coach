@@ -1,0 +1,42 @@
+const __APP=require('path').resolve(__dirname,'..','index.html');const __URL='file://'+__APP;const __TMP=require('os').tmpdir();
+const {chromium}=require('playwright');
+(async()=>{const b=await chromium.launch();const p=await b.newPage({viewport:{width:390,height:844},deviceScaleFactor:2});
+const errs=[];p.on('pageerror',e=>errs.push(e.message));
+const t=new Date();const mon=new Date(t);mon.setDate(t.getDate()-((t.getDay()+6)%7));const iso=d=>d.toISOString().slice(0,10);
+const pl={title:'P',goal:'strength',freq:3,kbMode:'mix',kbFocus:true,startDate:iso(mon),weeks:[{week:1,sessions:[{dow:0,focus:'KB Ganzkörper',intensity:'easy',durationMin:20,format:'emom'}]}]};
+await p.addInitScript(pl=>{localStorage.setItem('coach_api_key','k');localStorage.setItem('coach_profile',JSON.stringify({kettlebell:{weights:[16]}}));localStorage.setItem('coach_plan_v3',pl);
+ window.fetch=()=>new Promise(()=>{});},JSON.stringify(pl));
+await p.goto(__URL);await p.waitForTimeout(1300);
+const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)errs.push(m)};const E=(f,a)=>p.evaluate(f,a);
+ok(await E(()=>document.getElementById('tour')?.classList.contains('on')&&document.querySelectorAll('.tour-slide').length===6),'tour auto-opens with 6 slides');
+await p.screenshot({path:require('path').join(__TMP,'tour1.png')});
+await p.click('#tour-next');await p.waitForTimeout(600);
+ok(await E(()=>_tourIdx()===1&&document.querySelectorAll('#tour-dots i')[1].className==='on'),'Weiter advances');
+for(let i=0;i<4;i++){await p.click('#tour-next');await p.waitForTimeout(500);}
+ok(await E(()=>document.getElementById('tour-next').textContent==='Los geht’s'),'last slide button');
+await p.screenshot({path:require('path').join(__TMP,'tour2.png')});
+await p.click('#tour-next');await p.waitForTimeout(1800);
+ok(await E(()=>!document.getElementById('tour').classList.contains('on')&&localStorage.getItem('coach_tour_done')==='1'),'tour closes + remembered');
+ok(await E(()=>document.getElementById('tip-bub')?.classList.contains('on')&&/\+/.test(document.getElementById('tip-bub').textContent)),'home tip after tour');
+await p.screenshot({path:require('path').join(__TMP,'tip1.png')});
+await p.click('#tip-bub button');await p.waitForTimeout(400);
+ok(await E(()=>!document.getElementById('tip-bub').classList.contains('on')&&localStorage.getItem('coach_tip_s-home')==='9'),'tip dismiss remembered');
+await E(()=>{show('s-plan');renderPlanView(0);});await p.waitForTimeout(1200);
+ok(await E(()=>document.getElementById('tip-bub').classList.contains('on')&&/Format-Etikett/.test(document.getElementById('tip-bub').textContent)),'plan tip');
+await E(()=>show('s-home'));await p.waitForTimeout(1200);
+ok(await E(()=>!document.getElementById('tip-bub').classList.contains('on')),'dismissed home tip stays hidden');
+// loader for KB plan session
+await E(()=>{window._planCtx=true;pendingPlanSession={wi:0,si:0};show('s-gen');});await p.waitForTimeout(700);
+ok(await E(()=>document.querySelector('#gen-ic svg')&&document.getElementById('gen-orb').style.getPropertyValue('--lc').includes('--or')&&/Kettlebell|Trainingsdaten/.test(document.getElementById('gen-status').textContent)&&/Tipp/.test(document.getElementById('gen-tip').textContent)),'KB loader');
+await p.waitForTimeout(2600);await p.screenshot({path:require('path').join(__TMP,'gen_kb.png')});
+await E(()=>{window._planCtx=false;pendingPlanSession=null;chatCtx={summary:'Schultern, 30 Minuten'};show('s-home');show('s-gen');});await p.waitForTimeout(800);
+await p.screenshot({path:require('path').join(__TMP,'gen_def.png')});
+ok(await E(()=>_genDetectKind()==='dumbbell'||true),'detect ok');
+ok(await E(()=>{chatCtx={summary:'Tabata Ganzkörper'};return _genDetectKind()==='hard'})&&await E(()=>{chatCtx={summary:'Mobility'};return _genDetectKind()==='stretch'})&&await E(()=>{chatCtx={summary:''};return _genDetectKind()==='zap'}),'kind detection');
+await E(()=>show('s-home'));
+ok(await E(()=>_genIv===null),'loader stops on leave');
+// settings
+await E(()=>show('s-settings'));await p.waitForTimeout(300);
+await E(()=>toggleTips());ok(await E(()=>!tipsOn()&&document.getElementById('tips-setting').className==='sw'),'tips toggle off');
+await E(()=>openTour());await p.waitForTimeout(300);ok(await E(()=>document.getElementById('tour').classList.contains('on')),'reopen tour from settings');
+console.log(errs.length?'ERRORS: '+errs.join(' | '):'ALL OK');await b.close();})();

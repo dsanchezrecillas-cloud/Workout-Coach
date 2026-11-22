@@ -402,6 +402,26 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
 #greeting{font-size:23px!important;letter-spacing:-.02em}
 .hero-title{letter-spacing:-.02em}
 #t-disp{font-weight:700!important;letter-spacing:-.03em}
+#offline-pill{position:fixed;top:calc(env(safe-area-inset-top,0px) + 6px);left:50%;transform:translate(-50%,-60px);z-index:9000;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;color:var(--tx);background:color-mix(in srgb,var(--bg) 85%,transparent);border:1px solid var(--am);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);transition:transform .3s;pointer-events:none}
+#offline-pill.on{transform:translate(-50%,0)}
+.cp-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--br)}.cp-row:nth-child(2){border-top:0}
+.cp-n{font-size:14px;font-weight:700;color:var(--tx)}.cp-s{font-size:11.5px;color:var(--mu);margin-top:2px}
+.hint-capped{display:none!important}
+#hint-rail{flex-direction:column;overflow:visible;scroll-snap-type:none;margin:0;padding:0}
+#hint-rail>.card{flex:0 0 auto}
+#hint-dots{display:none!important}
+.compact-card{padding:12px 14px!important;margin-bottom:12px}
+.compact-card .ic-badge{transform:scale(.85);transform-origin:top left}
+#coach-card{position:relative}
+#coach-card.coach-col #c-text{-webkit-line-clamp:1!important;line-clamp:1;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+#coach-card.coach-col #c-more,#coach-card.coach-col #c-tip-toggle,#coach-card.coach-col #c-tip{display:none!important}
+#coach-card.coach-col::after{content:"mehr";position:absolute;right:16px;bottom:12px;font-size:11px;font-weight:600;color:var(--ac)}
+#coach-card.coach-col{cursor:pointer;padding-right:56px!important}
+.ws-dot.act{border-color:var(--co);color:var(--co);background:rgba(52,211,153,.12)!important}
+.act-lbl{font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px}
+.act-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.act-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--br)}.act-row:first-of-type{border-top:0}
+.act-dot{width:9px;height:9px;border-radius:50%;background:var(--co);flex-shrink:0}
 .rev-tune{margin:4px 0 16px;padding:13px;border-radius:14px;background:rgba(var(--acRGB),.06);border:1px solid rgba(var(--acRGB),.18)}
 .rev-tune-h{font-size:12px;font-weight:600;color:var(--su);margin-bottom:9px}
 .rt-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border-radius:11px;background:var(--up);border:1px solid var(--br);color:var(--tx);font-size:13px;font-weight:600;font-family:var(--f)}
@@ -456,6 +476,7 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
 <body>
 
 <!-- HOME -->
+<div id="offline-pill" role="status">Offline · KI pausiert</div>
 <div id="s-home" class="screen active">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px">
     <div style="display:flex;align-items:center;gap:11px">
@@ -555,6 +576,18 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
       <button onclick="dismissCard('balance')" aria-label="Ausblenden" style="flex-shrink:0;width:28px;height:28px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:12px">✕</button>
     </div>
     <button onclick="openAnalytics()" style="width:100%;margin-top:11px;padding:11px;border-radius:11px;background:rgba(var(--acRGB),.14);border:1px solid rgba(var(--acRGB),.3);color:var(--ac);font-size:13px;font-weight:700;font-family:var(--f)">Bilanz ansehen →</button>
+  </div>
+  <!-- Backup reminder -->
+  <div id="backup-card" class="card" style="display:none;border-color:rgba(var(--acRGB),.35);background:linear-gradient(135deg,rgba(var(--acRGB),.08),var(--card))">
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <div class="ic-badge" style="--c:var(--ac)"><i data-ic="save" data-s="18"></i></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;letter-spacing:.08em;color:var(--ac);text-transform:uppercase;font-weight:700">Backup fällig</div>
+        <div id="backup-sub" style="font-size:12px;color:var(--su);margin-top:2px;line-height:1.4"></div>
+      </div>
+      <button onclick="dismissCard('backup')" aria-label="Später" style="flex-shrink:0;width:28px;height:28px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:12px">✕</button>
+    </div>
+    <button onclick="doExport()" style="width:100%;margin-top:11px;padding:11px;border-radius:11px;background:rgba(var(--acRGB),.14);border:1px solid rgba(var(--acRGB),.3);color:var(--ac);font-size:13px;font-weight:700;font-family:var(--f)">Jetzt sichern →</button>
   </div>
   <!-- Benchmark reminder -->
   <div id="bench-card" class="card" style="display:none;border-color:rgba(var(--coRGB),.35);background:linear-gradient(135deg,rgba(var(--coRGB),.07),var(--card))">
@@ -875,6 +908,7 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
   <div style="font-size:21px;font-weight:700;letter-spacing:-.02em;margin-bottom:18px">Verlauf</div>
   <div id="hist-chart" class="card" style="display:none;margin-bottom:13px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:11px"><div style="font-size:9px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:600">Belastung · Kraft-Sessions</div><div style="font-size:9px;color:var(--mu)">Anstrengung /10 · Wdh darunter</div></div><svg id="rpe-chart" width="100%" height="86" style="overflow:visible"></svg><div id="hist-signal" style="display:none;font-size:11px;color:var(--co);margin-top:12px;line-height:1.4"></div></div>
   <div id="hist-cal" class="card" style="display:none;margin-bottom:13px"></div>
+  <div id="hist-acts"></div>
   <div id="hist-list" style="display:flex;flex-direction:column;gap:9px"></div>
 </div>
 
@@ -1343,6 +1377,8 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
     <button onclick="analyticsRange('year')" id="ar-year" style="flex:1;padding:9px;border-radius:8px;font-size:13px;background:none;border:none;color:var(--mu);font-family:var(--f);font-weight:600">Jahr</button>
     <button onclick="analyticsRange('all')" id="ar-all" style="flex:1;padding:9px;border-radius:8px;font-size:13px;background:none;border:none;color:var(--mu);font-family:var(--f);font-weight:600">Gesamt</button>
   </div>
+  <div id="ana-core"></div>
+  <div id="ana-acts"></div>
   <div id="analytics-content"></div>
   <div id="swing-card" style="display:none;margin-top:20px"></div>
 <div id="muscle-balance"></div>
@@ -1550,6 +1586,23 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
   </div>
 </div>
 <!-- MODAL: Exercise Info -->
+<div class="modal-ov" id="modal-activity">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:700">Aktivität eintragen</div>
+      <button aria-label="Schließen" onclick="closeModal('modal-activity')" style="color:var(--mu);font-size:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div class="act-lbl">Was?</div><div id="act-type" class="act-chips"></div>
+    <div class="act-lbl">Wann?</div><div id="act-day" class="act-chips"></div>
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <div style="flex:1"><div class="act-lbl">Dauer (min)</div><input id="act-min" class="inp" type="number" inputmode="numeric" min="0" placeholder="z. B. 120" style="margin:0"></div>
+      <div style="flex:1"><div class="act-lbl">Strecke (km)</div><input id="act-km" class="inp" type="text" inputmode="decimal" placeholder="optional" style="margin:0"></div>
+    </div>
+    <div class="act-lbl">Wie anstrengend?</div><div id="act-eff" class="act-chips"></div>
+    <div style="font-size:11px;color:var(--mu);line-height:1.5;margin:-4px 0 16px">Zählt nicht als Plan-Session. Nur „hart“ lässt den Coach die nächste Session leichter planen.</div>
+    <button class="btn btn-ac" onclick="saveActivity()">Speichern</button>
+  </div>
+</div>
 <div class="modal-ov" id="modal-revtune">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -1999,8 +2052,8 @@ function show(id){
     else if(id==='s-journal')renderJournal();
     else if(id==='s-settings'){try{renderPrefsSettings();}catch(e){}}
     else if(id==='s-settings'){applyTheme(loadTheme());setAutoAdvance(autoAdvanceOn());try{renderKbList();}catch(e){}}
-  else if(id==='s-history'){if(typeof renderHistory==='function')renderHistory();try{renderHistCalendar();groupHistoryByWeek();}catch(e){console.error(e);}}
-    else if(id==='s-analytics'){if(typeof analyticsRange==='function')analyticsRange(typeof currentAnalyticsRange!=='undefined'?currentAnalyticsRange:'week');}
+  else if(id==='s-history'){try{renderActivityLists();}catch(e){}if(typeof renderHistory==='function')renderHistory();try{renderHistCalendar();groupHistoryByWeek();}catch(e){console.error(e);}}
+    else if(id==='s-analytics'){try{renderActivityLists();}catch(e){}if(typeof analyticsRange==='function')analyticsRange(typeof currentAnalyticsRange!=='undefined'?currentAnalyticsRange:'week');}
     else if(id==='s-goals'){if(typeof renderGoals==='function')renderGoals();}
   }catch(e){console.error('Screen init error:',e);}
 }
@@ -2044,6 +2097,7 @@ function closeModal(id){
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 async function callAPI(messages,maxT=800,system='',_retry=0){
+  if(navigator.onLine===false)throw new Error('Offline — keine Internetverbindung. KI-Funktionen gehen wieder, sobald du Netz hast.');
   const key=loadKey();
   const body={model:MODEL,max_tokens:maxT,messages};
   if(system)body.system=system;
@@ -2427,7 +2481,7 @@ function updateHome(){
   try{_syncVoiceUI();}catch(e){}
   try{updateMissedCard();}catch(e){}
   try{updateChallengeCard();}catch(e){}
-  try{updateHintRail();}catch(e){}
+  try{updateBackupCard();}catch(e){}
   try{updateWeekRing();}catch(e){}
   try{updateResumeCard();}catch(e){}
   try{renderWeekReport();}catch(e){}
@@ -2436,6 +2490,8 @@ function updateHome(){
   try{renderAdjustCard();}catch(e){}
   try{updateResumeCard();}catch(e){}
   try{renderWeekReport();}catch(e){}
+  try{updateHintRail();}catch(e){}
+  try{_homeLayout();}catch(e){}
   const hasKey=!!loadKey(),last=log[log.length-1];
   document.getElementById('no-key').style.display=hasKey?'none':'flex';
   try{renderWeekStrip();}catch(e){}
@@ -3160,6 +3216,7 @@ function openStartSheet(){
   else h+=opt('zap','var(--am)','Fertige Workouts','Direkt loslegen ohne Planung','openPresetWorkouts()');
   h+=opt('share','var(--or)','Workout aus Video übernehmen','TikTok/Instagram: Text oder Screenshot','openImport()');
   h+=opt('stretch','#38bdf8','Dehnen','Mobility & Regeneration','openStretchModal()');
+  h+=opt('run','var(--co)','Aktivität eintragen','Wandern, Laufen, Radfahren … ohne App erledigt','openActivity()');
   h+=opt('list','var(--co)','Übungen selbst wählen','Aus dem Übungsverzeichnis zusammenstellen',"show('s-library')");
   if(loadTemplates().length)h+=opt('save','var(--su)','Vorlagen','Gespeicherte Vorlagen','openTemplates()');
   openSheet('Was trainierst du?',h);
@@ -3170,13 +3227,14 @@ function _ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0
 function _logDay(w){const d=new Date(w.date);return isNaN(d)?String(w.date).slice(0,10):_ymd(d);}
 function renderWeekStrip(){
   const el=document.getElementById('week-strip');if(!el)return;
+  try{window._actDayMap=_actDays();}catch(e){window._actDayMap={};}
   const now=new Date();const mon=new Date(now);mon.setHours(0,0,0,0);mon.setDate(now.getDate()-((now.getDay()+6)%7));
   const today=_ymd(now);
   const planDays={};
   if(plan?.weeks?.length&&plan.startDate){plan.weeks.forEach((wk,wi)=>(wk.sessions||[]).forEach(s=>{try{const k=_ymd(sessionDate(wi,s));(planDays[k]=planDays[k]||[]).push(s);}catch(e){}}));}
   const L=['Mo','Di','Mi','Do','Fr','Sa','So'];let done=0;
   const cells=L.map((lbl,i)=>{
-    const d=new Date(mon);d.setDate(mon.getDate()+i);const k=_ymd(d);
+    const d=new Date(mon);d.setDate(mon.getDate()+i);const k=_ymd(d);const _ad=window._actDayMap||{};
     const wo=log.filter(w=>_logDay(w)===k);
     const str=wo.some(w=>w.stretch),strength=wo.some(w=>!w.stretch);
     const ps=planDays[k]||[];const pOpen=ps.some(s=>!s.done&&!s.skipped),pDone=ps.some(s=>s.done);
@@ -3186,6 +3244,7 @@ function renderWeekStrip(){
     else if(pOpen&&k<today){cls+=' miss';}
     else if(pOpen){cls+=' plan';}
     if(str)cls+=' str';
+    if(!(strength||pDone)&&_ad[k]){cls+=' act';inner=ic('run',14,2.2);}
     return `<div class="ws-day${k===today?' today':''}"><div class="ws-lbl">${lbl}</div><div class="${cls}">${inner}</div></div>`;
   }).join('');
   let target=3;
@@ -3491,10 +3550,19 @@ function routineMenu(kind){
 }
 
 // ─── Hint cards as a swipeable rail ─────────────────────────────────────────
+const HINT_PRIO=['adjust-card','missed-card','soreness-card','deload-card','backup-card','week-report','bench-card','balance-card'];
+function _capHints(){
+  // At most two hint cards on the home screen, most urgent first
+  let shown=0;
+  HINT_PRIO.forEach(id=>{const el=document.getElementById(id);if(!el)return;el.classList.remove('hint-capped');
+    const vis=el.style.display!=='none'&&(id!=='week-report'||el.innerHTML.trim());
+    if(!vis)return;if(shown>=2)el.classList.add('hint-capped');else{shown++;el.style.order=String(HINT_PRIO.indexOf(id));}});
+}
 function updateHintRail(){
   const rail=document.getElementById('hint-rail');if(!rail)return;
+  try{_capHints();}catch(e){}
   const cards=[...rail.querySelectorAll(':scope > .card')];
-  const vis=cards.filter(c=>c.style.display!=='none');
+  const vis=cards.filter(c=>c.style.display!=='none'&&!c.classList.contains('hint-capped'));
   const wrap=document.getElementById('hint-wrap');
   wrap.style.display=vis.length?'block':'none';
   rail.classList.toggle('multi',vis.length>1);
@@ -3502,6 +3570,16 @@ function updateHintRail(){
   dots.innerHTML=vis.length>1?vis.map((_,i)=>`<span class="${i===0?'on':''}"></span>`).join(''):'';
   rail.scrollLeft=0;
 }
+function _homeLayout(){
+  // Challenge leaves the hint stack and sits with the routines as a compact row
+  const ch=document.getElementById('challenge-card'),mc=document.getElementById('morning-card');
+  if(ch&&mc&&ch.parentElement?.id==='hint-rail'){mc.after(ch);ch.classList.add('compact-card');}
+  const lc=document.getElementById('last-card');if(lc)lc.classList.add('hint-capped');
+  const cc=document.getElementById('coach-card');
+  if(cc&&!cc.dataset.colInit){cc.dataset.colInit='1';cc.classList.add('coach-col');
+    cc.addEventListener('click',e=>{if(e.target.closest('button'))return;if(cc.classList.contains('coach-col')||e.target.closest('#coach-card > div:first-child'))toggleCoachCollapse();});}
+}
+function toggleCoachCollapse(){const cc=document.getElementById('coach-card');if(!cc)return;cc.classList.toggle('coach-col');try{_syncCoachClamp();}catch(e){}}
 function _hintRailScroll(){
   const rail=document.getElementById('hint-rail');const vis=[...rail.querySelectorAll(':scope > .card')].filter(c=>c.style.display!=='none');
   if(vis.length<2)return;
@@ -3978,13 +4056,129 @@ function _complexWeightHint(){
   return `Kugel für den ganzen Komplex: <b>${low.w} kg</b> — richtet sich nach der schwächsten Übung (${low.n}).`;
 }
 
+// ─── Activities outside training (hike, walk, run …) ─────────────────────────
+const ACT_KEY='coach_activities';
+const ACT_TYPES={hike:{l:'Wandern',ic:'run'},walk:{l:'Spaziergang',ic:'run'},run:{l:'Laufen',ic:'run'},bike:{l:'Radfahren',ic:'zap'},swim:{l:'Schwimmen',ic:'zap'},other:{l:'Sonstiges',ic:'zap'}};
+const ACT_EFF={easy:'locker',medium:'mittel',hard:'hart'};
+function loadActs(){try{const a=JSON.parse(localStorage.getItem(ACT_KEY)||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}}
+function saveActs(a){safeSet(ACT_KEY,JSON.stringify(a.slice(-400)));}
+let _actDraft=null;
+function openActivity(){
+  _actDraft={type:'hike',day:0,effort:'easy'};
+  const m=document.getElementById('modal-activity');if(!m)return;
+  document.getElementById('act-min').value='';document.getElementById('act-km').value='';
+  _paintAct();m.classList.add('open');
+}
+function _paintAct(){
+  const ch=(id,map,key)=>{const el=document.getElementById(id);if(!el)return;el.innerHTML=Object.entries(map).map(([k,v])=>`<button class="chip${_actDraft[key]===k||String(_actDraft[key])===k?' ac':''}" onclick="_actDraft.${key}=${key==='day'?k:`'${k}'`};_paintAct()">${typeof v==='string'?v:v.l}</button>`).join('');};
+  ch('act-type',ACT_TYPES,'type');ch('act-eff',ACT_EFF,'effort');ch('act-day',{0:'Heute',1:'Gestern',2:'Vorgestern'},'day');
+}
+function saveActivity(){
+  const min=parseInt(document.getElementById('act-min').value,10)||0;
+  const km=parseFloat(String(document.getElementById('act-km').value).replace(',','.'))||0;
+  if(!min&&!km){showErr('Trag Dauer oder Strecke ein.');return;}
+  const d=new Date();d.setDate(d.getDate()-(_actDraft.day||0));d.setHours(12,0,0,0);
+  const a=loadActs();a.push({id:Date.now(),date:d.toISOString(),type:_actDraft.type,min,km,effort:_actDraft.effort});saveActs(a);
+  closeModal('modal-activity');showNote(`${ACT_TYPES[_actDraft.type].l} eingetragen`);
+  try{updateHome();}catch(e){}try{renderActivityLists();}catch(e){}
+}
+function deleteActivity(id){saveActs(loadActs().filter(a=>a.id!==id));try{renderActivityLists();updateHome();}catch(e){}}
+function _actTxt(a){return ACT_TYPES[a.type]?.l+(a.km?' '+String(a.km).replace('.',',')+' km':'')+(a.min?' · '+a.min+' min':'')+' · '+ACT_EFF[a.effort];}
+function _actDays(){const m={};loadActs().forEach(a=>{const k=_ymd(new Date(a.date));(m[k]=m[k]||[]).push(a);});return m;}
+function _actCoachLine(){
+  const now=new Date();const recent=loadActs().filter(a=>(now-new Date(a.date))/864e5<3.5).slice(-4);
+  if(!recent.length)return null;
+  return 'Aktivitäten außerhalb des Trainings (letzte 3 Tage): '+recent.map(a=>{const d=dSince(a.date);return (d===0?'heute':d===1?'gestern':'vor '+d+' Tagen')+' '+_actTxt(a);}).join('; ')+'. Nur „hart“ zählt als Belastung (dann betroffene Muskeln, v. a. Beine, schonen); „locker“/„mittel“ nicht für die Belastungssteuerung verwenden.';
+}
+// ─── Offline: local standard version of a plan session ───────────────────────
+const FOCUS_MUSCLES=[[/push|brust|drück/i,['chest','shoulders','triceps']],[/pull|rücken|zieh/i,['back','lats','biceps']],[/ober/i,['chest','back','shoulders','triceps','biceps']],[/unter|bein|po\b|glute/i,['quads','glutes','hamstrings','legs']],[/core|bauch|rumpf/i,['core','abs','obliques']]];
+function _focusMuscles(f){for(const [re,m] of FOCUS_MUSCLES)if(re.test(f||''))return m;return ['legs','chest','back','core','shoulders','glutes'];}
+function buildOfflineWorkout(sess,count){
+  const eq=_sessEquip(sess);const p=loadPrefs();
+  const okEq=e=>!e.equip||eq.includes(e.equip);
+  const avoid=new Set(p.avoid.map(_pk));const like=new Set(p.like.map(_pk));
+  const pool=DEFAULT_LIB.filter(e=>okEq(e)&&!avoid.has(_pk(e.name)));
+  const targets=_focusMuscles(sess.focus);const n=Math.max(3,Math.min(7,count||Math.round((sess.durationMin||30)/6)));
+  const pick=[];const used=new Set();
+  const add=e=>{if(!e||used.has(_pk(e.name))||pick.length>=n)return;used.add(_pk(e.name));pick.push(e);};
+  // Stammübungen first, if they fit the focus
+  p.core.forEach(c=>{const e=pool.find(x=>_pk(x.name)===_pk(c)||_pk(x.name).includes(_pk(c)));if(e&&e.muscles.some(m=>targets.includes(m)))add(e);});
+  // KB format → prefer kettlebell exercises
+  const kbFirst=(_isKbFmt(sess.format)||/\bkb\b|kettlebell/i.test(sess.focus||''))&&eq.includes('kettlebell');
+  const score=e=>(e.muscles.some(m=>targets.includes(m))?10:0)+(like.has(_pk(e.name))?3:0)+(kbFirst&&e.equip==='kettlebell'?6:0)+Math.random();
+  let guard=0;
+  while(pick.length<n&&guard++<60){
+    const tm=targets[pick.length%targets.length];
+    const cand=pool.filter(e=>!used.has(_pk(e.name))&&e.muscles.includes(tm)).sort((a,b)=>score(b)-score(a))[0]
+      ||pool.filter(e=>!used.has(_pk(e.name))).sort((a,b)=>score(b)-score(a))[0];
+    if(!cand)break;add(cand);
+  }
+  const it=sess.intensity||'medium';const sets=it==='easy'?2:it==='hard'?4:3;const reps=it==='hard'?8:10;
+  const isHold=e=>/plank|halte|hold|hollow|wall sit|stütz(?!e)/i.test(e.name);
+  curExercises=pick.map(e=>({name:e.name,muscles:e.muscles,bilateral:!!e.bilateral,tip:e.tip||'',sets,rest:it==='hard'?75:60,...(isHold(e)?{type:'time',duration:it==='hard'?45:30}:{type:'reps',reps})}));
+  wuExercises=[['Hampelmann',['legs']],['Armkreisen',['shoulders']],['Kniebeugen ohne Gewicht',['quads']],['Hüftkreisen',['glutes']]].map(([name,m])=>({name,muscles:m,warmup:true,type:'time',duration:30,sets:1}));
+  curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:sess.durationMin||30,offline:true,briefing:{focus:sess.focus,why:'Ohne Internet erstellt: Standard-Version aus deiner Übungsdatenbank, passend zu Fokus, Equipment und Vorlieben.',structure:sets+' Sätze je Übung',goal:'Sauber trainieren, beim nächsten Mal mit Netz passt die KI wieder genauer an.'}};
+  try{_applyPlanFormat();}catch(e){}
+  showReview();showNote('Offline: Standard-Version ohne KI erstellt');
+}
+function _isNetErr(e){return !navigator.onLine||/failed to fetch|networkerror|load failed|offline|netzwerk/i.test(String(e&&e.message||e));}
+function _syncOffline(){const b=document.getElementById('offline-pill');if(b)b.classList.toggle('on',!navigator.onLine);}
+
+// ─── Progress of Stammübungen (Analyse) ──────────────────────────────────────
+function coreHistory(name){
+  const k=_pk(name),out=[];
+  (log||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(w=>{
+    (w.exercises||[]).forEach((ex,ei)=>{
+      if(_pk(ex.name)!==k)return;const sets=[];
+      for(let s=1;s<=8;s++){const rk='1_'+ei+'_s'+s;const r=(w.repLog?.[rk]||0)+(w.repLog?.[rk+'_L']||0)+(w.repLog?.[rk+'_R']||0);if(r>0)sets.push(r);}
+      if(!sets.length){const r=(w.repLog?.['1_'+ei]||0);if(r>0)sets.push(r);}
+      if(sets.length)out.push({date:w.date,best:Math.max(...sets),total:sets.reduce((a,b)=>a+b,0),n:sets.length});
+    });
+  });
+  return out;
+}
+function _sparkSVG(vals,w=120,h=34){
+  if(vals.length<2)return '';const mx=Math.max(...vals),mn=Math.min(...vals),rg=Math.max(1,mx-mn);
+  const pts=vals.map((v,i)=>[4+i*(w-8)/(vals.length-1),h-4-(v-mn)*(h-8)/rg]);
+  const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const last=pts[pts.length-1];
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" stroke="var(--ac)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="3" fill="var(--ac)"/></svg>`;
+}
+function renderCoreProgress(){
+  const el=document.getElementById('ana-core');if(!el)return;
+  const core=loadPrefs().core;
+  if(!core.length){el.innerHTML='';return;}
+  const rows=core.map(n=>{
+    const h=coreHistory(n).slice(-12);
+    if(!h.length)return `<div class="cp-row"><div style="flex:1;min-width:0"><div class="cp-n">${n}</div><div class="cp-s">noch keine Daten</div></div></div>`;
+    const first=h[0],last=h[h.length-1],diff=last.best-first.best;
+    const trend=h.length<2?'':diff>0?` <b style="color:var(--co)">(+${diff})</b>`:diff<0?` <b style="color:var(--am)">(${diff})</b>`:' (gleich)';
+    return `<div class="cp-row"><div style="flex:1;min-width:0"><div class="cp-n">${n}</div><div class="cp-s">beste Serie ${h.length>1?first.best+' → ':''}<b style="color:var(--tx)">${last.best}</b> Wdh${trend}</div><div class="cp-s">${h.length} Training${h.length===1?'':'s'} erfasst</div></div>${_sparkSVG(h.map(x=>x.best))}</div>`;
+  }).join('');
+  el.innerHTML=`<div class="card" style="margin-bottom:12px"><div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">★ Stammübungen · Fortschritt</div>${rows}</div>`;
+}
+function renderActivityLists(){
+  try{renderCoreProgress();}catch(e){}
+  const acts=loadActs().slice().reverse();
+  const h=document.getElementById('hist-acts');
+  if(h){if(!acts.length){h.innerHTML='';}else{h.innerHTML=`<div class="card" style="margin-bottom:13px"><div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Aktivitäten</div>${acts.slice(0,8).map(a=>`<div class="act-row"><span class="act-dot"></span><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--tx)">${ACT_TYPES[a.type]?.l||'Aktivität'}</div><div style="font-size:11px;color:var(--mu)">${fmtDW(a.date)} · ${_actTxt(a).split(' · ').slice(1).join(' · ')||ACT_EFF[a.effort]}</div></div><button aria-label="Aktivität löschen" onclick="deleteActivity(${a.id})" style="color:var(--mu);width:28px;height:28px">✕</button></div>`).join('')}</div>`;}}
+  const an=document.getElementById('ana-acts');
+  if(an){const t=new Date();const mon=new Date(t);mon.setHours(0,0,0,0);mon.setDate(t.getDate()-((t.getDay()+6)%7));const prev=new Date(mon);prev.setDate(mon.getDate()-7);
+    const all=loadActs();const sum=(a,b)=>all.filter(x=>{const d=new Date(x.date);return d>=a&&d<b;});
+    const cur=sum(mon,new Date(8.64e15)),last=sum(prev,mon);
+    if(!all.length){an.innerHTML='';}else{const mins=x=>x.reduce((n,a)=>n+(a.min||0),0),kms=x=>x.reduce((n,a)=>n+(a.km||0),0);
+      an.innerHTML=`<div class="card" style="margin-bottom:12px"><div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px">Aktive Minuten außerhalb des Trainings</div><div style="display:flex;gap:18px"><div><div style="font-size:22px;font-weight:800;color:var(--co)">${mins(cur)} min</div><div style="font-size:11px;color:var(--mu)">diese Woche${kms(cur)?' · '+String(Math.round(kms(cur)*10)/10).replace('.',',')+' km':''}</div></div><div><div style="font-size:22px;font-weight:800;color:var(--su)">${mins(last)} min</div><div style="font-size:11px;color:var(--mu)">letzte Woche</div></div></div></div>`;}}
+}
+
 // ─── Exercise preferences (Stammübung / Mag ich / Lieber nicht) ──────────────
 const PREF_KEY='coach_prefs';
 function loadPrefs(){let p=null;try{p=JSON.parse(localStorage.getItem(PREF_KEY)||'null');}catch(e){}p=p&&typeof p==='object'?p:{};
   ['core','like','avoid'].forEach(k=>{if(!Array.isArray(p[k]))p[k]=[];});p.notes=typeof p.notes==='string'?p.notes:'';
   p.swapOut=p.swapOut||{};p.added=p.added||{};p.asked=p.asked||{};return p;}
 function savePrefs(p){safeSet(PREF_KEY,JSON.stringify(p));}
-function _pk(n){try{return _normExName(n);}catch(e){return String(n||'').toLowerCase();}}
+function _pk(n){let k;try{k=_normExName(n);}catch(e){k=String(n||'').toLowerCase();}
+  // plural/singular tolerant: Klimmzüge ≙ Klimmzug, Liegestütze ≙ Liegestütz
+  return k.replace(/\b(\w{4,}?)(es|en|e|n|s)\b/g,'$1');}
 function prefOf(name){const p=loadPrefs(),k=_pk(name);for(const c of ['core','like','avoid'])if(p[c].some(x=>_pk(x)===k))return c;return null;}
 function setPref(name,cat){
   const p=loadPrefs(),k=_pk(name);['core','like','avoid'].forEach(c=>{p[c]=p[c].filter(x=>_pk(x)!==k);});
@@ -4531,6 +4725,7 @@ function _coachContext(){
   const today=new Date().toDateString();const rw=(log||[]).filter(w=>w.readiness&&new Date(w.date).toDateString()===today).pop();
   const r=rw?rw.readiness:null;
   if(r)lines.push('Tagesform heute: '+({green:'gut',yellow:'mittel',red:'schlecht'})[r.level]);
+  try{const al=_actCoachLine();if(al)lines.push(al);}catch(e){}
   if(window._planCtx&&pendingPlanSession&&plan?.weeks){const w=plan.weeks[pendingPlanSession.wi],s=w?.sessions?.[pendingPlanSession.si];if(w&&s)lines.push(`Plan: Woche ${pendingPlanSession.wi+1}/${plan.weeks.length} „${w.theme||''}“, Session „${s.focus}“, Intensität ${INT_LABELS[s.intensity||'medium']}${s.format?', Format '+FORMAT_DE[s.format]:''}`);}
   return 'KONTEXT (nur diese Fakten über den Nutzer verwenden, nichts erfinden):\n- '+lines.join('\n- ');
 }
@@ -5472,6 +5667,7 @@ WANN Supersatz: antagonistische Paare (Drücken+Ziehen, Quads+Hamstrings) — sp
     if(/intensität:\s*leicht|deload/i.test(summary))curSetup.reserve=true;
     showReview();
   }catch(e){
+    if(_isNetErr(e)&&!_fromReview&&window._planCtx&&pendingPlanSession&&plan?.weeks?.[pendingPlanSession.wi]?.sessions?.[pendingPlanSession.si]){const ss=plan.weeks[pendingPlanSession.wi].sessions[pendingPlanSession.si];buildOfflineWorkout(ss,ss.exerciseCount);return;}
     if(_fromReview&&_revUndo.length){const s0=_revUndo.pop();curExercises=s0.ex;wuExercises=s0.wu;curSetup=s0.setup;showReview();showErr('Anpassen fehlgeschlagen: '+e.message+'. Dein Workout ist unverändert.');return;}
     showErr('Fehler: '+e.message);show('s-chat');
     addAIMsg('Generierung fehlgeschlagen. Nochmal?',['Nochmal versuchen','Ganzkörper']);
@@ -8047,6 +8243,7 @@ function startPlanSession(){
   const goalTxt=GOALS.find(g=>g.id===(plan.goal||'fitness'))?.label||'Fitness';
   const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.
 PLANKONTEXT — Ziel des Plans: ${goalTxt}. ${phase}${weekNote} ${doseTxt}${locTxt}${avoidTxt}${coolTxt}${ssHint}${historyDigest(sess.focus)}`;
+  if(!navigator.onLine&&!window._genExtra){buildOfflineWorkout(sess,count);return;}
   generateWorkout(summary);
 }
 function onDurSlider(which){
@@ -9855,11 +10052,34 @@ function doExport(){
     profile:JSON.parse(localStorage.getItem('coach_profile')||'null'),
     journal:JSON.parse(localStorage.getItem('coach_journal')||'[]'),
     myWorkouts:JSON.parse(localStorage.getItem('coach_myworkouts')||'[]'),
-    prefs:loadPrefs()};
+    prefs:loadPrefs(),
+    activities:loadActs()};
+  const name='smart-gains-'+todayIso()+'.json';
   const b=new Blob([JSON.stringify(full,null,2)],{type:'application/json'});
-  const u=URL.createObjectURL(b),a=document.createElement('a');
-  a.href=u;a.download='smart-gains-'+todayIso()+'.json';
-  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);}
+  const done=()=>{try{localStorage.setItem('coach_last_backup',String(Date.now()));}catch(e){}try{updateHome();}catch(e){}};
+  const download=()=>{const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(u),1500);done();showNote('Backup erstellt. Leg die Datei am besten in iCloud Drive ab.');};
+  // iPhone: share sheet → „In Dateien sichern“ (more reliable than a download in the home-screen app)
+  try{
+    const f=new File([b],name,{type:'application/json'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){
+      navigator.share({files:[f],title:'Smart Gains Backup'}).then(()=>{done();showNote('Backup gesichert ✓');}).catch(e=>{if(e&&e.name==='AbortError')return;download();});
+      return;
+    }
+  }catch(e){}
+  download();
+}
+function _backupDue(){
+  if((log||[]).filter(w=>!w.stretch).length<3)return false;
+  let t=0;try{t=+localStorage.getItem('coach_last_backup')||0;}catch(e){}
+  return Date.now()-t>7*864e5&&!_dismissed('backup',3);
+}
+function updateBackupCard(){
+  const el=document.getElementById('backup-card');if(!el)return;
+  const due=_backupDue();el.style.display=due?'flex':'none';if(!due)return;
+  let t=0;try{t=+localStorage.getItem('coach_last_backup')||0;}catch(e){}
+  const d=t?Math.floor((Date.now()-t)/864e5):null;
+  document.getElementById('backup-sub').textContent=(d===null?'Du hast noch nie ein Backup gemacht.':'Letztes Backup vor '+d+' Tagen.')+' Deine '+log.filter(w=>!w.stretch).length+' Trainings liegen nur auf diesem Handy.';
+}
 function doImport(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{
   const p=JSON.parse(ev.target.result);
   const d=Array.isArray(p)?p:(p.data||[]);
@@ -9872,6 +10092,7 @@ function doImport(e){const f=e.target.files[0];if(!f)return;const r=new FileRead
   if(p.journal)safeSet('coach_journal',JSON.stringify(p.journal));
   if(Array.isArray(p.myWorkouts))safeSet('coach_myworkouts',JSON.stringify(p.myWorkouts));
   if(p.prefs&&typeof p.prefs==='object')safeSet('coach_prefs',JSON.stringify(p.prefs));
+  if(Array.isArray(p.activities))safeSet('coach_activities',JSON.stringify(p.activities));
   persist();savePlan();saveLibrary();updateHome();
   showErr('✓ '+log.length+' Workouts importiert'+(Array.isArray(p.myWorkouts)&&p.myWorkouts.length?(' · '+p.myWorkouts.length+' eigene Workouts'):'')+'.');
 }catch{showErr('Ungültige Datei.');}};r.readAsText(f);e.target.value='';}
@@ -10317,6 +10538,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     // s-plan-create init handled in show()
   }catch(e){console.error('Init error:',e);}
   try{_bindReviewFmtInfo();}catch(e){}
+  try{_syncOffline();addEventListener('online',_syncOffline);addEventListener('offline',_syncOffline);if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}
   try{if(_tourDone()&&localStorage.getItem('coach_tour_skipped')==='1'){localStorage.removeItem('coach_tour_skipped');setTimeout(()=>_showTipText('Die Einführung findest du jederzeit unter Einstellungen → Einführung zeigen.'),1200);}}catch(e){}
   try{_syncTipsSetting();if(!_tourDone())setTimeout(openTour,700);else setTimeout(()=>{if(!document.querySelector('.modal-ov.open'))maybeSuggestCore();},2000);}catch(e){}
 });

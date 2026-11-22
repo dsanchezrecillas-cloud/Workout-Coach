@@ -1,0 +1,18 @@
+const __APP=require('path').resolve(__dirname,'..','index.html');const __URL='file://'+__APP;const __TMP=require('os').tmpdir();
+const {chromium}=require('playwright');
+(async()=>{const b=await chromium.launch();const p=await b.newPage({viewport:{width:390,height:844}});
+const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.addInitScript(()=>{localStorage.setItem('coach_tour_done','1');localStorage.setItem('coach_prefs',JSON.stringify({coreSuggested:true}));});
+await p.goto(__URL);await p.waitForTimeout(600);
+const E=f=>p.evaluate(f);const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)errs.push(m)};
+await E(()=>{show('s-timer');});await p.waitForTimeout(1200);
+ok(await E(()=>document.getElementById('tip-bub')?.classList.contains('on')),'timer tip shown');
+await p.mouse.click(200,300);await p.waitForTimeout(400);
+ok(await E(()=>!document.getElementById('tip-bub').classList.contains('on')),'tap hides timer tip');
+await E(()=>{localStorage.removeItem('coach_tip_s-timer');show('s-home');show('s-timer');});await p.waitForTimeout(1200);
+ok(await E(()=>document.getElementById('tip-bub').classList.contains('on')),'shown again');
+await p.waitForTimeout(8200);
+ok(await E(()=>!document.getElementById('tip-bub').classList.contains('on')),'auto-hide after 8s');
+await E(()=>{show('s-plan');});await p.waitForTimeout(9500);
+ok(await E(()=>document.getElementById('tip-bub')?.classList.contains('on')||!SCREEN_TIPS['s-plan']),'other screens stay');
+console.log(errs.length?'ERRORS: '+errs.join(' | '):'ALL OK');await b.close();})();

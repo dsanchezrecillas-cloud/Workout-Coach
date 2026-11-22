@@ -1,0 +1,15 @@
+const __APP=require('path').resolve(__dirname,'..','index.html');const __URL='file://'+__APP;const __TMP=require('os').tmpdir();
+const {chromium}=require('playwright');(async()=>{const b=await chromium.launch();const p=await b.newPage({viewport:{width:390,height:844},deviceScaleFactor:2});const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.addInitScript(()=>{localStorage.setItem('coach_tour_done','1');localStorage.setItem('coach_tips_off','1');const V=[{name:'Anna',lang:'de-DE',voiceURI:'anna',localService:true},{name:'Anna (Erweitert)',lang:'de-DE',voiceURI:'anna-e',localService:true},{name:'Markus (Premium)',lang:'de-DE',voiceURI:'markus-p',localService:true},{name:'Samantha',lang:'en-US',voiceURI:'sam',localService:true}];
+window.__u=[];window.SpeechSynthesisUtterance=function(t){this.text=t;};Object.defineProperty(window,'speechSynthesis',{value:{getVoices:()=>V,speak:u=>window.__u.push(u),cancel(){},addEventListener(){}},configurable:true});});
+await p.goto(__URL);await p.waitForTimeout(500);
+const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)errs.push(m)};const E=f=>p.evaluate(f);
+ok(await E(()=>_pickVoice().name==='Markus (Premium)'),'auto-picks best quality');
+await E(()=>{show('s-settings');toggleVoicePicker();});await p.waitForTimeout(200);
+ok(await E(()=>document.querySelectorAll('#voice-list .vc-row').length===3),'lists only German voices');
+await E(()=>pickVoice(1));
+ok(await E(()=>localStorage.getItem('coach_voice_name')==='anna-e'&&__u[__u.length-1].voice.name==='Anna (Erweitert)'),'pick saves + previews');
+await E(()=>setVoiceRate(1.2));await p.waitForTimeout(450);
+ok(await E(()=>{_deVoice=null;speak('Test');const u=__u[__u.length-1];return u.voice.voiceURI==='anna-e'&&Math.abs(u.rate-1.2)<.001;}),'speak uses saved voice + rate');
+await p.evaluate(()=>document.getElementById('voice-list').scrollIntoView());await p.screenshot({path:require('path').join(__TMP,'h_voice.png')});
+console.log(errs.length?'ERR '+errs.join('|'):'NO ERRORS');await b.close();})();
