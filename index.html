@@ -401,6 +401,7 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
 #greeting{font-size:23px!important;letter-spacing:-.02em}
 .hero-title{letter-spacing:-.02em}
 #t-disp{font-weight:700!important;letter-spacing:-.03em}
+.fmt-tag{font-size:11px;font-weight:700;color:var(--or);background:rgba(var(--orRGB),.14);padding:1px 7px;border-radius:7px}
 </style>
 </head>
 <body>
@@ -901,8 +902,9 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
 
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Workouts pro Woche</div>
   <div style="display:flex;gap:8px;margin-bottom:12px" id="freq-chips"></div>
-  <button id="pc-kb" class="chip" onclick="toggleKbFocus()" style="margin-bottom:6px">Kettlebell-Fokus: AUS</button>
-  <div style="font-size:12px;color:var(--mu);margin-bottom:20px;line-height:1.45">Sessions bekommen Kettlebell-Formate (EMOM, Komplex, Leiter, AMRAP, Tabata) im Wechsel.</div>
+  <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Kettlebell-Anteil</div>
+  <div id="pc-kb" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px"></div>
+  <div id="pc-kb-desc" style="font-size:12px;color:var(--mu);margin-bottom:20px;line-height:1.45"></div>
 
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px">Session-Dauer</div>
   <div style="font-size:12px;color:var(--mu);margin-bottom:14px">Bereich frei einstellbar — Dauer richtet sich nach Intensität</div>
@@ -3107,7 +3109,7 @@ function updatePlanHome(){
     const s=t.s;
     el.innerHTML=`<div class="hero"><div class="hero-eye"><span>Heute</span><span style="color:var(--mu)">Woche ${t.wi+1} / ${plan.weeks.length}</span></div>
       <div class="hero-title">${focusLabel(s.focus)}</div>
-      <div class="hero-meta"><span>${s.durationMin||30} min</span><span class="hero-pill">${INT_LABELS[s.intensity||'medium']||''}</span>${s.autoDeload?'<span class="hero-pill" style="background:rgba(var(--amRGB),.15);color:var(--am)">Erholungswoche</span>':''}</div>
+      <div class="hero-meta"><span>${s.durationMin||30} min</span><span class="hero-pill">${INT_LABELS[s.intensity||'medium']||''}</span>${s.format&&s.format!=='sets'&&FORMAT_DE[s.format]?`<span class="hero-pill" style="background:rgba(var(--orRGB),.16);color:var(--or)">${FORMAT_DE[s.format]}</span>`:''}${s.autoDeload?'<span class="hero-pill" style="background:rgba(var(--amRGB),.15);color:var(--am)">Erholungswoche</span>':''}</div>
       <button class="hero-go" onclick="startPlanSession()">${ic('play',18)}Training starten</button>
       <div class="hero-row">${sec('calendar','Plan ansehen','showPlan()')}${sec('plus','Etwas anderes','openStartSheet()')}</div></div>`;
     return;
@@ -4094,11 +4096,38 @@ function updateChallengeCard(){
 }
 
 // ─── Plan: kettlebell focus ─────────────────────────────────────────────────
-function toggleKbFocus(){planOpts.kbFocus=!planOpts.kbFocus;_syncKbFocus();}
-function _syncKbFocus(){const b=document.getElementById('pc-kb');if(b){b.className='chip'+(planOpts.kbFocus?' ac':'');b.textContent='Kettlebell-Fokus: '+(planOpts.kbFocus?'AN':'AUS');}}
-function _kbFocusTxt(on){
-  if(!on)return '';
-  return `\nKETTLEBELL-FOKUS: Der Nutzer trainiert vor allem mit Kettlebell (${kbLabel()}${kbHasPair()?'':', nur einzelne Kugeln'}). Gib JEDER Session zusätzlich ein Feld "format" mit einem dieser Werte: "emom","complex","ladder","amrap","tabata","rounds". Abwechslung über die Woche; easy eher complex/ladder, hard eher amrap/emom/tabata. Swing-Volumen über die Wochen steigern. Beispiel-Session: {"dow":1,"focus":"KB Ganzkörper","intensity":"medium","durationMin":30,"format":"emom","done":false}`;
+const KB_MODE_DE={off:'Aus',mix:'Gemischt',focus:'Schwerpunkt'};
+const KB_MODE_DESC={off:'Keine besonderen Formate — klassische Workouts.',mix:'Etwa jede zweite Session ist ein Kettlebell-Workout (EMOM, Komplex, Leiter …), die anderen klassisches Training. Wechselt wochenweise.',focus:'Fast alle Sessions mit Kettlebell und wechselnden Formaten.'};
+function _kbMode(p){return (p&&p.kbMode)||(p&&p.kbFocus?'focus':'off');}
+function setKbMode(m){planOpts.kbMode=m;planOpts.kbFocus=m!=='off';_syncKbFocus();}
+function _syncKbFocus(){
+  const el=document.getElementById('pc-kb');if(!el)return;const m=_kbMode(planOpts);
+  el.innerHTML=Object.keys(KB_MODE_DE).map(k=>`<button class="chip${k===m?' ac':''}" onclick="setKbMode('${k}')">${KB_MODE_DE[k]}</button>`).join('');
+  const d=document.getElementById('pc-kb-desc');if(d)d.textContent=KB_MODE_DESC[m];
+}
+function _kbFocusTxt(mode){
+  if(mode===true)mode='focus';if(!mode||mode==='off')return '';
+  const kb=kbLabel()+(kbHasPair()?'':', nur einzelne Kugeln');
+  if(mode==='mix')return `\nKETTLEBELL-MIX: Der Nutzer will eine MISCHUNG. Etwa die Hälfte der Sessions pro Woche sind Kettlebell-Sessions (${kb}), wochenweise abwechselnd (bei 3/Woche: 2 KB in Woche 1, 1 KB in Woche 2 usw.). Jede Session bekommt ein Feld "format": KB-Sessions "emom","complex","ladder","amrap" oder "tabata" (abwechseln), alle anderen "sets" (klassisches Training mit Körpergewicht/übrigem Equipment, keine Kettlebell-Pflicht). KB-Sessions im focus mit "KB" kennzeichnen. Beispiel: {"dow":1,"focus":"KB Ganzkörper","intensity":"medium","durationMin":30,"format":"emom","done":false},{"dow":3,"focus":"Oberkörper","intensity":"medium","durationMin":30,"format":"sets","done":false}`;
+  return `\nKETTLEBELL-FOKUS: Der Nutzer trainiert vor allem mit Kettlebell (${kb}). Gib JEDER Session zusätzlich ein Feld "format" mit einem dieser Werte: "emom","complex","ladder","amrap","tabata","rounds". Abwechslung über die Woche; easy eher complex/ladder, hard eher amrap/emom/tabata. Swing-Volumen über die Wochen steigern. Beispiel-Session: {"dow":1,"focus":"KB Ganzkörper","intensity":"medium","durationMin":30,"format":"emom","done":false}`;
+}
+// Guarantee the chosen mix even if the AI ignores it
+function _normalizeKbFormats(p,mode){
+  if(!p?.weeks?.length)return;
+  const KB=['emom','complex','ladder','amrap','tabata'];let rot=0;
+  p.weeks.forEach((wk,wi)=>{
+    const ss=(wk.sessions||[]).slice().sort((a,b)=>((a.dow+6)%7)-((b.dow+6)%7));if(!ss.length)return;
+    if(mode==='off'){ss.forEach(s=>{if(s.format&&s.format!=='sets')delete s.format;});return;}
+    if(mode==='focus'){ss.forEach(s=>{if(!s.format||s.format==='sets')s.format=KB[rot++%KB.length];});return;}
+    const want=Math.max(1,wi%2===0?Math.ceil(ss.length/2):Math.floor(ss.length/2));
+    let kb=ss.filter(s=>s.format&&s.format!=='sets');
+    // too many KB sessions → turn the extras into classic ones; too few → convert some
+    kb.slice(want).forEach(s=>{s.format='sets';if(/^KB\s/i.test(s.focus||''))s.focus=s.focus.replace(/^KB\s+/i,'');});
+    kb=ss.filter(s=>s.format&&s.format!=='sets');
+    for(let i=0;kb.length<want&&i<ss.length;i+=2){const s=ss[i];if(s.format&&s.format!=='sets')continue;s.format=KB[rot++%KB.length];if(!/kb|kettlebell/i.test(s.focus||''))s.focus='KB '+(s.focus||'Ganzkörper');kb.push(s);}
+    for(let i=1;kb.length<want&&i<ss.length;i+=2){const s=ss[i];if(s.format&&s.format!=='sets')continue;s.format=KB[rot++%KB.length];if(!/kb|kettlebell/i.test(s.focus||''))s.focus='KB '+(s.focus||'Ganzkörper');kb.push(s);}
+    ss.forEach(s=>{if(!s.format)s.format='sets';});
+  });
 }
 // ─── Coach briefing: why this workout, grounded in real data ────────────────
 function _coachContext(){
@@ -7622,7 +7651,7 @@ function onDurSlider(which){
   document.getElementById('dur-max-val').textContent=mx+' min';
 }
 
-function buildPlanCreate(){const gc=document.getElementById('goal-cards');if(!gc){console.error('goal-cards missing');return;}gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<div class="ic-badge" style="--c:var(--ac)">${ic(g.ik||'zap',18)}</div><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');if(wc){wc.innerHTML='';[4,6,8,12,16].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});}const fc=document.getElementById('freq-chips');if(fc){fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' ac':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};fc.appendChild(b);});}const dmS=document.getElementById('dur-min-slider'),dxS=document.getElementById('dur-max-slider');if(dmS){dmS.value=planOpts.durMin;document.getElementById('dur-min-val').textContent=planOpts.durMin+' min';}if(dxS){dxS.value=planOpts.durMax;document.getElementById('dur-max-val').textContent=planOpts.durMax+' min';}const bdp=document.getElementById('blocked-days-picker');if(bdp){bdp.innerHTML='';const dayOrder=[1,2,3,4,5,6,0];const dayLbl={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};dayOrder.forEach(d=>{const active=!planOpts.blockedDays.includes(d);const b=document.createElement('button');b.style.cssText=`flex:1;padding:11px 0;border-radius:9px;border:1.5px solid ${active?'var(--ac)':'var(--br)'};background:${active?'rgba(var(--acRGB),.15)':'var(--up)'};color:${active?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f);opacity:${active?1:.5}`;b.textContent=dayLbl[d];b.onclick=()=>{if(planOpts.blockedDays.includes(d))planOpts.blockedDays=planOpts.blockedDays.filter(x=>x!==d);else planOpts.blockedDays=[...planOpts.blockedDays,d];const on=!planOpts.blockedDays.includes(d);b.style.borderColor=on?'var(--ac)':'var(--br)';b.style.background=on?'rgba(var(--acRGB),.15)':'var(--up)';b.style.color=on?'var(--ac)':'var(--mu)';b.style.opacity=on?1:.5;};bdp.appendChild(b);});}const sc=document.getElementById('style-cards');if(sc){sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<div class="ic-badge" style="--c:var(--ac);width:30px;height:30px">${ic(s.ik||'zap',16)}</div><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}sc.appendChild(b);});}const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';const gri=document.getElementById('goal-reason-inp');if(gri)gri.value=planOpts.goalReason||'';
+function buildPlanCreate(){try{_syncKbFocus();}catch(e){}const gc=document.getElementById('goal-cards');if(!gc){console.error('goal-cards missing');return;}gc.innerHTML='';GOALS.forEach(g=>{const b=document.createElement('div');b.id='gc-'+g.id;b.style.cssText='padding:13px 15px;border-radius:11px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px';b.innerHTML=`<div class="ic-badge" style="--c:var(--ac)">${ic(g.ik||'zap',18)}</div><div><div style="font-size:14px;font-weight:600;color:var(--tx)">${g.label}</div><div style="font-size:12px;color:var(--mu);margin-top:2px">${g.desc}</div></div>`;b.onclick=()=>{planOpts.goal=g.id;document.querySelectorAll('[id^=gc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(g.id===planOpts.goal){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}gc.appendChild(b);});const wc=document.getElementById('weeks-chips');if(wc){wc.innerHTML='';[4,6,8,12,16].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.weeks?' ac':'');b.textContent=n+' Wo';b.onclick=()=>{planOpts.weeks=n;wc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};wc.appendChild(b);});}const fc=document.getElementById('freq-chips');if(fc){fc.innerHTML='';[2,3,4,5].forEach(n=>{const b=document.createElement('button');b.className='chip'+(n===planOpts.freq?' ac':'');b.textContent=n+'x/Wo';b.onclick=()=>{planOpts.freq=n;fc.querySelectorAll('.chip').forEach(x=>x.className='chip');b.className='chip ac';};fc.appendChild(b);});}const dmS=document.getElementById('dur-min-slider'),dxS=document.getElementById('dur-max-slider');if(dmS){dmS.value=planOpts.durMin;document.getElementById('dur-min-val').textContent=planOpts.durMin+' min';}if(dxS){dxS.value=planOpts.durMax;document.getElementById('dur-max-val').textContent=planOpts.durMax+' min';}const bdp=document.getElementById('blocked-days-picker');if(bdp){bdp.innerHTML='';const dayOrder=[1,2,3,4,5,6,0];const dayLbl={0:'So',1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};dayOrder.forEach(d=>{const active=!planOpts.blockedDays.includes(d);const b=document.createElement('button');b.style.cssText=`flex:1;padding:11px 0;border-radius:9px;border:1.5px solid ${active?'var(--ac)':'var(--br)'};background:${active?'rgba(var(--acRGB),.15)':'var(--up)'};color:${active?'var(--ac)':'var(--mu)'};font-size:12px;font-weight:600;font-family:var(--f);opacity:${active?1:.5}`;b.textContent=dayLbl[d];b.onclick=()=>{if(planOpts.blockedDays.includes(d))planOpts.blockedDays=planOpts.blockedDays.filter(x=>x!==d);else planOpts.blockedDays=[...planOpts.blockedDays,d];const on=!planOpts.blockedDays.includes(d);b.style.borderColor=on?'var(--ac)':'var(--br)';b.style.background=on?'rgba(var(--acRGB),.15)':'var(--up)';b.style.color=on?'var(--ac)':'var(--mu)';b.style.opacity=on?1:.5;};bdp.appendChild(b);});}const sc=document.getElementById('style-cards');if(sc){sc.innerHTML='';STYLES.forEach(s=>{const b=document.createElement('div');b.id='sc-'+s.id;b.style.cssText='padding:11px 14px;border-radius:10px;border:1.5px solid var(--br);background:var(--up);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px';b.innerHTML=`<div class="ic-badge" style="--c:var(--ac);width:30px;height:30px">${ic(s.ik||'zap',16)}</div><div><div style="font-size:13px;font-weight:600;color:var(--tx)">${s.label}</div><div style="font-size:11px;color:var(--mu);margin-top:1px">${s.desc}</div></div>`;b.onclick=()=>{planOpts.style=s.id;sc.querySelectorAll('div[id^=sc-]').forEach(x=>{x.style.borderColor='var(--br)';x.style.background='var(--up)';});b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';};if(s.id===planOpts.style){b.style.borderColor='var(--ac)';b.style.background='rgba(var(--acRGB),.15)';}sc.appendChild(b);});}const ped=document.getElementById('plan-end-date');if(ped)ped.value='';const psd=document.getElementById('plan-start-date');if(psd)psd.value=todayIso();const sdn=document.getElementById('start-date-note');if(sdn)sdn.textContent='= Heute';const gri=document.getElementById('goal-reason-inp');if(gri)gri.value=planOpts.goalReason||'';
   const cdb=document.getElementById('plan-cooldown');if(cdb)cdb.checked=!!planOpts.cooldown;
   const plp=document.getElementById('plan-loc-picker');
   if(plp){
@@ -7817,7 +7846,7 @@ ${regenRule}
 DAUER: Jede Session zwischen ${planOpts.durMin} und ${planOpts.durMax} Minuten, NIE darüber oder darunter. Koppel die Dauer an die Intensität: easy≈${planOpts.durMin} min, medium≈${durMid} min, hard≈${planOpts.durMax} min.
 WICHTIG Woche 1: Plan startet am ${dayNamesDe[startDow]} (${startDateVal}). Verwende in Woche 1 NUR: ${week1DaysStr||allowedDaysStr}. Woche 1 hat nur ${week1Count} Session(s). Ab Woche 2 volle ${planOpts.freq} Sessions, verteilt mit Erholung.
 ${jrecent?"\nAKTUELLES BEFINDEN (Tagebuch): "+jrecent+(acuteFlag?"\nWICHTIG: Nutzer ist aktuell krank/angeschlagen. Starte Woche 1 SEHR moderat (nur leichte Sessions, weniger Umfang, Mobilität/Technik). Intensität erst ab Woche 2 aufbauen. Erwähne das kurz im intro.":"\nBeim Einstieg berücksichtigen."):""}intro: 2 kurze motivierende Sätze.${goalReason?" Nutzer trainiert für: "+goalReason+" — beziehe dich konkret darauf.":""} note je Woche: 1 kurzer Satz zum Wochenziel.
-${_kbFocusTxt(planOpts.kbFocus)}
+${_kbFocusTxt(_kbMode(planOpts))}
 NUR minifiziertes JSON ohne Leerzeichen: {"title":"Kurzname","goal":"${planOpts.goal}","intro":"...","weeks":[{"week":1,"theme":"Start","note":"...","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${planOpts.durMin},"done":false}]}]}
 dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
 
@@ -7826,12 +7855,13 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
     const parsed=extractJSON(raw);
     let planData=null;
     if(Array.isArray(parsed)&&parsed[0]?.sessions){
-      planData={title:'Trainingsplan',goal:planOpts.goal,freq:planOpts.freq,durMin:planOpts.durMin,durMax:planOpts.durMax,style:planOpts.style,startDate:startDateVal,weeks:parsed};
+      planData={title:'Trainingsplan',goal:planOpts.goal,freq:planOpts.freq,kbMode:_kbMode(planOpts),kbFocus:_kbMode(planOpts)!=='off',durMin:planOpts.durMin,durMax:planOpts.durMax,style:planOpts.style,startDate:startDateVal,weeks:parsed};
     }else if(!Array.isArray(parsed)&&parsed?.weeks?.length){
       planData=parsed;
-      planData.freq=planOpts.freq;planData.kbFocus=!!planOpts.kbFocus;planData.durMin=planOpts.durMin;planData.durMax=planOpts.durMax;planData.style=planOpts.style;planData.goal=planOpts.goal;planData.startDate=startDateVal;
+      planData.freq=planOpts.freq;planData.kbMode=_kbMode(planOpts);planData.kbFocus=planData.kbMode!=='off';planData.durMin=planOpts.durMin;planData.durMax=planOpts.durMax;planData.style=planOpts.style;planData.goal=planOpts.goal;planData.startDate=startDateVal;
     }
     if(!planData?.weeks?.length)throw new Error('Kein gültiger Plan — bitte nochmal versuchen');
+    try{_normalizeKbFormats(planData,_kbMode(planOpts));}catch(e){}
     // Clamp every session duration into the chosen range, coupled to intensity
     {
       const dMin=planOpts.durMin, dMax=planOpts.durMax, dMid=Math.round((dMin+dMax)/2);
@@ -7919,6 +7949,7 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
       if(kept.length)planData.weeks[0].sessions=kept;
       else planData.weeks[0].sessions=[{dow:(week1DaysFiltered[0]??startDow),focus:'Ganzkörper Start',intensity:'easy',durationMin:planOpts.durMin,done:false}];
     }
+    try{_normalizeKbFormats(planData,_kbMode(planData));}catch(e){}
     plan=planData;savePlan();renderPlanView(0);show('s-plan');
     if(rampMsg)showErr('✓ '+rampMsg);
   }catch(e){showErr('Fehler: '+e.message);}
@@ -8162,7 +8193,7 @@ function renderPlanView(wi=0){
   document.getElementById('plan-sessions').innerHTML=week.sessions.map((s,si)=>{if(s.skipped)return'';const isToday=s.dow===todayDow,isNext=window._nextSess&&window._nextSess.pwi===wi&&window._nextSess.dow===s.dow&&!s.done,ic=INT_COLORS[s.intensity||'medium'];const c=isToday?'rgba(var(--acRGB),.13)':'var(--card)',bc=isToday?'rgba(var(--acRGB),.35)':'var(--br)';
     return`<div class="card" style="background:${c};border-color:${bc}"><div style="display:flex;align-items:center;gap:11px"><div style="width:44px;height:44px;border-radius:9px;background:${s.done?'rgba(var(--coRGB),.14)':isToday?'rgba(var(--acRGB),.17)':'var(--up)'};border:1px solid ${s.done?'rgba(var(--coRGB),.35)':isToday?'rgba(var(--acRGB),.28)':'var(--br)'};display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
       ${s.done?`<span style="font-size:18px;color:var(--co)">✓</span>`:`<span style="font-size:12px;font-weight:700;color:${isToday?'var(--ac)':'var(--mu)'};line-height:1.1">${DAYS[s.dow]}</span><span style="font-size:10px;color:${isToday?'var(--ac)':'var(--mu)'};line-height:1.2">${_sessDateShort(wi,s.dow)}</span>`}
-    </div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${focusLabel(s.focus)}${isNext?' 📍':''}${s.savedWorkout?' 💾':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${(s.savedWorkout?s.savedWorkout.exercises.length:s.exerciseCount)?' · '+(s.savedWorkout?s.savedWorkout.exercises.length:s.exerciseCount)+' Üb.':''}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);display:flex;align-items:center;justify-content:center">${window.ic('edit',14)}</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f);display:flex;align-items:center">${window.ic('play',13)}</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f);display:flex;align-items:center">${window.ic('chat',14)}</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
+    </div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:${s.done?'var(--mu)':'var(--tx)'}${s.done?';text-decoration:line-through':''}">${focusLabel(s.focus)}${isNext?' 📍':''}${s.savedWorkout?' 💾':''}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${s.durationMin||30} min · <span style="color:${ic}">${INT_LABELS[s.intensity||'medium']}</span>${s.format&&s.format!=='sets'&&FORMAT_DE[s.format]?` · <span class="fmt-tag">${FORMAT_DE[s.format]}</span>`:''}${(s.savedWorkout?s.savedWorkout.exercises.length:s.exerciseCount)?' · '+(s.savedWorkout?s.savedWorkout.exercises.length:s.exerciseCount)+' Üb.':''}</div></div><div style="display:flex;gap:5px"><button onclick="openSessEdit(${wi},${si})" style="width:30px;height:30px;border-radius:8px;background:var(--up);border:1px solid var(--br);color:var(--mu);display:flex;align-items:center;justify-content:center">${window.ic('edit',14)}</button>${!s.done?`<div style="display:flex;gap:4px"><button onclick="startSessAt(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px;font-weight:600;font-family:var(--f);display:flex;align-items:center">${window.ic('play',13)}</button><button onclick="chatFromPlan(${wi},${si})" style="padding:7px 10px;border-radius:9px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f);display:flex;align-items:center">${window.ic('chat',14)}</button></div>`:`<button onclick="markSessDone(${wi},${si},false)" style="padding:7px 10px;border-radius:8px;background:none;border:1px solid var(--br);color:var(--mu);font-size:11px;font-family:var(--f)">↩</button>`}</div></div></div>`;
   }).join('');
 }
 
@@ -8495,7 +8526,7 @@ PERIODISIERUNG: Lineare Progression, erst Umfang, dann Intensität. Woche 1 easy
 TRAININGSTAGE: Nutze NUR diese Tage: ${allowedDaysStr}.
 ${rbRegen}
 WICHTIG Woche 1: Start am ${dayNamesDe[startDow]}. Woche 1 NUR: ${week1DaysStr} (nur ${week1Count} Session(s)). Ab Woche 2 volle ${newFreq} Sessions mit Erholung.
-${_kbFocusTxt(plan.kbFocus)}
+${_kbFocusTxt(_kbMode(plan))}
 NUR minifiziertes JSON: {"title":"${(plan.title||'Plan').replace(/"/g,'')}","goal":"${plan.goal}","weeks":[{"week":1,"theme":"Start","sessions":[{"dow":${startDow},"focus":"Brust & Arme","intensity":"easy","durationMin":${plan.durMin||30},"done":false}]}]}
 dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
   try{
@@ -8503,9 +8534,10 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
     const parsed=extractJSON(raw);
     let planData=Array.isArray(parsed)?{weeks:parsed}:parsed;
     if(!planData?.weeks?.length)throw new Error('Neuaufbau fehlgeschlagen');
+    try{_normalizeKbFormats(planData,_kbMode(plan));}catch(e){}
     // Preserve plan metadata
     planData.title=plan.title;planData.goal=plan.goal;planData.freq=newFreq;
-    planData.durMin=plan.durMin;planData.durMax=plan.durMax;planData.style=plan.style;planData.kbFocus=!!plan.kbFocus;
+    planData.durMin=plan.durMin;planData.durMax=plan.durMax;planData.style=plan.style;planData.kbMode=_kbMode(plan);planData.kbFocus=planData.kbMode!=='off';
     planData.startDate=rebuildStart;
     // Clamp durations to range, coupled to intensity
     {
@@ -8536,6 +8568,7 @@ dow: 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa 0=So. intensity: easy/medium/hard.`;
       if(kept.length)planData.weeks[0].sessions=kept;
       else planData.weeks[0].sessions=[{dow:(week1Days[0]??startDow),focus:'Ganzkörper Start',intensity:'easy',durationMin:plan.durMin||30,done:false}];
     }
+    try{_normalizeKbFormats(planData,_kbMode(planData));}catch(e){}
     plan=planData;savePlan();renderPlanView(0);show('s-plan');
     showErr('✓ Plan mit '+newFreq+'×/Woche neu aufgebaut.');
   }catch(e){showErr('Fehler: '+e.message);show('s-plan');}
