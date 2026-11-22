@@ -4126,6 +4126,15 @@ function _actCoachLine(){
   if(!recent.length)return null;
   return 'Aktivitäten außerhalb des Trainings (letzte 3 Tage): '+recent.map(a=>{const d=dSince(a.date);return (d===0?'heute':d===1?'gestern':'vor '+d+' Tagen')+' '+_actTxt(a);}).join('; ')+'. Nur „hart“ zählt als Belastung (dann betroffene Muskeln, v. a. Beine, schonen); „locker“/„mittel“ nicht für die Belastungssteuerung verwenden.';
 }
+// ─── Limitations come only from the profile (no built-in assumptions) ─────────
+function _kneeIssue(){const l=((loadProfile()||{}).limits||'');return /knie|knee|it.?band|tractus|menisk|patella|kreuzband|läufer.?knie/i.test(l);}
+function _kneeTag(){return _kneeIssue()?', knieschonend':'';}
+function _kneeRule(){return _kneeIssue()?' Knieschonend (keine tiefen Sprünge, keine hohen Knie-Scherkräfte), weil der Nutzer Knieprobleme angegeben hat.':'';}
+function _curEquip(){
+  try{if(window._planCtx&&pendingPlanSession){const ss=plan?.weeks?.[pendingPlanSession.wi]?.sessions?.[pendingPlanSession.si];if(ss)return _sessEquip(ss);}}catch(e){}
+  return (curSetup&&Array.isArray(curSetup.equipment)&&curSetup.equipment.length)?curSetup.equipment:_homeEquip();
+}
+
 // ─── Offline: local standard version of a plan session ───────────────────────
 const FOCUS_MUSCLES=[[/push|brust|drück/i,['chest','shoulders','triceps']],[/pull|rücken|zieh/i,['back','lats','biceps']],[/ober/i,['chest','back','shoulders','triceps','biceps']],[/unter|bein|po\b|glute/i,['quads','glutes','hamstrings','legs']],[/core|bauch|rumpf/i,['core','abs','obliques']]];
 function _focusMuscles(f){for(const [re,m] of FOCUS_MUSCLES)if(re.test(f||''))return m;return ['legs','chest','back','core','shoulders','glutes'];}
@@ -5604,7 +5613,7 @@ Unbekannte Übungen konservativ starten.`:'';
   const profPromptTxt=profW?`\n\nNUTZER: ${profW}\nKALIBRIERUNG: Nutze den Fitness-Check als Referenz für realistische Wdh-Ziele. Beispiel: max 10 Liegestütze -> Arbeitssätze bei ca. 5-7 Wdh (50-70% des Maximums), nicht 15. Einschränkungen strikt beachten.`:'';
   const rc=recoveryContext();
   const recoveryPromptTxt=rc?`\n\nZULETZT TRAINIERT: ${rc}\nERHOLUNG: Muskelgruppen, die vor <48h mit RPE>=7 belastet wurden, heute MEIDEN oder nur leicht/technisch einbinden. Wähle Übungen für erholte Muskelgruppen.`:'';
-  const sys=`Erfahrener Trainingswissenschaftler und Coach. Erstelle Home-Workout auf Deutsch. Vorgaben: ${summary}. Knieschonend (keine tiefen Sprünge, keine hohen Knie-Scherkräfte).
+  const sys=`Erfahrener Trainingswissenschaftler und Coach. Erstelle ein Workout auf Deutsch. Vorgaben: ${summary}.${_kneeRule()}
 
 ZEITBUDGET — RECHNE NACH: Zeit pro Übung = Sätze × (Arbeitszeit + Pause). Die vorgegebene Übungszahl ist aus Dauer, Ziel und Pausenlänge berechnet — halte sie exakt ein. Die Summe aus Warmup (~5 min) und allen Hauptübungen muss in die Session-Dauer passen. Passt es nicht, kürze NICHT die Pausen (die sind zieldefiniert), sondern nutze Supersätze.
 
@@ -6854,7 +6863,7 @@ function lastPerformance(exName){
   const reps=recent?Math.max(...recent.sets,0)||0:0;
   return {sets,reps,secs};
 }
-async function getAISwap(){if(!loadKey()){showErr('API Key fehlt');return;}const ex=curExercises[swapIdx];const muscles=ex.muscles||[];document.getElementById('swap-ai-result').textContent='Lädt...';try{const raw=await callAPI([{role:'user',content:`3 Alternativen für "${ex.name}" (Muskeln: ${muscles.join(',')}). Kein Equipment, knieschonend.${(()=>{const a=loadPrefs().avoid;return a.length?' Nicht vorschlagen: '+a.join(', ')+'.':'';})()} NUR JSON-Array: [{"name":"...","tip":"DE","muscles":["core"],"bilateral":false}]`}],400);const parsed=extractJSON(raw);const arr=Array.isArray(parsed)?parsed:[parsed];document.getElementById('swap-ai-result').innerHTML='';arr.filter(e=>e&&e.name).forEach(e=>{const b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;cursor:pointer;font-family:var(--f)';b.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx)">${e.name}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${e.tip||''}</div>`;b.onclick=()=>applySwap({...e,icon:getExIcon(e.name)});document.getElementById('swap-ai-result').appendChild(b);});}catch(err){document.getElementById('swap-ai-result').textContent='Fehler: '+err.message;}}
+async function getAISwap(){if(!loadKey()){showErr('API Key fehlt');return;}const ex=curExercises[swapIdx];const muscles=ex.muscles||[];document.getElementById('swap-ai-result').textContent='Lädt...';try{const raw=await callAPI([{role:'user',content:`3 Alternativen für "${ex.name}" (Muskeln: ${muscles.join(',')}). Equipment: ${equipSummary(_curEquip())}${_kneeTag()}.${(()=>{const a=loadPrefs().avoid;return a.length?' Nicht vorschlagen: '+a.join(', ')+'.':'';})()} NUR JSON-Array: [{"name":"...","tip":"DE","muscles":["core"],"bilateral":false}]`}],400);const parsed=extractJSON(raw);const arr=Array.isArray(parsed)?parsed:[parsed];document.getElementById('swap-ai-result').innerHTML='';arr.filter(e=>e&&e.name).forEach(e=>{const b=document.createElement('button');b.style.cssText='display:block;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--br);background:var(--card);margin-bottom:7px;cursor:pointer;font-family:var(--f)';b.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx)">${e.name}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${e.tip||''}</div>`;b.onclick=()=>applySwap({...e,icon:getExIcon(e.name)});document.getElementById('swap-ai-result').appendChild(b);});}catch(err){document.getElementById('swap-ai-result').textContent='Fehler: '+err.message;}}
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
 const RREST=60;let isWU=false;
@@ -8277,7 +8286,7 @@ function startPlanSession(){
     : `Woche ${wi+1} von ${totalW} (${week.theme||'Aufbau'}). ${wi===0?'Einstieg: Technik vor Last, konservative Wdh-Ziele.':'Progressive Überlastung: leicht mehr Volumen/Wdh als in der Vorwoche.'}`;
   const weekNote=week.note?` Wochenziel: ${week.note}`:'';
   const goalTxt=GOALS.find(g=>g.id===(plan.goal||'fitness'))?.label||'Fitness';
-  const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.
+  const summary=`${sess.focus}, ${sess.durationMin||30} Minuten${_kneeTag()}, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.
 PLANKONTEXT — Ziel des Plans: ${goalTxt}. ${phase}${weekNote} ${doseTxt}${locTxt}${avoidTxt}${coolTxt}${ssHint}${historyDigest(sess.focus)}`;
   if(!navigator.onLine&&!window._genExtra){buildOfflineWorkout(sess,count);return;}
   generateWorkout(summary);
@@ -8479,8 +8488,8 @@ async function generatePlan(){
   const regenRule=isFullbody
     ? `ERHOLUNG (Ganzkörper): Nach jeder Ganzkörper-Session mindestens 1 Pausentag. NIE zwei Trainingstage direkt hintereinander. Verteile die Sessions gleichmäßig über die Woche (z.B. Mo/Mi/Fr).`
     : `ERHOLUNG (Split): Trainiere dieselbe Muskelgruppe frühestens nach 48h wieder. Aufeinanderfolgende Tage sind nur erlaubt, wenn sie KOMPLETT verschiedene Muskelgruppen treffen (z.B. Mo Rücken+Bizeps, Di Beine, Mi Brust+Trizeps). Nach einer harten Session bevorzugt ein leichterer Tag oder Pause. Beine brauchen ~48h Erholung.`;
-  const GOAL_SYSTEM={fitness:'SYSTEM: Ausgewogen — Kraftbasis (Compound) + kurzer Konditions-Finisher, moderate Pausen.',strength:'SYSTEM: Kraft/Hypertrophie — Grundübungen zuerst, 8-15 Wdh bei Körpergewicht, längere Pausen, Volumen wochenweise steigern.',fatLoss:'SYSTEM: Körperfett — Ganzkörper-Dichteformate/Zirkel, kurze Pausen, hoher Energieumsatz, knieschonend ohne Sprünge.',endurance:'SYSTEM: Ausdauer — Zirkel mit kurzen Pausen (30-45s), Umfang vor Intensität.'};
-  const profP=profileTxt();const sys=`Erfahrener Trainingswissenschaftler. Der Gesamtplan umfasst ${weeks} Wochen. Erstelle davon die ersten ${aiWeeks} Wochen im Detail — die übrigen Wochen werden automatisch nach demselben Muster fortgeschrieben. intro und Ausblick beziehen sich auf die GESAMTEN ${weeks} Wochen, nicht nur auf die ersten ${aiWeeks}. Nennt der title oder das intro eine Dauer, dann NUR "${weeks} Wochen". Ziel: ${goalObj.label}. ${planOpts.freq}×/Woche. ${styleRule} ${GOAL_SYSTEM[planOpts.goal]||''} Knieschonend.${profP?'\nNUTZER: '+profP+' — Einschränkungen strikt beachten, Fitness-Check zur Kalibrierung des Startniveaus nutzen.':''}
+  const GOAL_SYSTEM={fitness:'SYSTEM: Ausgewogen — Kraftbasis (Compound) + kurzer Konditions-Finisher, moderate Pausen.',strength:'SYSTEM: Kraft/Hypertrophie — Grundübungen zuerst, 8-15 Wdh bei Körpergewicht, längere Pausen, Volumen wochenweise steigern.',fatLoss:'SYSTEM: Körperfett — Ganzkörper-Dichteformate/Zirkel, kurze Pausen, hoher Energieumsatz.'+(_kneeIssue()?' Knieschonend ohne Sprünge.':''),endurance:'SYSTEM: Ausdauer — Zirkel mit kurzen Pausen (30-45s), Umfang vor Intensität.'};
+  const profP=profileTxt();const sys=`Erfahrener Trainingswissenschaftler. Der Gesamtplan umfasst ${weeks} Wochen. Erstelle davon die ersten ${aiWeeks} Wochen im Detail — die übrigen Wochen werden automatisch nach demselben Muster fortgeschrieben. intro und Ausblick beziehen sich auf die GESAMTEN ${weeks} Wochen, nicht nur auf die ersten ${aiWeeks}. Nennt der title oder das intro eine Dauer, dann NUR "${weeks} Wochen". Ziel: ${goalObj.label}. ${planOpts.freq}×/Woche. ${styleRule} ${GOAL_SYSTEM[planOpts.goal]||''}${_kneeRule()}${profP?'\nNUTZER: '+profP+' — Einschränkungen strikt beachten, Fitness-Check zur Kalibrierung des Startniveaus nutzen.':''}
 ${freqStyleWarn?freqStyleWarn+"\n":""}PERIODISIERUNG: Lineare Progression — Volumen/Intensität wochenweise steigern, erst Umfang, dann Intensität. Woche 1 easy (Technik, RPE 5-6), Woche 2-3 medium bis hard (RPE 7-8,5), Woche 4 = Deload mit ~50-60% Volumen, alles easy (aktive Erholung, Bewegungsqualität). intensity easy=RPE 5-6, medium=RPE 7-8, hard=RPE 8-9.
 TRAININGSTAGE: Nutze NUR diese Wochentage: ${allowedDaysStr}. An anderen Tagen KEINE Session.
 ${regenRule}
@@ -8884,7 +8893,7 @@ async function regenPlanSession(){
 }
 function _startSessAt_legacy(wi,si){
   const sess=plan?.weeks[wi]?.sessions[si];if(!sess)return;
-  const equip=equipSummary(_sessEquip(sess));const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);
+  const equip=equipSummary(_sessEquip(sess));const count=sess.exerciseCount||5;const summary=`${sess.focus}, ${sess.durationMin||30} Minuten${_kneeTag()}, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen`;generateWorkout(summary);
 }
 
 // Leave the review without starting the workout. Goes back to the plan when the
@@ -8925,7 +8934,7 @@ function chatFromPlan(wi,si){
   const weekNote=week?.note?` Wochenziel: ${week.note}`:'';
   const goalTxt=GOALS.find(g=>g.id===(plan.goal||'fitness'))?.label||'Fitness';
   const ssHint=(sess.wantSuperset||rec.superset)?' Nutze 1-2 antagonistische Supersätze (group), damit alle Muster ins Zeitbudget passen.':'';
-  chatCtx.summary=`${focusClean}, ${sess.durationMin||30} Minuten, knieschonend, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.\nPLANKONTEXT — Ziel: ${goalTxt}. ${phase}${weekNote} Aus Intensität abgeleitet: sets=${rec.sets}, rest≈${rec.rest}s — halte dich daran.${ssHint}${historyDigest(sess.focus)}`;
+  chatCtx.summary=`${focusClean}, ${sess.durationMin||30} Minuten${_kneeTag()}, Intensität: ${INT_LABELS[sess.intensity||'medium']}, Equipment: ${equip}, genau ${count} Hauptübungen.\nPLANKONTEXT — Ziel: ${goalTxt}. ${phase}${weekNote} Aus Intensität abgeleitet: sets=${rec.sets}, rest≈${rec.rest}s — halte dich daran.${ssHint}${historyDigest(sess.focus)}`;
   chatHistory.push({role:'assistant',content:`Bereit für "${sess.focus}"!`});
 }
 
@@ -9169,8 +9178,8 @@ async function rebuildPlanWithFreq(newFreq){
   // Show loading
   window._genKindHint='plan';show('s-gen');document.getElementById('gen-text').textContent='Plan wird neu aufgebaut';
   const aiWeeks=Math.min(4,oldWeeks);
-  const profR=profileTxt();const GOAL_SYSTEM2={fitness:'SYSTEM: Ausgewogen — Kraftbasis + Konditions-Finisher.',strength:'SYSTEM: Kraft/Hypertrophie — Compound zuerst, längere Pausen, Volumen steigern.',fatLoss:'SYSTEM: Dichteformate/Zirkel, kurze Pausen, knieschonend.',endurance:'SYSTEM: Zirkel, kurze Pausen, Umfang vor Intensität.'};
-  const sys=`Erfahrener Trainingswissenschaftler. Der Gesamtplan umfasst ${oldWeeks} Wochen. Erstelle davon die ersten ${aiWeeks} Wochen im Detail — die übrigen werden automatisch fortgeschrieben. intro und Ausblick beziehen sich auf die GESAMTEN ${oldWeeks} Wochen. Ziel: ${goalObj.label}. ${newFreq}×/Woche (genau ${newFreq} Sessions pro Woche). ${styleRule} ${GOAL_SYSTEM2[plan.goal]||''} Knieschonend.${profR?'\nNUTZER: '+profR+' — Einschränkungen strikt beachten.':''}
+  const profR=profileTxt();const GOAL_SYSTEM2={fitness:'SYSTEM: Ausgewogen — Kraftbasis + Konditions-Finisher.',strength:'SYSTEM: Kraft/Hypertrophie — Compound zuerst, längere Pausen, Volumen steigern.',fatLoss:'SYSTEM: Dichteformate/Zirkel, kurze Pausen.'+(_kneeIssue()?' Knieschonend.':''),endurance:'SYSTEM: Zirkel, kurze Pausen, Umfang vor Intensität.'};
+  const sys=`Erfahrener Trainingswissenschaftler. Der Gesamtplan umfasst ${oldWeeks} Wochen. Erstelle davon die ersten ${aiWeeks} Wochen im Detail — die übrigen werden automatisch fortgeschrieben. intro und Ausblick beziehen sich auf die GESAMTEN ${oldWeeks} Wochen. Ziel: ${goalObj.label}. ${newFreq}×/Woche (genau ${newFreq} Sessions pro Woche). ${styleRule} ${GOAL_SYSTEM2[plan.goal]||''}${_kneeRule()}${profR?'\nNUTZER: '+profR+' — Einschränkungen strikt beachten.':''}
 PERIODISIERUNG: Lineare Progression, erst Umfang, dann Intensität. Woche 1 easy (RPE 5-6), Woche 2-3 medium bis hard (RPE 7-8,5), Woche 4 Deload ~50-60% Volumen, easy. intensity easy=RPE 5-6, medium=RPE 7-8, hard=RPE 8-9.
 TRAININGSTAGE: Nutze NUR diese Tage: ${allowedDaysStr}.
 ${rbRegen}
@@ -9797,7 +9806,7 @@ async function runAiFind(){
     const keys=Object.keys(MUSCLE_DE).filter(k=>k!=='fullbody').join(', ');
     const have=[...DEFAULT_LIB,...library].map(e=>e.name).join(', ');
     const prompt=`Der Nutzer sucht: "${q}". Das ist entweder ein Übungsname oder eine Muskelgruppe.
-Finde 1–4 dazu passende, knieschonende Home-/Körpergewichtsübungen (bei Muskelgruppe mehrere Varianten, bei konkretem Übungsnamen genau diese plus 1–2 Varianten).
+Finde 1–4 dazu passende Übungen (Körpergewicht oder mit üblichem Equipment${_kneeIssue()?', knieschonend':''}) (bei Muskelgruppe mehrere Varianten, bei konkretem Übungsnamen genau diese plus 1–2 Varianten).
 NICHT doppeln mit: ${have}.
 muscles NUR aus dieser Liste (englische Keys): ${keys}.
 Antworte NUR mit JSON-Array, sonst nichts:
@@ -9854,7 +9863,7 @@ async function aiLoadExercises(){
   const btn=document.getElementById('lib-load-btn');btn.textContent='Lädt...';btn.disabled=true;
   try{
     const existing=[...DEFAULT_LIB,...library].map(e=>e.name).join(', ');
-    const raw=await callAPI([{role:'user',content:`10 knieschonende Home-Übungen NICHT in: ${existing}. NUR JSON-Array: [{"name":"...","muscles":["core"],"bilateral":false,"tip":"DE","details":"1 Satz","mistakes":"Fehler"}]`}],1000);
+    const raw=await callAPI([{role:'user',content:`10 ${_kneeIssue()?'knieschonende ':''}Übungen (Körpergewicht oder ${equipSummary(_homeEquip())}) NICHT in: ${existing}. NUR JSON-Array: [{"name":"...","muscles":["core"],"bilateral":false,"tip":"DE","details":"1 Satz","mistakes":"Fehler"}]`}],1000);
     const parsed=extractJSON(raw);const arr=Array.isArray(parsed)?parsed:[parsed].filter(Boolean);
     library=[...library,...arr.filter(e=>e&&e.name)];saveLibrary();renderLibrary();
   }catch(e){showErr('Fehler: '+e.message);}
@@ -10170,7 +10179,7 @@ async function startQuickWorkout(){
   const qGoal=(plan&&plan.goal)||'fitness';
   const qRec=recommendExercises(quickDur,quickFocus.label,qGoal,'medium');
   const qHint=qRec.superset?' Nutze 1-2 antagonistische Supersätze (group), damit die Bewegungsmuster ins Zeitbudget passen.':'';
-  const summary=`${quickFocus.label}, ${quickDur} Minuten, knieschonend, Intensität: mittel, Körpergewicht, genau ${qRec.count} Hauptübungen.${qHint}`;
+  const summary=`${quickFocus.label}, ${quickDur} Minuten${_kneeTag()}, Intensität: mittel, Equipment: ${equipSummary(_homeEquip())}, genau ${qRec.count} Hauptübungen.${qHint}`;
   await generateWorkout(summary);
   // Mark as bonus after save (via pendingPlanSession flag not set, handled in showPlanLinkModal)
 }
@@ -10576,6 +10585,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   }catch(e){console.error('Init error:',e);}
   try{_bindReviewFmtInfo();}catch(e){}
   try{_syncOffline();addEventListener('online',_syncOffline);addEventListener('offline',_syncOffline);if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}
+  try{const _pf=loadProfile()||{};if(_tourDone()&&!(_pf.limits||'').trim()&&!localStorage.getItem('coach_limits_hint')&&(log||[]).length){localStorage.setItem('coach_limits_hint','1');setTimeout(()=>_showTipText('Hast du körperliche Einschränkungen, z. B. Knie oder Rücken? Trag sie unter Einstellungen → Profil ein, dann berücksichtigt der Coach sie.'),3500);}}catch(e){}
   try{if(_tourDone()&&localStorage.getItem('coach_tour_skipped')==='1'){localStorage.removeItem('coach_tour_skipped');setTimeout(()=>_showTipText('Die Einführung findest du jederzeit unter Einstellungen → Einführung zeigen.'),1200);}}catch(e){}
   try{_syncTipsSetting();if(!_tourDone())setTimeout(openTour,700);else setTimeout(()=>{if(!document.querySelector('.modal-ov.open'))maybeSuggestCore();},2000);}catch(e){}
 });

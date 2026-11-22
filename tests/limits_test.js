@@ -1,0 +1,16 @@
+const __APP=require('path').resolve(__dirname,'..','index.html');const __URL='file://'+__APP;
+const {chromium}=require('playwright');
+(async()=>{const b=await chromium.launch();const p=await b.newPage({viewport:{width:390,height:844}});
+const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.addInitScript(()=>{localStorage.setItem('coach_tour_done','1');localStorage.setItem('coach_tips_off','1');localStorage.setItem('coach_api_key','k');localStorage.setItem('coach_prefs',JSON.stringify({coreSuggested:true}));localStorage.setItem('coach_profile',JSON.stringify({name:'Rike',homeEquip:['bodyweight','kettlebell']}));
+ window.__prompts=[];window.fetch=async(u,o)=>{window.__prompts.push(o.body);const t=/Alternativen/.test(o.body)?'[{"name":"KB Swing","tip":"x","muscles":["glutes"]}]':'{"exercises":[{"name":"Kniebeugen","type":"reps","reps":10,"sets":3}]}';return {ok:true,status:200,json:async()=>({model:'m',stop_reason:'end_turn',content:[{type:'text',text:t}]})};};});
+await p.goto(__URL);await p.waitForTimeout(800);
+const E=f=>p.evaluate(f);const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)errs.push(m)};
+await E(()=>generateWorkout('Beine, 30 Minuten'));await p.waitForTimeout(600);
+ok(await E(()=>!/knieschon/i.test(window.__prompts.at(-1))),'no knee rule without limits');
+await E(()=>{swapIdx=0;getAISwap();});await p.waitForTimeout(500);
+ok(await E(()=>{const x=window.__prompts.at(-1);return /Alternativen/.test(x)&&/Kettlebell/.test(x)&&!/Kein Equipment/.test(x)&&!/knieschon/i.test(x);}),'swap uses home equipment, no knee');
+await E(()=>{const pr=loadProfile();pr.limits='IT-Band links';saveProfile(pr);generateWorkout('Beine, 30 Minuten');});await p.waitForTimeout(600);
+ok(await E(()=>/Knieschonend/.test(window.__prompts.at(-1))),'knee rule with IT-Band in profile');
+ok(await E(()=>_kneeTag()===', knieschonend'),'knee tag');
+console.log(errs.length?'ERRORS: '+errs.join(' | '):'ALL OK');await b.close();})();
