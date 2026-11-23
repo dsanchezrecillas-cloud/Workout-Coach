@@ -36,7 +36,7 @@ setTimeout(()=>{
  // 2 Balance
  t('muscle balance counts sets per group',()=>{const b=E('muscleBalance(7)');A(b['Gesäß']===9,'glute '+JSON.stringify(b));A(b['Beine']===4.5,'legs '+b['Beine']);A(b['Brust']===0);});
  t('balance card names neglected groups',()=>{E('updateBalanceCard()');A(d.getElementById('balance-card').style.display==='block');A(/Brust/.test(d.getElementById('balance-sub').textContent)&&/Rücken/.test(d.getElementById('balance-sub').textContent));});
- t('muscle balance renders bars',()=>{E('renderMuscleBalance()');A((d.getElementById('muscle-balance').innerHTML.match(/Sätze/g)||[]).length>=7);});
+ t('muscle balance renders bars',()=>{E(`log.push({date:new Date().toISOString(),rpe:7,exercises:[{name:'Kettlebell Swing',equip:'kettlebell',muscles:['glutes','hamstrings'],sets:2,reps:10}],repLog:{'1_0_s1':10,'1_0_s2':10}})`);E('renderMuscleBalance()');E('log.pop()');A((d.getElementById('muscle-balance').innerHTML.match(/Sätze/g)||[]).length>=7);});
  // 4 KB upgrade
  t('no KB upgrade when reps missed / RPE high',()=>{A(E("kbUpgradeHtml({name:'Kettlebell Swing',equip:'kettlebell'})")==='');});
  t('KB upgrade suggests next owned bell',()=>{
