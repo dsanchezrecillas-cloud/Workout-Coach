@@ -730,7 +730,7 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
       </div>
       <div id="rounds-row" class="fmt-row"><span>Runden:</span><div style="display:flex;gap:6px;flex-wrap:wrap" id="rounds-chips"></div></div>
       <div id="amrap-row" class="fmt-row" style="display:none"><span>Zeit:</span><div style="display:flex;gap:6px;flex-wrap:wrap" id="cap-chips"></div></div>
-      <div id="emom-row" class="fmt-row" style="display:none"><span>Dauer:</span><div style="display:flex;gap:6px;flex-wrap:wrap" id="emom-chips"></div></div>
+      <div id="emom-row" class="fmt-row" style="display:none;flex-direction:column;align-items:flex-start"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>Dauer:</span><div style="display:flex;gap:6px;flex-wrap:wrap" id="emom-chips"></div></div><div id="emom-side-wrap" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px"><span>Seiten:</span><div style="display:flex;gap:6px;flex-wrap:wrap" id="emom-side-chips"></div></div><div id="emom-info" style="font-size:11px;color:var(--mu);margin-top:6px"></div></div>
       <div id="tabata-row" class="fmt-row" style="display:none"><span>Intervalle:</span><div style="display:flex;gap:6px;flex-wrap:wrap" id="tabata-chips"></div></div>
       <div id="complex-row" class="fmt-row" style="display:none;flex-direction:column;align-items:flex-start"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>Runden:</span><div style="display:flex;gap:6px;flex-wrap:wrap" id="complex-chips"></div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>Pause:</span><div style="display:flex;gap:6px;flex-wrap:wrap" id="complex-rest-chips"></div></div></div>
       <div id="ladder-row" class="fmt-row" style="display:none;flex-direction:column;align-items:flex-start"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>Leiter:</span><div style="display:flex;gap:6px;flex-wrap:wrap" id="ladder-chips"></div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>Pause je Stufe:</span><div style="display:flex;gap:6px;flex-wrap:wrap" id="ladder-rest-chips"></div></div></div>
@@ -827,14 +827,14 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
         </div>
         <div id="rep-bi" style="display:none;margin-top:4px">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div style="text-align:center"><div style="font-size:9px;color:var(--mu);margin-bottom:7px;letter-spacing:.06em;font-weight:600">LINKS</div>
+            <div id="rep-col-L" style="text-align:center"><div style="font-size:9px;color:var(--mu);margin-bottom:7px;letter-spacing:.06em;font-weight:600">LINKS</div>
               <div style="display:flex;align-items:center;justify-content:center;gap:8px">
                 <button class="rep-btn" style="width:40px;height:40px;font-size:20px;background:var(--up);border-color:var(--br);color:var(--su)" onclick="addRep('L',-1)">−</button>
                 <input id="rep-L" type="text" inputmode="numeric" pattern="[0-9]*" value="0" onchange="setRepDirectSide('L',this.value)" style="font-size:28px;font-weight:700;color:var(--co);width:52px;text-align:center;background:none;border:none;outline:none;font-family:var(--m);-webkit-appearance:none;border-bottom:2px solid rgba(var(--coRGB),.35)"/>
                 <button class="rep-btn" style="width:40px;height:40px;font-size:20px;background:rgba(var(--coRGB),.1);border-color:rgba(var(--coRGB),.3);color:var(--co)" onclick="addRep('L',1)">+</button>
               </div>
             </div>
-            <div style="text-align:center"><div style="font-size:9px;color:var(--mu);margin-bottom:7px;letter-spacing:.06em;font-weight:600">RECHTS</div>
+            <div id="rep-col-R" style="text-align:center"><div style="font-size:9px;color:var(--mu);margin-bottom:7px;letter-spacing:.06em;font-weight:600">RECHTS</div>
               <div style="display:flex;align-items:center;justify-content:center;gap:8px">
                 <button class="rep-btn" style="width:40px;height:40px;font-size:20px;background:var(--up);border-color:var(--br);color:var(--su)" onclick="addRep('R',-1)">−</button>
                 <input id="rep-R" type="text" inputmode="numeric" pattern="[0-9]*" value="0" onchange="setRepDirectSide('R',this.value)" style="font-size:28px;font-weight:700;color:var(--co);width:52px;text-align:center;background:none;border:none;outline:none;font-family:var(--m);-webkit-appearance:none;border-bottom:2px solid rgba(var(--coRGB),.35)"/>
@@ -2995,19 +2995,23 @@ function unlockVoice(){try{if(voiceOn()&&'speechSynthesis' in window&&typeof Spe
 let _voiceSig='';
 function _voiceOnStateChange(){
   if(!voiceOn())return;
-  const sig=tStatus+'|'+tIdx+'|'+tSet+'|'+tRound+'|'+(window._holdSide||1);
+  const sig=tStatus+'|'+tIdx+'|'+tSet+'|'+tRound+'|'+(window._holdSide||1)+'|'+(window._emomSide||1);
   if(sig===_voiceSig)return;
   const prev=_voiceSig;_voiceSig=sig;
   if(tStatus==='idle'||!prev&&tStatus!=='work'&&tStatus!=='ready')return;
   const exList=exListCur(),ex=exList[tIdx]||{};
   if(tStatus==='work'||tStatus==='ready'){
     if((window._holdSide||1)===2){speak('Andere Seite',{interrupt:true});return;}
+    if(_emomSideMode(ex)){const per=Math.max(1,Math.round((ex.reps||10)/2));
+      if((window._emomSide||1)===2){speak(_fmtVoicePrefix()+'Seitenwechsel, rechte Seite. '+per+' Wiederholungen',{interrupt:true});return;}
+      speak(_fmtVoicePrefix()+(ex.name||'Nächste Übung')+', '+per+' Wiederholungen, linke Seite',{interrupt:true});return;}
     if((tSet||1)>1){speak('Satz '+tSet,{interrupt:true});return;}
     speak(_fmtVoicePrefix()+(ex.name||'Nächste Übung')+', '+_amountTxt(ex,ex.reps),{interrupt:true});
   }else if(tStatus==='rest'||tStatus==='round_rest'){
     window._restLen=tLeft;
     const nx=_nextUp();
     const head=tStatus==='round_rest'?'Runde geschafft':'Pause';
+    if(tStatus==='rest'&&_emomSideMode(ex)&&(window._emomSide||1)===1){speak('Pause. Gleich rechte Seite.',{interrupt:true});return;}
     if(!nx){speak(head+'. Letzte Übung geschafft.',{interrupt:true});return;}
     if(nx.sameEx){speak(head,{interrupt:true});return;}
     if(_fmt()==='tabata'||tLeft<12){speak(head+'. Gleich: '+nx.ex.name,{interrupt:true});return;}
@@ -4516,6 +4520,9 @@ function _syncCircuitType(){
   show('cx-pauses',f==='rounds'||f==='amrap');
   const k=Math.max(1,curExercises.filter(e=>!e.warmup).length);
   _chipRow('emom-chips',[10,12,16,20,24,30],curSetup.emomMin,v=>v+' Min','setEmomMin');
+  {const bi=_emomBiMain().length>0;const w=document.getElementById('emom-side-wrap');if(w)w.style.display=(f==='emom'&&bi)?'flex':'none';
+   if(bi)_chipRow('emom-side-chips',[0,1],_emomSides()?1:0,v=>v?'Je Seite eine Minute':'Beide in einer Minute','setEmomSides');
+   const inf=document.getElementById('emom-info');if(inf&&f==='emom'){const main=curExercises.filter(e=>!e.warmup);const per=main.reduce((n,e)=>n+((bi&&_emomSides()&&e.bilateral&&(e.type||'reps')==='reps')?2:1),0)||1;const r=Math.max(1,Math.round((curSetup.emomMin||12)/per));inf.textContent=`${per} Minuten pro Runde → ${r} Runde${r===1?'':'n'} (${r*per} Min)`;}}
   _chipRow('tabata-chips',[8,12,16],curSetup.tabataInt,v=>v+'×','setTabataInt');
   _chipRow('complex-chips',[3,4,5,6],curSetup.complexRounds,v=>v+'×','setComplexRounds');
   _chipRow('complex-rest-chips',[30,60,90],curSetup.roundRestSec,v=>v+' s','setRoundRestSec');
@@ -4550,7 +4557,9 @@ function _applyFormat(){
     const n=curSetup.tabataInt||8;curSetup.rounds=Math.max(1,Math.ceil(n/k));curSetup.exRest=true;curSetup.roundRest=false;
     main.forEach(e=>{e.type='time';e.duration=20;e.rest=10;e.sets=1;e.bilateral=false;delete e.group;});
   }else if(f==='emom'){
-    const n=curSetup.emomMin||12;curSetup.rounds=Math.max(1,Math.round(n/k));curSetup.emomMin=curSetup.rounds*k;curSetup.exRest=true;curSetup.roundRest=false;
+    if(curSetup.emomSides===undefined)curSetup.emomSides=_emomSidesDefault();
+    const kk=main.reduce((n,e)=>n+((curSetup.emomSides&&e.bilateral&&(e.type||'reps')==='reps')?2:1),0)||k;
+    const n=curSetup.emomMin||12;curSetup.rounds=Math.max(1,Math.round(n/kk));curSetup.emomMin=curSetup.rounds*kk;curSetup.exRest=true;curSetup.roundRest=false;window._emomSide=1;
     main.forEach(e=>{e.sets=1;delete e.group;if(isHoldEx(e)){e.type='time';e.duration=Math.min(e.duration||30,45);}});
   }else if(f==='complex'){
     const side=main.some(e=>e.bilateral);curSetup.sideRounds=side;curSetup.exRest=false;curSetup.roundRest=true;
@@ -4570,11 +4579,19 @@ function _exRestSec(ex){
   if(_fmt()==='emom'&&!isWU)return Math.max(1,Math.round(60-(Date.now()-(window._emomStart||Date.now()))/1000));
   return ex.rest||20;
 }
-function _emomMark(){if(_fmt()!=='emom'||isWU||tStatus!=='work')return;const key=tRound+'_'+tIdx;if(window._emomKey!==key){window._emomKey=key;window._emomStart=Date.now();}}
+function _emomMark(){if(_fmt()!=='emom'||isWU||tStatus!=='work')return;const key=tRound+'_'+tIdx+'_'+(window._emomSide||1);if(window._emomKey!==key){window._emomKey=key;window._emomStart=Date.now();}}
+// EMOM: one-sided exercises can get their own minute per side
+function _emomBiMain(){return curExercises.filter(e=>!e.warmup&&e.bilateral&&(e.type||'reps')==='reps');}
+function _emomSidesDefault(){return _emomBiMain().some(e=>/kettlebell|\bkb\b/i.test(e.name||'')||e.equip==='kettlebell'||Math.round((e.reps||0)/2)>=5);}
+function _emomSides(){return curSetup.emomSides===undefined?_emomSidesDefault():!!curSetup.emomSides;}
+function _emomSideMode(ex){return _fmt()==='emom'&&!isWU&&!!ex&&ex.bilateral&&(ex.type||'reps')==='reps'&&_emomSides();}
+function _emomSlots(e){return _emomSideMode(e)?2:1;}
+function _emomMinuteNo(){const main=curExercises;const per=main.reduce((n,e)=>n+_emomSlots(e),0);let before=0;for(let i=0;i<tIdx;i++)before+=_emomSlots(main[i]);return (tRound-1)*per+before+((_emomSideMode(main[tIdx])&&(window._emomSide||1)===2)?2:1);}
+function setEmomSides(v){curSetup.emomSides=!!v;_syncCircuitType();}
 function _sideSwitchRound(){return !!curSetup.sideRounds&&tRound%2===0;}
 function _roundLabel(){
   const f=_fmt(),k=curExercises.length||1,rounds=curSetup.rounds||1;
-  if(f==='emom')return 'Minute '+((tRound-1)*k+tIdx+1)+'/'+(curSetup.emomMin||rounds*k);
+  if(f==='emom'){const ex=curExercises[tIdx];return 'Minute '+_emomMinuteNo()+'/'+(curSetup.emomMin||rounds*k)+(_emomSideMode(ex)?' · '+((window._emomSide||1)===2?'rechts':'links'):'');}
   if(f==='tabata')return 'Intervall '+((tRound-1)*k+tIdx+1)+'/'+(rounds*k);
   if(f==='complex'&&curSetup.sideRounds)return 'Runde '+Math.ceil(tRound/2)+'/'+Math.round(rounds/2)+' · '+(tRound%2?'Seite 1':'Seite 2')+' · '+(tIdx+1)+'/'+k;
   if(f==='ladder')return 'Stufe '+tRound+'/'+rounds+' · '+((_ladderArr()[tRound-1])||'')+' Wdh';
@@ -4582,7 +4599,7 @@ function _roundLabel(){
 }
 function _fmtVoicePrefix(){
   const f=_fmt();if(isWU)return '';
-  if(f==='emom')return 'Minute '+((tRound-1)*(curExercises.length||1)+tIdx+1)+'. ';
+  if(f==='emom')return 'Minute '+_emomMinuteNo()+'. ';
   if(f==='complex'&&curSetup.sideRounds&&tIdx===0&&tRound%2===0)return 'Seitenwechsel. ';
   if(f==='ladder'&&tIdx===0)return 'Stufe '+tRound+'. ';
   return '';
@@ -7172,7 +7189,10 @@ function updateTimer(){
     document.getElementById('rep-uni').style.display=isBi?'none':'flex';
     document.getElementById('rep-bi').style.display=isBi?'block':'none';
     const rk=tRound+'_'+tIdx+'_s'+tSet;
-    if(isBi){const el_L=document.getElementById('rep-L');const el_R=document.getElementById('rep-R');if(el_L)el_L.value=tReps[rk+'_L']||0;if(el_R)el_R.value=tReps[rk+'_R']||0;}
+    if(isBi){const el_L=document.getElementById('rep-L');const el_R=document.getElementById('rep-R');if(el_L)el_L.value=tReps[rk+'_L']||0;if(el_R)el_R.value=tReps[rk+'_R']||0;
+      const sm=_emomSideMode(ex),sd=window._emomSide||1;const cL=document.getElementById('rep-col-L'),cR=document.getElementById('rep-col-R');
+      if(cL)cL.style.display=sm&&sd===2?'none':'';if(cR)cR.style.display=sm&&sd===1?'none':'';
+      const grid=cL?.parentElement;if(grid)grid.style.gridTemplateColumns=sm?'1fr':'1fr 1fr';}
     else{const rn=document.getElementById('rep-n');if(rn)rn.value=tReps[rk]||0;}
     const lbl=document.getElementById('rep-set-label');
     const totalS=(curExercises[tIdx]?.sets)||1;
@@ -7374,6 +7394,8 @@ function advance(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{
     tStatus='rest';tLeft=_exRestSec(ex);beep(660,.15);
     updateTimer();
   }else if(tStatus==='rest'){
+      if(_emomSideMode(ex)&&(window._emomSide||1)===1){window._emomSide=2;tStatus='work';tLeft=ex.duration||40;beep(880,.15);_beginPhase();return;}
+      window._emomSide=1;
       const gr=!isWU?_groupRange(tIdx):null;
       if(gr){
         // Inside a superset: rotate through the group, then repeat the rotation for each set
