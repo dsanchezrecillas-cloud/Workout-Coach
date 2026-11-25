@@ -1004,7 +1004,7 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
   <div id="start-date-note" style="font-size:11px;color:var(--mu);margin-bottom:20px">= Heute</div>
 
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Workouts pro Woche</div>
-  <div style="display:flex;gap:8px;margin-bottom:12px" id="freq-chips"></div>
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap" id="freq-chips"></div>
   <div style="font-size:10px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px">Kettlebell-Anteil</div>
   <div id="pc-kb" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px"></div>
   <div id="pc-kb-desc" style="font-size:12px;color:var(--mu);margin-bottom:20px;line-height:1.45"></div>
@@ -1052,7 +1052,7 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
 <!-- LIBRARY -->
 <div id="s-library" class="screen">
   <button class="back" onclick="show('s-home')">← zurück</button>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:8px">
     <div style="font-size:21px;font-weight:700;letter-spacing:-.02em">Übungsverzeichnis</div>
     <div style="display:flex;gap:7px"><button onclick="openAiFind()" style="padding:7px 12px;border-radius:9px;background:rgba(var(--acRGB),.13);border:1px solid rgba(var(--acRGB),.28);color:var(--ac);font-size:12px;font-weight:600;font-family:var(--f)">KI-Suche</button><button onclick="openAddEx()" style="padding:7px 12px;border-radius:9px;background:rgba(var(--coRGB),.12);border:1px solid rgba(var(--coRGB),.26);color:var(--co);font-size:12px;font-weight:600;font-family:var(--f)">+ Eigene</button></div>
   </div>
@@ -1061,7 +1061,7 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
     <input id="lib-search" class="inp" placeholder="Übung suchen..." oninput="renderLibrary()" style="padding-right:38px"/>
     <button onclick="clearLibSearch()" id="lib-search-x" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:50%;background:var(--up);border:1px solid var(--br);color:var(--mu);font-size:12px">✕</button>
   </div>
-  <div style="display:flex;gap:6px;margin-bottom:9px" id="lib-loc-filter"></div>
+  <div style="display:flex;gap:6px;margin-bottom:9px;flex-wrap:wrap" id="lib-loc-filter"></div>
   <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px" id="lib-filter"></div>
   <div id="lib-list" style="display:flex;flex-direction:column;gap:7px;padding-bottom:80px"></div>
   <!-- Floating build button -->
@@ -1284,7 +1284,7 @@ html[data-theme="light"] #timer-wrap.compact{background:rgba(246,243,253,.95)!im
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="add-ex-muscles"></div>
     <label style="display:flex;align-items:center;gap:10px;margin-bottom:16px;cursor:pointer">
       <input type="checkbox" id="add-ex-bilateral" style="width:16px;height:16px;accent-color:var(--ac)"/>
-      <span style="font-size:13px;color:var(--tx)">Beidseitig (Links/Rechts getrennt)</span>
+      <span style="font-size:13px;color:var(--tx)">Einseitig (links/rechts getrennt)</span>
     </label>
     <button onclick="saveCustomEx()" class="btn btn-ac">Hinzufügen</button>
     <button onclick="deleteLibEx()" id="del-ex-btn" style="display:none;width:100%;margin-top:9px;padding:11px;border-radius:11px;background:rgba(var(--hotRGB),.1);border:1px solid rgba(var(--hotRGB),.28);color:var(--hot);font-size:13px;font-weight:600;font-family:var(--f)">Übung löschen</button>
@@ -2010,7 +2010,7 @@ function todayStatusTxt(){
   if(doneToday.length){
     const det=doneToday.map(w=>{
       const m=(w.muscles||[]).map(x=>MUSCLE_DE_SHORT[x]||x).join(', ')||'Workout';
-      return `${m} (${w.durationMin||'?'} min, RPE ${w.rpe||'?'}/10)`;
+      return `${m} (${wMin(w)||'?'} min, RPE ${w.rpe||'?'}/10)`;
     }).join(' + ');
     parts.push(`HEUTE BEREITS TRAINIERT: ${doneToday.length}× — ${det}. Das Tagesziel ist erfüllt; schlage KEIN weiteres Workout für heute vor, sondern Erholung, Ernährung oder Ausblick auf die nächste Einheit.`);
   }else{
@@ -2040,7 +2040,7 @@ function histTxt(){
     const muscles=w.stretch
       ?('🧘 Dehnen'+(w.areaId&&STRETCH_AREAS[w.areaId]&&w.areaId!=='full'?' — '+STRETCH_AREAS[w.areaId].label:''))
       :(mainMuscles(w.muscles,3).join(', ')||'?');
-    return`${when} | ${muscles} | RPE ${w.rpe}/10`+(w.note?` | "${w.note}"`:'')+` | ${w.durationMin||'?'} min`;
+    return`${when} | ${muscles} | RPE ${w.rpe}/10`+(w.note?` | "${w.note}"`:'')+` | ${wMin(w)||'?'} min`;
   }).join('\n');
 }
 
@@ -2088,10 +2088,15 @@ function toggleTheme(){
   applyTheme(next);
 }
 
-function showErr(msg){const e=document.getElementById('err');e.classList.remove('info');document.getElementById('err-txt').textContent=msg;e.style.display='flex';clearTimeout(window._errT);window._errT=setTimeout(hideErr,7000);}
+// Toasts: one after another (several can arrive right after a workout);
+// confirmations and good news never use the red error look.
+const _toastQ=[];let _toastOn=false;
+function _toastShow(msg,info){const e=document.getElementById('err');e.classList.toggle('info',!!info);document.getElementById('err-txt').textContent=msg;e.style.display='flex';_toastOn=true;clearTimeout(window._errT);window._errT=setTimeout(hideErr,_toastQ.length?3200:(info?4500:7000));}
+function _toast(msg,info){if(!msg)return;if(_toastOn){if(!_toastQ.some(t=>t[0]===msg))_toastQ.push([msg,info]);if(_toastQ.length===1){clearTimeout(window._errT);window._errT=setTimeout(hideErr,2600);}return;}_toastShow(msg,info);}
+function showErr(msg){_toast(msg,/^\s*(✓|🏆|🎉|📖|🔧|↔|★|♥)/u.test(String(msg)));}
 // Neutral notice for confirmations (same slot, calm styling)
-function showNote(msg){showErr(msg);document.getElementById('err').classList.add('info');}
-function hideErr(){document.getElementById('err').style.display='none';}
+function showNote(msg){_toast(msg,true);}
+function hideErr(){document.getElementById('err').style.display='none';_toastOn=false;const n=_toastQ.shift();if(n)setTimeout(()=>_toastShow(n[0],n[1]),220);}
 function closeModal(id){
   document.getElementById(id).classList.remove('open');
   // Resume a timer that was paused just to read an exercise description
@@ -4178,9 +4183,7 @@ function coreHistory(name){
   const k=_pk(name),out=[];
   (log||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(w=>{
     (w.exercises||[]).forEach((ex,ei)=>{
-      if(_pk(ex.name)!==k)return;const sets=[];
-      for(let s=1;s<=8;s++){const rk='1_'+ei+'_s'+s;const r=(w.repLog?.[rk]||0)+(w.repLog?.[rk+'_L']||0)+(w.repLog?.[rk+'_R']||0);if(r>0)sets.push(r);}
-      if(!sets.length){const r=(w.repLog?.['1_'+ei]||0);if(r>0)sets.push(r);}
+      if(_pk(ex.name)!==k)return;const sets=_exSets(w,ei).map(x=>x.r);
       if(sets.length)out.push({date:w.date,best:Math.max(...sets),total:sets.reduce((a,b)=>a+b,0),n:sets.length});
     });
   });
@@ -4878,9 +4881,9 @@ function _syncBriefBtn(){const b=document.getElementById('brief-btn');if(b)b.sty
 // ─── Review: compact rows, one editor open at a time ────────────────────────
 function _revSummary(ex){
   const t=ex.type||'time',sets=ex.sets||1;
-  const amt=t==='reps'?(ex.reps||10)+' Wdh':t==='amrap'?'max. Wdh in '+(ex.duration||40)+' s':(ex.duration||40)+' s'+(t==='hold'?' halten':'');
-  const p=[(sets>1?sets+' × ':'')+amt];
-  if(ex.bilateral)p.push('beidseitig');
+  const circ=curSetup.trainingMode==='circuit';
+  const amt=t==='reps'?(ex.bilateral?Math.max(1,Math.round((ex.reps||10)/2))+' Wdh je Seite':(ex.reps||10)+' Wdh'):t==='amrap'?'max. Wdh in '+(ex.duration||40)+' s':(ex.duration||40)+' s'+(t==='hold'?' halten':'')+(ex.bilateral&&t!=='reps'?' je Seite':'');
+  const p=[(sets>1&&!circ?sets+' × ':'')+amt+(circ?' pro Runde':'')];
   if(curSetup.trainingMode!=='circuit'||curSetup.exRest)p.push('Pause '+(ex.rest||20)+' s');
   if(ex.trackWeight)p.push(ex.defaultWeight?String(ex.defaultWeight).replace('.',',')+' kg':'mit Gewicht');
   return p.join(' · ');
@@ -5673,7 +5676,7 @@ TRAININGSWISSENSCHAFTLICHE REGELN:
 - Bei bilateral:true (einseitige Übungen wie Ausfallschritte) reps PRO SEITE angeben.
 - Warmup nach RAMP-Prinzip: 1 Übung Puls anheben (z.B. Hampelmann leicht), 1-2 Übungen Zielmuskulatur aktivieren/mobilisieren (dynamisch, keine statischen Dehnungen).
 
-Typen: type:"time" zeitbasiert, type:"reps" zählbar (dann reps:N), type:"hold" Halten, type:"amrap" max Wdh in Zeit. 5-7 Hauptübungen + 2-3 Warmup.
+Typen: type:"time" zeitbasiert, type:"reps" zählbar (dann reps:N), type:"hold" Halten, type:"amrap" max Wdh in Zeit. Anzahl der Hauptübungen genau wie in den Vorgaben (steht dort keine Zahl: 5–7) + 2–3 Warmup.
 ${_coachContext()}${_prefsTxt()}${_extraTxt}
 ${BRIEF_RULES}
 Antworte NUR mit JSON-Objekt: {"briefing":{"focus":"...","why":"...","structure":"...","goal":"..."},"exercises":[ÜBUNGEN]} — ÜBUNGEN ist ein Array aus Objekten wie: [{"name":"...","why":"max 8 Wörter","type":"time","duration":40,"reps":null,"rest":20,"sets":3,"group":null,"icon":"◈","tip":"max 8 Wörter","muscles":["chest"],"bilateral":false,"details":"max 12 Wörter","mistakes":"max 8 Wörter","warmup":false,"cooldown":false}]
@@ -5845,7 +5848,7 @@ function showReview(){
     <div class="rev-edit">
     <!-- Bilateral toggle -->
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
-        <button onclick="toggleBilateral(${i})" style="padding:5px 10px;border-radius:8px;border:1.5px solid ${ex.bilateral?'var(--ac)':'var(--br)'};background:${ex.bilateral?'rgba(var(--acRGB),.15)':'var(--up)'};color:${ex.bilateral?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">↔ Beidseitig${ex.bilateral?' AN':' AUS'}</button>
+        <button onclick="toggleBilateral(${i})" style="padding:5px 10px;border-radius:8px;border:1.5px solid ${ex.bilateral?'var(--ac)':'var(--br)'};background:${ex.bilateral?'rgba(var(--acRGB),.15)':'var(--up)'};color:${ex.bilateral?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">↔ Je Seite${ex.bilateral?' AN':' AUS'}</button>
         <span style="font-size:11px;color:var(--mu)">${ex.bilateral?'Zählt L und R getrennt':'Zählt zusammen'}</span>
       </div>
       <div style="display:flex;gap:5px;margin-bottom:8px">
@@ -6624,7 +6627,7 @@ function _revCardHTML(ex,i){
     <div class="rev-edit">
     <!-- Bilateral toggle -->
     <div style="display:flex;align-items:center;gap:7px;margin-top:9px;margin-bottom:7px">
-      <button onclick="toggleBilateral(${i})" style="padding:5px 10px;border-radius:8px;border:1.5px solid ${ex.bilateral?'var(--ac)':'var(--br)'};background:${ex.bilateral?'rgba(var(--acRGB),.15)':'var(--up)'};color:${ex.bilateral?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">↔ Beidseitig${ex.bilateral?' AN':' AUS'}</button>
+      <button onclick="toggleBilateral(${i})" style="padding:5px 10px;border-radius:8px;border:1.5px solid ${ex.bilateral?'var(--ac)':'var(--br)'};background:${ex.bilateral?'rgba(var(--acRGB),.15)':'var(--up)'};color:${ex.bilateral?'var(--ac)':'var(--mu)'};font-size:11px;font-weight:600;font-family:var(--f)">↔ Je Seite${ex.bilateral?' AN':' AUS'}</button>
       <span style="font-size:11px;color:var(--mu)">${ex.bilateral?'Zählt L und R getrennt':'Zählt zusammen'}</span>
     </div>
     <div style="display:flex;gap:5px;margin-bottom:8px">
@@ -6963,7 +6966,7 @@ function toggleBilateralLive(){
     delete tReps[rk];
   }
   updateTimer();renderExList();
-  showErr(ex.bilateral?'↔ Übung zählt jetzt links und rechts getrennt.':'Übung zählt jetzt beidseitig zusammen.');
+  showNote(ex.bilateral?'↔ Übung zählt jetzt je Seite (links und rechts getrennt).':'Übung zählt jetzt ohne Seiten.');
 }
 
 // Tapping an exercise in the list should let you look it up — not teleport you
@@ -7784,6 +7787,18 @@ function saveWorkout(){
   // Snapshot challenge completion before adding this workout
   const _chBefore={};loadChallenges().forEach(ch=>{_chBefore[ch.id]=calcChallengeProgress(ch).pct>=100;});
   log.push(entry);persist();window._popDay=_ymd(new Date());
+  // PR detection
+  const newPRs=[];
+  entry.exercises?.forEach((ex,ei)=>{
+    if(!ex.name)return;
+    const oldH=getExerciseHistory(ex.name).slice(0,-1); // history before this workout
+    const oldPR=oldH.length?Math.max(...oldH.map(e=>e.maxSet),0):0;
+    // Find max reps this workout for this exercise
+    const maxThisWorkout=Math.max(0,..._exSets(entry,ei).map(x=>x.r));
+    if(maxThisWorkout>0&&maxThisWorkout>oldPR)newPRs.push({name:ex.name,reps:maxThisWorkout,old:oldPR});
+  });
+  if(newPRs.length)setTimeout(()=>{showNote('🏆 Neuer Rekord! '+newPRs.map(p=>p.name+': '+p.reps+' Wdh'+(p.old>0?' (vorher: '+p.old+')':'')).join(' · '));},600);
+
   // Update personal-workout records (best rounds / best reps for same signature)
   try{const beaten=updateWorkoutRecords(entry);if(beaten.length)setTimeout(()=>showErr('🏆 Neuer Rekord: '+beaten.map(b=>b.title+' — '+b.val+' '+b.unit+(b.old?(' (vorher '+b.old+')'):'')).join(' · ')),1300);}catch{}
   // Grow the library with whatever was actually trained
@@ -7797,25 +7812,7 @@ function saveWorkout(){
     if(done.length)setTimeout(()=>showErr('🎉 Challenge geschafft: '+done.map(ch=>ch.title).join(', ')),1000);
   }catch{}
   if(pendingPlanSession){markSessDone(pendingPlanSession.wi,pendingPlanSession.si,true);pendingPlanSession=null;updateHome();setTimeout(fetchCoach,600);show('s-home');if(!entry.stretch)setTimeout(()=>{try{offerCooldown(entry.muscles);}catch(e){}},900);return;}
-  // PR detection
-  const newPRs=[];
-  entry.exercises?.forEach((ex,ei)=>{
-    if(!ex.name)return;
-    const oldH=getExerciseHistory(ex.name).slice(0,-1); // history before this workout
-    const oldPR=oldH.length?Math.max(...oldH.map(e=>e.maxSet),0):0;
-    // Find max reps this workout for this exercise
-    let maxThisWorkout=0;
-    for(let s=1;s<=5;s++){
-      const rk='1_'+ei+'_s'+s;
-      const r=(entry.repLog?.[rk]||0)+(entry.repLog?.[rk+'_L']||0)+(entry.repLog?.[rk+'_R']||0);
-      if(r>maxThisWorkout)maxThisWorkout=r;
-    }
-    if(maxThisWorkout>0&&maxThisWorkout>oldPR)newPRs.push({name:ex.name,reps:maxThisWorkout,old:oldPR});
-  });
   updateHome();setTimeout(fetchCoach,600);
-  if(newPRs.length){
-    setTimeout(()=>{showErr('🏆 Neuer Rekord! '+newPRs.map(p=>p.name+': '+p.reps+' Wdh'+(p.old>0?' (vorher: '+p.old+')':'')).join(' · '));},600);
-  }
   // Offer to save this workout to the portfolio (not if it came from one, not for stretch)
   const _offerSave=!curSetup.fromMyWorkout&&!entry.stretch&&(curExercises||[]).length>=2;
   if(plan?.weeks?.length){showPlanLinkModal(entry);}
@@ -9808,6 +9805,17 @@ function renderLibrary(){
 
 
 // ─── Exercise Progress Tracking ───────────────────────────────────────────────
+// All logged sets of exercise #ei in a workout — every round (circuits, EMOM …)
+// and every set, L+R summed, with the weight of that set. Ordered by round, set.
+function _exSets(w,ei){
+  const rl=(w&&w.repLog)||{};const m={};
+  for(const k in rl){const x=k.match(/^(\d+)_(\d+)(?:_s(\d+))?(_L|_R)?$/);if(!x||+x[2]!==ei)continue;const key=(+x[1])*1000+(+(x[3]||1));(m[key]=m[key]||{r:0,w:0}).r+=(+rl[k]||0);}
+  for(const k in rl){const x=k.match(/^(\d+)_(\d+)_s(\d+)_w$/);if(!x||+x[2]!==ei)continue;const key=(+x[1])*1000+(+x[3]);if(m[key])m[key].w=+rl[k]||0;}
+  return Object.keys(m).map(Number).sort((a,b)=>a-b).map(k=>m[k]).filter(s=>s.r>0);
+}
+// Reps of exercise #ei in a workout, incl. AMRAP round-mode (rounds × reps)
+function _exReps(w,ei){const ss=_exSets(w,ei);let r=ss.reduce((a,s)=>a+s.r,0);if(!r&&w&&w.amrap){const ex=(w.exercises||[])[ei]||{};r=(w.amrapRounds||0)*(ex.reps||0);}return r;}
+function wMin(w){return (w&&(w.actualMin||w.durationMin))||0;}
 function getExerciseHistory(exName){
   const history=[];
   log.forEach(workout=>{
@@ -9815,17 +9823,9 @@ function getExerciseHistory(exName){
     exArr.forEach((ex,ei)=>{
       if((ex.name||'').toLowerCase()!==exName.toLowerCase())return;
       // Collect all sets for this exercise
-      const sets=[];let totalReps=0;
-      for(let s=1;s<=5;s++){
-        const rk='1_'+ei+'_s'+s;
-        const reps=(workout.repLog?.[rk]||0)+(workout.repLog?.[rk+'_L']||0)+(workout.repLog?.[rk+'_R']||0);
-        // Also check old format without set suffix
-        const rkOld='1_'+ei;
-        const repsOld=(workout.repLog?.[rkOld]||0)+(workout.repLog?.[rkOld+'_L']||0)+(workout.repLog?.[rkOld+'_R']||0);
-        if(s===1&&reps===0&&repsOld>0){sets.push(repsOld);totalReps+=repsOld;break;}
-        if(reps>0){sets.push(reps);totalReps+=reps;}
-      }
-      const weights=sets.map((_,si)=>workout.repLog?.['1_'+ei+'_s'+(si+1)+'_w']||0);
+      const ss=_exSets(workout,ei);
+      const sets=ss.map(x=>x.r);const totalReps=sets.reduce((a,b)=>a+b,0);
+      const weights=ss.map(x=>x.w);
       if(totalReps>0||sets.length>0){
         history.push({date:workout.date,sets,weights,totalReps,maxSet:Math.max(...sets,0),rpe:workout.rpe||0});
       }
@@ -10328,7 +10328,7 @@ function calcAchProgress(ach){
     case 'total_reps':return{cur:total_reps,pct:Math.min(100,Math.round(total_reps/ach.target*100))};
     case 'exercise_reps':{
       let exReps=0;
-      log.forEach(w=>{const exArr=w.exercises||[];exArr.forEach((ex,ei)=>{if((ex.name||'').toLowerCase().includes((ach.exercise||'').toLowerCase())){const rk='1_'+ei;exReps+=(w.repLog?.[rk]||0)+(w.repLog?.[rk+'_L']||0)+(w.repLog?.[rk+'_R']||0);}});});
+      log.forEach(w=>{const exArr=w.exercises||[];exArr.forEach((ex,ei)=>{if((ex.name||'').toLowerCase().includes((ach.exercise||'').toLowerCase())){exReps+=_exReps(w,ei);}});});
       return{cur:exReps,pct:Math.min(100,Math.round(exReps/ach.target*100))};
     }
     case 'max_rpe':{const maxRPE=Math.max(0,...log.map(w=>w.rpe||0));return{cur:maxRPE,pct:maxRPE>=ach.target?100:0};}
@@ -10344,7 +10344,7 @@ function calcChallengeProgress(ch){
   const start=ch.startDate,end=ch.endDate;
   const filtered=log.filter(w=>{const d=w.date.slice(0,10);return d>=start&&d<=end;});
   switch(ch.type){
-    case 'reps':{let r=0;filtered.forEach(w=>{const exArr=w.exercises||[];exArr.forEach((ex,ei)=>{if(!ch.exercise||(ex.name||'').toLowerCase().includes(ch.exercise.toLowerCase())){const rk='1_'+ei;r+=(w.repLog?.[rk]||0)+(w.repLog?.[rk+'_L']||0)+(w.repLog?.[rk+'_R']||0);}});});return{cur:r,pct:Math.min(100,Math.round(r/ch.target*100))};}
+    case 'reps':{let r=0;filtered.forEach(w=>{const exArr=w.exercises||[];exArr.forEach((ex,ei)=>{if(!ch.exercise||(ex.name||'').toLowerCase().includes(ch.exercise.toLowerCase())){r+=_exReps(w,ei);}});});return{cur:r,pct:Math.min(100,Math.round(r/ch.target*100))};}
     case 'workouts':return{cur:filtered.length,pct:Math.min(100,Math.round(filtered.length/ch.target*100))};
     case 'total_reps':{const r=filtered.reduce((s,w)=>s+workoutVolume(w),0);return{cur:r,pct:Math.min(100,Math.round(r/ch.target*100))};}
     case 'streak':{
@@ -10357,7 +10357,7 @@ function calcChallengeProgress(ch){
       }
       return{cur:best,pct:Math.min(100,Math.round(best/ch.target*100))};
     }
-    case 'minutes':{let m=0;filtered.forEach(w=>{m+=(w.durationMin||w.setup?.durationMin||0);});return{cur:m,pct:Math.min(100,Math.round(m/ch.target*100))};}
+    case 'minutes':{let m=0;filtered.forEach(w=>{m+=(wMin(w)||w.setup?.durationMin||0);});return{cur:m,pct:Math.min(100,Math.round(m/ch.target*100))};}
     case 'week_streak':{
       // Longest run of consecutive calendar weeks (Mon-Sun) with >=1 workout in the window.
       const weeks=new Set(filtered.map(w=>weekKeyOf(w.date.slice(0,10))));
@@ -10502,7 +10502,7 @@ function renderAnalytics(range){
 
   const totalReps=filtered.reduce((s,w)=>s+workoutVolume(w),0);
   const avgRpe=filtered.length?Math.round(filtered.reduce((s,w)=>s+(w.rpe||0),0)/filtered.length*10)/10:0;
-  const totalMin=filtered.reduce((s,w)=>s+(w.durationMin||0),0);
+  const totalMin=filtered.reduce((s,w)=>s+wMin(w),0);
 
   // Muscle distribution
   const muscleCounts={};filtered.forEach(w=>(w.muscles||[]).forEach(m=>{muscleCounts[m]=(muscleCounts[m]||0)+1;}));
