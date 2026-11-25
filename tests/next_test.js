@@ -23,8 +23,8 @@ ok((await last())==='Runde geschafft. Als Nächstes: Kettlebell Swing, 15 Wieder
 await E(()=>{clearInterval(tIv);show('s-home');});
 // EMOM end of round
 await E(new Function(`curExercises=[{...${L('Kettlebell Swing')},type:'reps',reps:15,sets:1},{...${L('Push-up')},type:'reps',reps:10,sets:1}];wuExercises=[];curSetup={trainingMode:'circuit',format:'emom',emomMin:10,_readyDone:true,durationMin:10};startWorkout();startTimer();`));
-await E(()=>{tIdx=1;tStatus='work';window._emomKey='x';window._emomStart=Date.now()-20000;advance();clearInterval(tIv);});
-ok((await last())==='Pause. Als Nächstes: Kettlebell Swing, 15 Wiederholungen, 12 Kilo','emom wraps to next round: '+await last());
+await E(()=>{tIdx=1;tStatus='work';window._emomKey='x';window._emomStart=Date.now()-20000;repsDone();clearInterval(tIv);});
+ok((await last())==='Geschafft. Als Nächstes: Kettlebell Swing, 15 Wiederholungen, 12 Kilo','emom wraps to next round: '+await last());
 await E(()=>{clearInterval(tIv);show('s-home');});
 // Ladder round rest
 await E(new Function(`curExercises=[{...${L('Kettlebell Clean & Press')},type:'reps',reps:5,sets:1},{...${L('Squat')},type:'reps',reps:5,sets:1}];wuExercises=[];curSetup={trainingMode:'circuit',format:'ladder',ladderKey:'1-5',roundRestSec:30,_readyDone:true,durationMin:10};startWorkout();startTimer();`));

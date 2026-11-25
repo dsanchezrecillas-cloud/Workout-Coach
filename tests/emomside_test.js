@@ -14,14 +14,14 @@ await E(()=>{startWorkout();startTimer();clearInterval(tIv);});await p.waitForTi
 const st=()=>E(()=>({s:tStatus,i:tIdx,side:window._emomSide||1,lbl:_roundLabel(),rounds:curSetup.rounds,min:curSetup.emomMin}));
 let a=await st();console.log(JSON.stringify(a));
 ok(a.rounds===4&&a.min===12&&a.i===0&&/Minute 1\/12 · links/.test(a.lbl),'minute 1 left');
-await E(()=>{advance();clearInterval(tIv);});a=await st();ok(a.s==='rest'&&a.side===1,'rest after left');
+await E(()=>{if(tStatus==='work')repsDone();else advance();clearInterval(tIv);});a=await st();ok(a.s==='rest'&&a.side===1,'rest after left');
 ok(await E(()=>getComputedStyle(document.getElementById('rep-col-R')).display==='none'),'only left counter during rest');
-await E(()=>{advance();clearInterval(tIv);});a=await st();console.log(JSON.stringify(a));
+await E(()=>{if(tStatus==='work')repsDone();else advance();clearInterval(tIv);});a=await st();console.log(JSON.stringify(a));
 ok(a.s==='work'&&a.i===0&&a.side===2&&/Minute 2\/12 · rechts/.test(a.lbl),'minute 2 right, same exercise');
 ok(await E(()=>window.__said.some(t=>/Seitenwechsel, rechte Seite/.test(t))),'voice: side switch');
-await E(()=>{advance();clearInterval(tIv);});await E(()=>{advance();clearInterval(tIv);});a=await st();
+await E(()=>{if(tStatus==='work')repsDone();else advance();clearInterval(tIv);});await E(()=>{if(tStatus==='work')repsDone();else advance();clearInterval(tIv);});a=await st();
 ok(a.s==='work'&&a.i===1&&a.side===1&&/Minute 3\/12$/.test(a.lbl),'minute 3 next exercise');
-await E(()=>{advance();clearInterval(tIv);});await E(()=>{advance();clearInterval(tIv);});a=await st();
+await E(()=>{if(tStatus==='work')repsDone();else advance();clearInterval(tIv);});await E(()=>{if(tStatus==='work')repsDone();else advance();clearInterval(tIv);});a=await st();
 ok(a.i===0&&/Minute 4\/12 · links/.test(a.lbl),'round 2 starts left at minute 4');
 // switch off → both in one minute
 await E(()=>{curSetup={muscles:['legs'],durationMin:20,format:'emom',emomMin:12,emomSides:false,trainingMode:'circuit'};curExercises=[{name:'Kettlebell Clean & Press',type:'reps',reps:10,sets:1,bilateral:true},{name:'Goblet Squat',type:'reps',reps:10,sets:1}];showReview();_syncCircuitType();});

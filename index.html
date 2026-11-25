@@ -3010,8 +3010,8 @@ function _voiceOnStateChange(){
   }else if(tStatus==='rest'||tStatus==='round_rest'){
     window._restLen=tLeft;
     const nx=_nextUp();
-    const head=tStatus==='round_rest'?'Runde geschafft':'Pause';
-    if(tStatus==='rest'&&_emomSideMode(ex)&&(window._emomSide||1)===1){speak('Pause. Gleich rechte Seite.',{interrupt:true});return;}
+    const head=tStatus==='round_rest'?'Runde geschafft':_isEmomMain()?'Geschafft':'Pause';
+    if(tStatus==='rest'&&_emomSideMode(ex)&&(window._emomSide||1)===1){speak('Geschafft. Gleich rechte Seite.',{interrupt:true});return;}
     if(!nx){speak(head+'. Letzte Übung geschafft.',{interrupt:true});return;}
     if(nx.sameEx){speak(head,{interrupt:true});return;}
     if(_fmt()==='tabata'||tLeft<12){speak(head+'. Gleich: '+nx.ex.name,{interrupt:true});return;}
@@ -4580,6 +4580,34 @@ function _exRestSec(ex){
   return ex.rest||20;
 }
 function _emomMark(){if(_fmt()!=='emom'||isWU||tStatus!=='work')return;const key=tRound+'_'+tIdx+'_'+(window._emomSide||1);if(window._emomKey!==key){window._emomKey=key;window._emomStart=Date.now();}}
+// EMOM runs on one continuous minute clock (work + remaining time share it)
+// One-sided or not is decided by the exercise itself, not trusted blindly from the AI
+const _UNI_RX=/einarmig|einbeinig|single.?(arm|leg)|one.?(arm|leg)|ausfallschritt|lunge|split.?squat|bulgarian|seitstütz|side.?plank|pistol|step.?up|aufsteiger|einseitig|windmill|get.?up|suitcase|koffer|einhändig/i;
+const _BI_RX=/liegestütz|push.?up|kniebeuge|squat|klimmz|pull.?up|chin.?up|burpee|\bdips?\b|plank|unterarmstütz|hampelmann|jumping|mountain|crunch|sit.?up|bridge|hüftheben|beckenheben|deadlift|kreuzheben|good.?morning|superman|hollow|thruster|goblet|swing|russian twist|bergsteiger/i;
+function _fixBilateral(e,perSide){
+  if(!e||e.warmup&&!e.bilateral)return e;
+  const n=e.name||'';const was=!!e.bilateral;
+  const uni=_UNI_RX.test(n),bi=!uni&&_BI_RX.test(n);
+  if(uni)e.bilateral=true;else if(bi)e.bilateral=false;
+  // AI gave reps per side (prompt rule) → app stores the total of both sides
+  if(perSide&&was&&e.bilateral&&(e.type||'reps')==='reps'&&e.reps)e.reps=e.reps*2;
+  return e;
+}
+function _tabataDone(){const k=Math.max(1,curExercises.length);return ((tRound-1)*k+tIdx+1)>=(curSetup.tabataInt||8);}
+function _isEmomMain(){return _fmt()==='emom'&&!isWU;}
+function _emomLeft(){return Math.max(0,Math.ceil(((window._emomStart||Date.now())+60000-Date.now())/1000));}
+// Flow modes (circuit and its formats): no waiting for a tap between exercises
+function _flowMode(){return curSetup?.trainingMode==='circuit'&&!curSetup?.stretch&&!window._isStretchSession;}
+// Log the planned reps when a set ends without manual entry (EMOM minute ran out)
+function _autoLogReps(ex){
+  if(isWU||!ex||(ex.type||'reps')!=='reps')return;
+  const rk=tRound+'_'+tIdx+'_s'+tSet;
+  if(ex.bilateral){
+    const per=Math.max(1,Math.round((ex.reps||10)/2));
+    const sides=_emomSideMode(ex)?[(window._emomSide||1)===2?'R':'L']:['L','R'];
+    sides.forEach(sd=>{if(!tReps[rk+'_'+sd])tReps[rk+'_'+sd]=per;});
+  }else if(!tReps[rk])tReps[rk]=ex.reps||10;
+}
 // EMOM: one-sided exercises can get their own minute per side
 function _emomBiMain(){return curExercises.filter(e=>!e.warmup&&e.bilateral&&(e.type||'reps')==='reps');}
 function _emomSidesDefault(){return _emomBiMain().some(e=>/kettlebell|\bkb\b/i.test(e.name||'')||e.equip==='kettlebell'||Math.round((e.reps||0)/2)>=5);}
@@ -4592,7 +4620,7 @@ function _sideSwitchRound(){return !!curSetup.sideRounds&&tRound%2===0;}
 function _roundLabel(){
   const f=_fmt(),k=curExercises.length||1,rounds=curSetup.rounds||1;
   if(f==='emom'){const ex=curExercises[tIdx];return 'Minute '+_emomMinuteNo()+'/'+(curSetup.emomMin||rounds*k)+(_emomSideMode(ex)?' · '+((window._emomSide||1)===2?'rechts':'links'):'');}
-  if(f==='tabata')return 'Intervall '+((tRound-1)*k+tIdx+1)+'/'+(rounds*k);
+  if(f==='tabata')return 'Intervall '+((tRound-1)*k+tIdx+1)+'/'+(curSetup.tabataInt||rounds*k);
   if(f==='complex'&&curSetup.sideRounds)return 'Runde '+Math.ceil(tRound/2)+'/'+Math.round(rounds/2)+' · '+(tRound%2?'Seite 1':'Seite 2')+' · '+(tIdx+1)+'/'+k;
   if(f==='ladder')return 'Stufe '+tRound+'/'+rounds+' · '+((_ladderArr()[tRound-1])||'')+' Wdh';
   return 'Runde '+tRound+'/'+rounds+' · '+(tIdx+1)+'/'+k;
@@ -4662,6 +4690,7 @@ NUR JSON: {"title":"kurzer Titel","format":"rounds","rounds":4,"capMin":0,"emomM
       const e={...base,sets:Math.max(1,parseInt(x.sets)||1),rest:parseInt(x.rest)||0,icon:getExIcon(base.name)};
       if(reps){e.type='reps';e.reps=reps;}else if(dur){e.type='time';e.duration=dur;delete e.reps;}else{e.type='reps';e.reps=10;}
       if(x.bilateral!=null)e.bilateral=!!x.bilateral;
+      _fixBilateral(e,false);
       if(_isKbEx(e)&&kbWeights().length)e.trackWeight=true;
       return e;
     }).filter(e=>e.name);
@@ -5720,6 +5749,7 @@ WANN Supersatz: antagonistische Paare (Drücken+Ziehen, Quads+Hamstrings) — sp
       const wu=exArr.filter(e=>e.warmup);
       exArr=[...wu,...ordered];
     }
+    exArr.forEach(e=>_fixBilateral(e,true));
     curExercises=exArr.filter(e=>!e.warmup);wuExercises=exArr.filter(e=>e.warmup);
     if(!curExercises.length)throw new Error('Keine Hauptübungen');
     curSetup={muscles:[...new Set(curExercises.flatMap(e=>e.muscles||[]))],durationMin:Math.round((wuExercises.length*35+curExercises.length*60)/60)};
@@ -6688,6 +6718,8 @@ function startWorkout(){
   if(_needsReadyCheck()){openReadyCheck();return;}
   unlockVoice();
   try{_applyFormat();_applyRememberedWeights();}catch(e){console.error(e);}
+  // Classic circuit: rounds replace sets — each exercise once per round
+  if(curSetup.trainingMode==='circuit'&&!_isNewFmt()&&!curSetup.capMin){const mx=Math.max(1,...curExercises.filter(e=>!e.warmup).map(e=>e.sets||1));if(!curSetup.rounds)curSetup.rounds=mx;curExercises.forEach(e=>{if(!e.warmup)e.sets=1;});}
   initTimer();
   // AMRAP round-mode: a self-contained flow — run the circuit freely, tap
   // "Runde geschafft" to count a round, the clock runs in real time until the cap.
@@ -7047,13 +7079,16 @@ function updateTimer(){
   let pc=tStatus==='ready'?'var(--am)':isWu&&tStatus==='work'?'#d97706':tStatus==='rest'?'var(--co)':tStatus==='done'?'var(--co)':'var(--ac)';
   const plMap={work:isWu?'AUFWÄRMEN':exType==='hold'?'HALTEN':exType==='reps'?'WIEDERHOLUNGEN':'ARBEIT',rest:'PAUSE',round_rest:'RUNDENPAUSE',ready:'BEREIT',done:'FERTIG',idle:'BEREIT'};
   let pl=plMap[tStatus]!==undefined?plMap[tStatus]:'PAUSE';
+  const _em=_isEmomMain();
+  if(_em&&tStatus==='work'&&exType==='reps'){const per=ex.bilateral?Math.max(1,Math.round((ex.reps||10)/2)):(ex.reps||10);pl=per+(ex.bilateral?' WDH JE SEITE':' WIEDERHOLUNGEN');if(_emomSideMode(ex))pl=per+' WDH · '+((window._emomSide||1)===2?'RECHTS':'LINKS');}
+  if(_em&&tStatus==='rest')pl='NÄCHSTE MINUTE IN';
   // Two-sided holds run per side — say which one
   const twoSided=ex.bilateral&&(ex.type==='hold'||ex.stretch);
   if(twoSided&&tStatus==='work')pl+=(window._holdSide||1)===1?' · SEITE 1':' · SEITE 2';
-  const mt=tStatus==='work'?(ex.duration||40):tStatus==='rest'?(_fmt()==='emom'&&!isWU?60:(ex.rest||20)):_roundRestSec();
+  const mt=_em&&(tStatus==='rest'||exType==='reps')?60:tStatus==='work'?(ex.duration||40):tStatus==='rest'?(ex.rest||20):_roundRestSec();
   const pg=mt>0?((mt-tLeft)/mt)*100:0;
   const arc=document.getElementById('timer-arc');arc.setAttribute('stroke',pc);
-  const isRM=exType==='reps'&&(tStatus==='work'||tStatus==='ready');
+  const isRM=exType==='reps'&&(tStatus==='work'||tStatus==='ready')&&!_em;
   if(isRM){arc.setAttribute('stroke-dashoffset',CIRC);}else{arc.setAttribute('stroke-dashoffset',CIRC-(pg/100)*CIRC);}
   arc.style.filter=`drop-shadow(0 0 9px ${pc}55)`;
   document.getElementById('ph-label').textContent=pl;document.getElementById('ph-label').style.color=pc;
@@ -7143,11 +7178,12 @@ function updateTimer(){
     const icon=document.getElementById('ex-icon');icon.textContent=tStatus==='round_rest'?'⏸':(ex.icon||'○');icon.style.color=pc;icon.style.borderColor=pc+'33';icon.style.background=pc+'14';
     let name='',tip='';
     if(tStatus==='round_rest'){name='Kurz durchatmen';tip=curExercises[0]?'Nächste Runde: '+curExercises[0].name:'';}
-    else{name=ex.name||'—';if(tStatus==='work'){if(exType==='reps')tip=`Ziel: ${ex.reps||10} Wiederholungen`;else if(exType==='hold')tip='Halten — so lange wie möglich';else if(exType==='amrap')tip='So viele Wdh wie möglich';else tip=ex.tip||'';}
+    else{name=ex.name||'—';if(tStatus==='work'){if(exType==='reps')tip=ex.bilateral?`Ziel: ${Math.max(1,Math.round((ex.reps||10)/2))} Wiederholungen je Seite`:`Ziel: ${ex.reps||10} Wiederholungen`;else if(exType==='hold')tip='Halten — so lange wie möglich';else if(exType==='amrap')tip='So viele Wdh wie möglich';else tip=ex.tip||'';}
     else if(tStatus==='rest'){
       const totalSets=ex.sets||1;
       const twoSidedNext=ex.bilateral&&(ex.type==='hold'||ex.stretch);
       if(twoSidedNext&&(window._holdSide||1)===1)tip='Gleich: '+ex.name+' — andere Seite';
+      else if(_emomSideMode(ex)&&(window._emomSide||1)===1)tip='Gleich: '+ex.name+' — rechte Seite';
       else if(tSet<totalSets)tip=`Gleich: ${ex.name} — Satz ${tSet+1} von ${totalSets}`;
       else if(exList[tIdx+1])tip='Nächste: '+exList[tIdx+1].name;
       else if(isWU&&curExercises[0])tip='Gleich geht\u2019s los: '+curExercises[0].name;
@@ -7208,6 +7244,7 @@ function updateTimer(){
   const isActive=tStatus==='work'||tStatus==='rest'||tStatus==='round_rest';
   // Reps-done button: only during work phase of reps mode
   rd.style.display=(tStatus==='work'||tStatus==='ready')&&isRepsMode?'block':'none';
+  rd.textContent=_em?'✓ Geschafft':'✓ Satz fertig';
   // Skip: during work phase, hidden in reps mode (use Satz fertig instead), hidden in done
   const liveAdd=document.getElementById('add-ex-live');
   if(liveAdd)liveAdd.style.display=(tStatus!=='done'&&!isWU)?'block':'none';
@@ -7227,7 +7264,7 @@ function updateTimer(){
   const btn=document.getElementById('main-btn');
   if(tStatus==='done'){btn.textContent='Bewerten →';btn.className='btn btn-co';btn.style.flex='1';btn.style.border='none';btn.onclick=()=>initRating();}
   else if(tStatus==='ready'){btn.textContent='▶ Weiter';btn.className='btn btn-ac';btn.style.flex='1';btn.style.border='none';btn.style.color='#fff';btn.onclick=()=>continueTimer();}
-  else if(tStatus==='work'&&exType==='reps'){btn.textContent='⏸ Angehalten';btn.className='btn btn-ol';btn.style.flex='1';btn.style.borderColor='var(--br)';btn.style.color='var(--mu)';btn.onclick=()=>{};}
+  else if(tStatus==='work'&&exType==='reps'&&!_em){btn.textContent='⏸ Angehalten';btn.className='btn btn-ol';btn.style.flex='1';btn.style.borderColor='var(--br)';btn.style.color='var(--mu)';btn.onclick=()=>{};}
   else if(!tRun){btn.textContent=tStatus==='idle'?'Start':'▶ Weiter';btn.className='btn btn-ac';btn.style.flex='1';btn.style.border='none';btn.style.color='#fff';btn.onclick=()=>startTimer();}
   else{btn.textContent='⏸ Pause';btn.className='btn btn-ol';btn.style.flex='1';btn.style.borderColor=pc;btn.style.color=pc;btn.onclick=()=>pauseTimer();}
   try{persistActive();}catch(e){}
@@ -7238,6 +7275,7 @@ function updateTimer(){
 // is on) the set after a rest wait for a tap instead of rolling on by themselves.
 function _beginPhase(){
   try{_emomMark();}catch(e){}
+  if(_isEmomMain()&&tStatus==='work'){const ex=curExercises[tIdx]||{};tLeft=(ex.type||'reps')==='reps'?_emomLeft():Math.min(ex.duration||40,_emomLeft());}
   const timed=isTimedPhase();
   if(!timed){
     // Reps have no countdown — make sure no stale interval keeps ticking the clock
@@ -7247,7 +7285,11 @@ function _beginPhase(){
   if((!autoAdvanceOn()||_circuitNoExPause())&&tStatus==='work'){
     // Ready state: countdown is armed but paused until the user says go
     if(tIv){clearInterval(tIv);tIv=null;}
-    tStatus='ready';tRun=false;updateTimer();renderExList();return;
+    tStatus='ready';tRun=false;updateTimer();renderExList();
+    // Circuits keep flowing: timed exercises start by themselves after 3 s
+    if(_flowMode()&&!isWU){const sig=tRound+'_'+tIdx+'_'+tSet;clearTimeout(window._autoGoT);window._autoGoSig=sig;
+      window._autoGoT=setTimeout(()=>{if(tStatus==='ready'&&window._autoGoSig===tRound+'_'+tIdx+'_'+tSet)continueTimer();},3000);}
+    return;
   }
   _startTick();updateTimer();renderExList();
 }
@@ -7269,6 +7311,7 @@ function resumeAfterModal(){
 function isTimedPhase(){
   if(tStatus==='rest'||tStatus==='round_rest')return true;
   if(tStatus!=='work')return false;
+  if(_isEmomMain())return true;
   const exList=isWU?wuExercises:curExercises;
   const t=(exList[tIdx]||{}).type||'time';
   return t!=='reps';
@@ -7343,14 +7386,17 @@ function continueTimer(){
 function startTimer(){
   if(tStatus==='ready'){continueTimer();return;}
   if(tStatus==='idle'){tStatus='work';const f=isWU?wuExercises[0]:curExercises[0];tLeft=f?.duration||40;tRound=1;tIdx=0;window._emomKey=null;}
+  if(_isEmomMain()&&window._emomPausedLeft!=null){window._emomStart=Date.now()-(60-window._emomPausedLeft)*1000;window._emomPausedLeft=null;}
   try{_emomMark();}catch(e){}
+  if(_isEmomMain()&&tStatus==='work'){const ex=curExercises[tIdx]||{};tLeft=(ex.type||'reps')==='reps'?_emomLeft():Math.min(tLeft||ex.duration||40,_emomLeft());}
   reqWL();
   if(isTimedPhase()){_startTick();updateTimer();}
   else{tRun=false;updateTimer();}   // reps: wait for "Satz fertig"
 }
-function pauseTimer(){tRun=false;if(tIv){clearInterval(tIv);tIv=null;}updateTimer();}
+function pauseTimer(){if(_isEmomMain()&&(tStatus==='work'||tStatus==='rest'))window._emomPausedLeft=_emomLeft();clearTimeout(window._autoGoT);tRun=false;if(tIv){clearInterval(tIv);tIv=null;}updateTimer();}
 let _tickTs=0;
 function tick(){_tickTs=Date.now();
+  if(_isEmomMain()&&(tStatus==='rest'||(tStatus==='work'&&((curExercises[tIdx]||{}).type||'reps')==='reps')))tLeft=_emomLeft()+1;
   if(tLeft<=4&&tLeft>1){if(voiceOn())speak(['','eins','zwei','drei'][tLeft-1]||'');else beep(660,.08);}
   if(tLeft===11&&tStatus==='work'&&((exListCur()[tIdx]||{}).duration||0)>=30)speak('Noch 10 Sekunden');
   if(tLeft===6&&(tStatus==='rest'||tStatus==='round_rest')&&(window._restLen||0)>=20&&voiceOn()){const nx=_nextUp();if(nx&&!nx.sameEx)speak('Noch 5 Sekunden, gleich '+nx.ex.name);}
@@ -7387,6 +7433,8 @@ function advance(){const exList=isWU?wuExercises:curExercises,ex=exList[tIdx]||{
       return;
     }
     window._holdSide=1;
+    if(_isEmomMain()&&(ex.type||'reps')==='reps'){_autoLogReps(ex);tStatus='rest';tLeft=1;advance();return;}
+    if(!isWU&&_fmt()==='tabata'&&_tabataDone()){tStatus='done';beep(1100,.5);updateTimer();return;}
     maybeShowExRpe();
     // Circuit without between-exercise pause: skip the rest countdown, move on
     // (the next exercise will wait on a "Weiter" confirm via _beginPhase).
@@ -7500,6 +7548,7 @@ function repsDone(){
   // Circuit without between-exercise pause: no rest countdown — go straight on.
   // The tap on "Satz fertig" IS the confirmation to continue.
   if(!isWU&&_circuitNoExPause()){tStatus='rest';tLeft=1;advance();return;}
+  if(_isEmomMain()){_autoLogReps(ex);tStatus='rest';tLeft=_emomLeft();beep(660,.15);if(tLeft<=1){advance();return;}_startTick();updateTimer();renderExList();return;}
   tStatus='rest';tLeft=ex.rest||20;beep(660,.15);
   _startTick();updateTimer();renderExList();
 }

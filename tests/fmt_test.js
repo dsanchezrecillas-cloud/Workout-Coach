@@ -27,7 +27,7 @@ await E(()=>{clearInterval(tIv);show('s-home');});
 // EMOM
 await E(new Function(`curExercises=[{...${lib('Kettlebell Swing')},type:'reps',reps:15,sets:3},{...${lib('Push-up')},type:'reps',reps:10,sets:3}];wuExercises=[];curSetup={trainingMode:'circuit',format:'emom',emomMin:12,_readyDone:true,durationMin:12};startWorkout();startTimer();`));
 ok(await E(()=>curSetup.rounds===6&&_roundLabel()==='Minute 1/12'&&_fmtVoicePrefix()==='Minute 1. '),'emom setup + label + voice');
-await E(()=>{window._emomStart=Date.now()-25000;advance();clearInterval(tIv);});
+await E(()=>{window._emomStart=Date.now()-25000;repsDone();clearInterval(tIv);});
 ok(await E(()=>tStatus==='rest'&&tLeft>=34&&tLeft<=36),'emom rest = rest of minute');
 await E(()=>{clearInterval(tIv);show('s-home');});
 // Complex
